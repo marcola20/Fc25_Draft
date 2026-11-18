@@ -31,4 +31,23 @@ public static class AcessoPorToken
     /// <summary>Se o token dá acesso a este clube (treinador ou auxiliar, tanto faz).</summary>
     public static async Task<bool> TokenComandaAsync(this DraftDbContext db, string? token, Guid timeId, CancellationToken ct = default)
         => await db.TimeIdPorTokenAsync(token, ct) == timeId;
+
+    /// <summary>
+    /// O administrador ativo por trás do token: o próprio token de admin ou o token de treinador
+    /// da pessoa ligada a ele. Assim quem é admin e treinador entra com um token só.
+    /// </summary>
+    public static async Task<AdminToken?> AdminPorTokenAsync(this DraftDbContext db, string? token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+
+        var limpo = token.Trim();
+        var maiusculo = limpo.ToUpperInvariant();
+
+        return await db.AdminTokens.AsNoTracking()
+            .Where(a => a.IsActive
+                && (a.Token == limpo
+                    || (a.Treinador != null && a.Treinador.Ativo && a.Treinador.Token.ToUpper() == maiusculo)))
+            .OrderByDescending(a => a.Token == limpo)
+            .FirstOrDefaultAsync(ct);
+    }
 }

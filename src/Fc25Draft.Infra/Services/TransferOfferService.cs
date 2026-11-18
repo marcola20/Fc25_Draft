@@ -399,8 +399,7 @@ public class TransferOfferService : ITransferOfferService
 
     public async Task CancelarPeloAdminAsync(Guid offerId, string adminToken, string? motivo, CancellationToken ct)
     {
-        var admin = await _db.AdminTokens.AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Token == adminToken && a.IsActive, ct)
+        var admin = await _db.AdminPorTokenAsync(adminToken, ct)
             ?? throw new UnauthorizedAccessException("Token de administrador inválido.");
 
         var offer = await _db.TransferOffers

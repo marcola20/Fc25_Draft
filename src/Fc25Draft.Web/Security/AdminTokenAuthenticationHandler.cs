@@ -49,12 +49,11 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
         if (string.IsNullOrWhiteSpace(providedToken))
             return AuthenticateResult.Fail("Token inválido.");
 
-        // Check AdminTokens first (dedicated admin tokens without team requirement)
-        var adminToken = await _db.AdminTokens
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == providedToken && t.IsActive, Context.RequestAborted);
+        // O admin vem pelo token de admin ou pelo token de treinador da pessoa ligada a ele.
+        var adminToken = await _db.AdminPorTokenAsync(providedToken, Context.RequestAborted);
 
-        if (adminToken is not null)
+        // Token de admin em si: entra só como admin, sem clube.
+        if (adminToken is not null && adminToken.Token == providedToken)
         {
             var claims = new List<Claim>
             {
@@ -106,11 +105,14 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
             if (semClube is null)
                 return AuthenticateResult.Fail("Token inválido.");
 
-            var visitante = new ClaimsIdentity(new List<Claim>
+            var visitanteClaims = new List<Claim>
             {
                 new(ClaimTypes.Name, semClube.Nome),
                 new("TreinadorId", semClube.TreinadorId.ToString()),
-            }, Scheme.Name);
+            };
+            AdicionarPapelDeAdmin(visitanteClaims, adminToken);
+
+            var visitante = new ClaimsIdentity(visitanteClaims, Scheme.Name);
 
             return AuthenticateResult.Success(
                 new AuthenticationTicket(new ClaimsPrincipal(visitante), Scheme.Name));
@@ -132,14 +134,25 @@ public class AdminTokenAuthenticationHandler : AuthenticationHandler<Authenticat
             new("Papel", acesso.Papel.ToString()),
         };
 
-        if (team.IsAdmin)
+        if (team.IsAdmin && adminToken is null)
             teamClaims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        AdicionarPapelDeAdmin(teamClaims, adminToken);
 
         var teamIdentity = new ClaimsIdentity(teamClaims, Scheme.Name);
         var teamPrincipal = new ClaimsPrincipal(teamIdentity);
         var teamTicket = new AuthenticationTicket(teamPrincipal, Scheme.Name);
 
         return AuthenticateResult.Success(teamTicket);
+    }
+
+    /// <summary>Treinador que também é administrador: mesmo token, mais o papel de admin.</summary>
+    private static void AdicionarPapelDeAdmin(List<Claim> claims, Fc25Draft.Core.Entities.AdminToken? admin)
+    {
+        if (admin is null) return;
+
+        claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        if (admin.IsPrincipal)
+            claims.Add(new Claim(ClaimTypes.Role, "AdminPrincipal"));
     }
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)

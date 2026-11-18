@@ -1345,10 +1345,7 @@ public partial class AlbumService : IAlbumService
         var limpo = adminToken?.Trim();
         var adminId = string.IsNullOrEmpty(limpo)
             ? null
-            : await _db.AdminTokens.AsNoTracking()
-                .Where(t => t.Token == limpo)
-                .Select(t => (Guid?)t.AdminTokenId)
-                .FirstOrDefaultAsync(ct);
+            : (await _db.AdminPorTokenAsync(limpo, ct))?.AdminTokenId;
 
         _db.AdminActionsLogs.Add(new AdminActionsLog
         {

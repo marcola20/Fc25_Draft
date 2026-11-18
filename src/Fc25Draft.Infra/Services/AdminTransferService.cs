@@ -654,10 +654,7 @@ public partial class AdminTransferService
         var normalized = adminToken.Trim();
 
         // Tokens dedicados de administrador (mesma regra do AdminTokenAuthenticationHandler).
-        var dedicated = await _dbContext.AdminTokens
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Token == normalized && t.IsActive, ct)
-            .ConfigureAwait(false);
+        var dedicated = await _dbContext.AdminPorTokenAsync(normalized, ct).ConfigureAwait(false);
 
         if (dedicated is not null)
             return dedicated.AdminTokenId;

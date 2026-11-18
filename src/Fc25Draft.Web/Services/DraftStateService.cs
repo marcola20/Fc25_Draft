@@ -416,9 +416,7 @@ public class DraftStateService
             if (!isTeamToken)
             {
                 var timeDoToken = await _db.TimeIdPorTokenAsync(normalizedToken, ct);
-                var isAdmin = await _db.AdminTokens
-                    .AsNoTracking()
-                    .AnyAsync(t => t.Token == normalizedToken && t.IsActive, ct)
+                var isAdmin = await _db.AdminPorTokenAsync(normalizedToken, ct) is not null
                     || await _db.Teams
                         .AsNoTracking()
                         .AnyAsync(t => t.TeamId == timeDoToken && t.IsAdmin, ct);

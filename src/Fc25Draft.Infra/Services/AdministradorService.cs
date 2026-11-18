@@ -26,9 +26,7 @@ public class AdministradorService : IAdministradorService
     {
         if (string.IsNullOrWhiteSpace(token)) return false;
 
-        var limpo = token.Trim();
-        return await _db.AdminTokens.AsNoTracking()
-            .AnyAsync(t => t.IsPrincipal && t.IsActive && t.Token == limpo, ct);
+        return (await _db.AdminPorTokenAsync(token, ct))?.IsPrincipal == true;
     }
 
     public async Task<IReadOnlyList<AdministradorDto>> ListAsync(string tokenDoPrincipal, CancellationToken ct)
