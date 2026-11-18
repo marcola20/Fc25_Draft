@@ -14,6 +14,8 @@ namespace Fc25Draft.Infra.Services;
 /// </summary>
 public class AposentadoriaService : IAposentadoriaService
 {
+    private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
 
@@ -139,11 +141,33 @@ public class AposentadoriaService : IAposentadoriaService
                 .ToListAsync(ct);
             var ids = jogadores.Select(p => p.PlayerId).ToList();
             var vinculos = await _db.TeamRosters.Where(r => ids.Contains(r.PlayerId)).ToListAsync(ct);
+            var emprestimos = await _db.Emprestimos
+                .Where(e => ids.Contains(e.PlayerId) && e.Status == EmprestimoStatus.Ativo)
+                .ToListAsync(ct);
             var agora = _time.GetUtcNow().UtcDateTime;
+
+            // O clube recebe o que a venda rápida daria (mesmo preço, mesmos 80%). Emprestado: quem recebe é o dono.
+            var precos = new PricingService(_db, new ParticipacaoService(_db, _time));
+            var timesQueRecebem = vinculos.Select(r => r.TeamId).Concat(emprestimos.Select(e => e.DonoTeamId)).Distinct().ToList();
+            var times = await _db.Teams.Where(t => timesQueRecebem.Contains(t.TeamId)).ToDictionaryAsync(t => t.TeamId, ct);
 
             foreach (var p in jogadores)
             {
                 var vinculo = vinculos.FirstOrDefault(r => r.PlayerId == p.PlayerId);
+                var quemRecebe = emprestimos.FirstOrDefault(e => e.PlayerId == p.PlayerId)?.DonoTeamId ?? vinculo?.TeamId;
+                decimal? pagamento = null;
+                if (quemRecebe is Guid recebedor && times.TryGetValue(recebedor, out var clube))
+                {
+                    var preco = (await precos.CalculateForPlayerAsync(p.PlayerId, ct)).BasePrice;
+                    if (preco > 0m)
+                    {
+                        pagamento = QuickSellOverallCalculator.Pagamento(preco);
+                        clube.Budget = decimal.Round(clube.Budget + pagamento.Value, 2, MidpointRounding.AwayFromZero);
+                        ExtratoCaixa.Lancar(_db, clube.TeamId, pagamento.Value, ExtratoCaixa.Aposentadoria,
+                            $"Aposentadoria de {p.Name}", agora);
+                    }
+                }
+
                 p.TimeAoSeAposentar = vinculo?.TeamId ?? p.CurrentTeamId;
                 p.AposentadoNaTemporada = p.UltimaTemporada;
                 p.AposentadoEm = agora;
@@ -153,9 +177,16 @@ public class AposentadoriaService : IAposentadoriaService
                 foreach (var r in vinculos.Where(r => r.PlayerId == p.PlayerId))
                     _db.TeamRosters.Remove(r);
 
+                var valorTexto = pagamento is decimal v ? v.ToString("C", Br) : null;
                 if (p.TimeAoSeAposentar is Guid time)
                     AvisosDoTime.Criar(_db, time, AvisosDoTime.Carreira,
-                        $"🎖️ {p.Name} pendurou as chuteiras e saiu do elenco.", $"/players/details/{p.PlayerId}", agora);
+                        $"🎖️ {p.Name} pendurou as chuteiras e saiu do elenco." +
+                        (valorTexto is not null && quemRecebe == time ? $" O clube recebeu {valorTexto}." : ""),
+                        $"/players/details/{p.PlayerId}", agora);
+                if (valorTexto is not null && quemRecebe is Guid dono && dono != p.TimeAoSeAposentar)
+                    AvisosDoTime.Criar(_db, dono, AvisosDoTime.Carreira,
+                        $"🎖️ {p.Name}, emprestado, pendurou as chuteiras. O clube recebeu {valorTexto}.",
+                        $"/players/details/{p.PlayerId}", agora);
 
                 _db.TransferHistories.Add(new TransferHistory
                 {
@@ -164,7 +195,9 @@ public class AposentadoriaService : IAposentadoriaService
                     PlayerId = p.PlayerId,
                     FromTeamId = p.TimeAoSeAposentar,
                     ToTeamId = null,
-                    Notes = $"{p.Name} se aposentou depois da temporada {p.AposentadoNaTemporada}.",
+                    Amount = pagamento,
+                    Notes = $"{p.Name} se aposentou depois da temporada {p.AposentadoNaTemporada}." +
+                            (valorTexto is not null ? $" O clube recebeu {valorTexto} (valor da venda rápida)." : ""),
                     PerformedBy = "Aposentadoria",
                     PerformedAtUtc = agora,
                     OldOverall = p.Overall,
@@ -204,6 +237,24 @@ public class AposentadoriaService : IAposentadoriaService
                 .Where(t => t.PlayerId == p.PlayerId && t.Type == TransferType.Aposentadoria)
                 .ToListAsync(ct);
             _db.TransferHistories.RemoveRange(historico);
+
+            // Devolve o que o clube recebeu na aposentadoria (o lançamento é do mesmo instante).
+            if (p.AposentadoEm is DateTime quando)
+            {
+                var descricao = $"Aposentadoria de {p.Name}";
+                var pagos = await _db.BudgetLedgers
+                    .Where(l => l.Origem == ExtratoCaixa.Aposentadoria && l.Tipo == "CREDIT" && l.Descricao == descricao && l.DataUtc == quando)
+                    .ToListAsync(ct);
+                var agora = _time.GetUtcNow().UtcDateTime;
+                foreach (var pago in pagos)
+                {
+                    var clube = await _db.Teams.FirstOrDefaultAsync(t => t.TeamId == pago.TeamId, ct);
+                    if (clube is null) continue;
+                    clube.Budget = decimal.Round(clube.Budget - pago.Valor, 2, MidpointRounding.AwayFromZero);
+                    ExtratoCaixa.Lancar(_db, clube.TeamId, -pago.Valor, ExtratoCaixa.Aposentadoria,
+                        $"{p.Name} voltou da aposentadoria (devolução)", agora);
+                }
+            }
 
             p.AposentadoNaTemporada = null;
             p.AposentadoEm = null;

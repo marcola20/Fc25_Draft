@@ -122,6 +122,8 @@ Na prévia de 2010 (30/10/2026), +3 vira +1 ou +2 de overall e −2/−3 vira �
 - **Durante a temporada**: selo "Última temporada" na ficha, no elenco e na figurinha; notícia de despedida.
 - **Na virada seguinte**: sai do elenco e fica marcado como aposentado, **continuando no histórico** (carreira, recordes,
   Hall da Fama, álbum). Se o clube cair abaixo do mínimo de elenco vale a regra que já existe (aviso e só contrata).
+- **O clube recebe** o valor da venda rápida (80% do preço base, com a participação) no caixa, extrato
+  `APOSENTADORIA`. Emprestado: recebe o dono. Desfazer a aposentadoria devolve o valor. Decidido em 18/11/2026.
 - **Editor PES**: tira os aposentados dos elencos dos clubes no save.
 
 ### 8. A virada da temporada

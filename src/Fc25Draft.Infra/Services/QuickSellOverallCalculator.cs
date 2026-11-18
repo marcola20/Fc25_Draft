@@ -4,6 +4,12 @@ namespace Fc25Draft.Infra.Services;
 
 internal static class QuickSellOverallCalculator
 {
+    /// <summary>A venda rápida paga 80% do preço base. A aposentadoria paga o mesmo ao clube.</summary>
+    public const decimal FatorDoPagamento = 0.8m;
+
+    public static decimal Pagamento(decimal precoBase) =>
+        decimal.Round(precoBase * FatorDoPagamento, 2, MidpointRounding.AwayFromZero);
+
     public static int CalculateNewOverall(int currentOverall)
         => CalculateNewOverall(currentOverall, RandomInclusive);
 

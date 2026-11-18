@@ -123,7 +123,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                 if (basePrice <= 0m)
                     throw new QuickSellException("Preço base inválido para o jogador.", StatusCodes.Status400BadRequest);
 
-                var payout = decimal.Round(basePrice * 0.8m, 2, MidpointRounding.AwayFromZero);
+                var payout = QuickSellOverallCalculator.Pagamento(basePrice);
                 int oldOverall, newOverall;
                 string? evolucao = null;
                 if (player.Atributos is not null

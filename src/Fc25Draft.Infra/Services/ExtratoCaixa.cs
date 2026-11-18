@@ -22,6 +22,7 @@ internal static class ExtratoCaixa
     public const string TrocaAdmin = "TROCA_ADMIN";
     public const string Bolao = "BOLAO";
     public const string Comissao = "COMISSAO";
+    public const string Aposentadoria = "APOSENTADORIA";
 
     /// <summary><paramref name="valor"/> com sinal: positivo entrou no caixa, negativo saiu.</summary>
     public static void Lancar(DraftDbContext db, Guid teamId, decimal valor, string origem, string descricao, DateTime quando)

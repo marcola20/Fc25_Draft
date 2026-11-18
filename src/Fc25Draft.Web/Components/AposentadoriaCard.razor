@@ -248,7 +248,7 @@
 
     private async Task AposentarAsync()
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Aposentar {_painel!.ParaAposentar.Count} jogador(es)? Eles saem dos elencos agora."))
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Aposentar {_painel!.ParaAposentar.Count} jogador(es)? Eles saem dos elencos agora e cada clube recebe o valor da venda rápida."))
             return;
         await Executar(async () =>
         {
@@ -259,7 +259,7 @@
 
     private async Task DesaposentarAsync(AposentadoriaJogadorDto j)
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Desfazer a aposentadoria de {j.Nome}? Ele volta ao clube em que estava (se der)."))
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Desfazer a aposentadoria de {j.Nome}? Ele volta ao clube em que estava (se der) e o clube devolve o que recebeu."))
             return;
         await Executar(async () =>
         {
