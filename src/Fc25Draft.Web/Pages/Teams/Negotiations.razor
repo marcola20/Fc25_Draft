@@ -327,7 +327,7 @@
                             Escolha os do adversário para pegar emprestado, os seus para emprestar, ou dos dois lados para uma
                             <strong>troca por empréstimo</strong> (na virada cada um volta para o seu time).
                             O valor em dinheiro é a taxa do empréstimo. Conta no limite de empréstimos, não no de transferências:
-                            1 para quem recebe no empréstimo de um lado só; na troca por empréstimo, cada time conta os jogadores que recebe.
+                            cada time conta os jogadores que recebe (3 emprestados = 3 do limite).
                         </div>
                     }
 
@@ -672,7 +672,7 @@
                     {
                         <p class="mb-0">
                             É um <strong>empréstimo até o fim da temporada</strong>@(_acceptConfirmOffer.BuyOptionPrice is decimal opcaoAceite ? $", com opção de compra por {FormatCurrency(opcaoAceite)}" : "").
-                            Conta no limite de empréstimos de quem recebe o jogador, não no de transferências.
+                            Conta no limite de empréstimos de quem recebe, um por jogador, não no de transferências.
                         </p>
                     }
                     else

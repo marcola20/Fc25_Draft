@@ -1090,7 +1090,7 @@ public class TransferOfferService : ITransferOfferService
     }
 
     /// <summary>
-    /// Registra o empréstimo de cada jogador que mudou de time e conta no limite de quem recebeu.
+    /// Registra o empréstimo de cada jogador que mudou de time e conta no limite de quem recebeu, um por jogador.
     /// Na troca por empréstimo os dois lados recebem, e cada um conta os jogadores que recebeu.
     /// Chegando no limite, as outras propostas de empréstimo em que o time receberia jogador caem.
     /// </summary>
@@ -1142,14 +1142,15 @@ public class TransferOfferService : ITransferOfferService
     }
 
     /// <summary>
-    /// Quem recebe jogador no empréstimo e quanto isso conta no limite. Empréstimo de um lado só conta 1
-    /// para quem recebe; troca por empréstimo conta, para cada time, os jogadores que ele recebe.
+    /// Quem recebe jogador no empréstimo e quanto isso conta no limite: cada time conta os jogadores que
+    /// recebe, seja empréstimo de um lado só ou troca por empréstimo.
     /// </summary>
     private static List<(Team Tomador, int Conta)> TomadoresDoEmprestimo(Team fromTeam, Team toTeam, int pedidos, int oferecidos)
     {
-        if (pedidos > 0 && oferecidos > 0)
-            return [(fromTeam, pedidos), (toTeam, oferecidos)];
-        return pedidos > 0 ? [(fromTeam, 1)] : [(toTeam, 1)];
+        var tomadores = new List<(Team, int)>();
+        if (pedidos > 0) tomadores.Add((fromTeam, pedidos));
+        if (oferecidos > 0) tomadores.Add((toTeam, oferecidos));
+        return tomadores;
     }
 
     private static void EnsureMercadoAberto(TransferConfig cfg)
