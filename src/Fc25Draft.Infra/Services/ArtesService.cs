@@ -13,6 +13,11 @@ public class ArtesService : IArtesService
     /// <summary>Um pedido entregue tantas vezes sem resposta do agente vira "falhou" (o admin manda refazer).</summary>
     private const int MaximoDeEntregas = 3;
 
+    // Draft: até a 3ª escolha, uma arte cada; da 4ª à 8ª, uma arte com as cinco.
+    private const int UltimaIndividual = 3;
+    private const int PrimeiraDoGrupo = 4;
+    private const int UltimaDoGrupo = 8;
+
     private static readonly TransferType[] TiposDeContratacao =
         [TransferType.MarketAuction, TransferType.TeamSale, TransferType.TeamTrade, TransferType.Loan, TransferType.LoanPurchase];
 
@@ -49,9 +54,12 @@ public class ArtesService : IArtesService
                 continue;
             }
 
-            var dto = pedido.Tipo == TipoPedidoArte.Premio
-                ? await MontarPremioAsync(pedido, ct)
-                : await MontarContratacaoAsync(pedido, ct);
+            var dto = pedido.Tipo switch
+            {
+                TipoPedidoArte.Premio => await MontarPremioAsync(pedido, ct),
+                TipoPedidoArte.Contratacao => await MontarContratacaoAsync(pedido, ct),
+                _ => await MontarDraftAsync(pedido, ct)
+            };
             if (dto is null)
             {
                 pedido.Situacao = SituacaoPedidoArte.Descartado;
@@ -139,6 +147,32 @@ public class ArtesService : IArtesService
             novos.Add(Novo(TipoPedidoArte.Contratacao, chave, t.TransferId, $"{t.Jogador} {seta} {t.Para}{valor} · over {t.Over}"));
         }
 
+        // Draft: as 3 primeiras escolhas, uma arte cada, e as escolhas 4 a 8 juntas quando a 8ª sai.
+        var escolhas = await _db.DraftPicks.AsNoTracking()
+            .Where(p => p.PlayerId != null && p.PickedAtUtc >= desde && p.OverallPick <= UltimaDoGrupo)
+            .Select(p => new { p.DraftId, p.OverallPick, Jogador = p.Player!.Name, Clube = p.Team.TeamName, NomeDraft = p.Draft.Name })
+            .ToListAsync(ct);
+        var draftIds = escolhas.Select(e => e.DraftId).Distinct().ToList();
+        var faixas = await _db.DraftPicks.AsNoTracking()
+            .Where(p => draftIds.Contains(p.DraftId) && p.OverallPick >= PrimeiraDoGrupo && p.OverallPick <= UltimaDoGrupo)
+            .GroupBy(p => p.DraftId)
+            .Select(g => new { DraftId = g.Key, Total = g.Count(), Feitas = g.Count(p => p.PlayerId != null) })
+            .ToListAsync(ct);
+        foreach (var e in escolhas.Where(e => e.OverallPick <= UltimaIndividual).OrderBy(e => e.OverallPick))
+        {
+            var chave = $"draft:{e.DraftId}:{e.OverallPick}";
+            if (chaves.Contains(chave)) continue;
+            novos.Add(Novo(TipoPedidoArte.DraftEscolha, chave, e.DraftId,
+                $"{e.NomeDraft} · {e.OverallPick}ª escolha · {e.Jogador} ({e.Clube})"));
+        }
+        foreach (var f in faixas.Where(f => f.Total > 0 && f.Feitas == f.Total))
+        {
+            var chave = $"draft:{f.DraftId}:{PrimeiraDoGrupo}-{UltimaDoGrupo}";
+            if (chaves.Contains(chave)) continue;
+            var nome = escolhas.First(e => e.DraftId == f.DraftId).NomeDraft;
+            novos.Add(Novo(TipoPedidoArte.DraftGrupo, chave, f.DraftId, $"{nome} · escolhas {PrimeiraDoGrupo} a {UltimaDoGrupo}"));
+        }
+
         if (novos.Count == 0) return 0;
         _db.PedidosArte.AddRange(novos);
         await _db.SaveChangesAsync(ct);
@@ -218,6 +252,53 @@ public class ArtesService : IArtesService
             Emprestimo: t.Type == TransferType.Loan, t.Nome, t.Para, t.De,
             t.Amount is decimal a && a > 0 ? a : null, numero, t.Over, t.Posicao, foto);
         return new PedidoArteDto(pedido.PedidoArteId, "contratacao", pedido.Titulo, null, contratacao);
+    }
+
+    private async Task<PedidoArteDto?> MontarDraftAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        // a chave diz qual: "draft:{DraftId}:2" ou "draft:{DraftId}:4-8"
+        var faixa = pedido.Chave.Split(':').Last().Split('-');
+        if (!int.TryParse(faixa[0], out var de)) return null;
+        var ate = faixa.Length > 1 && int.TryParse(faixa[1], out var a) ? a : de;
+
+        var draft = await _db.Drafts.AsNoTracking()
+            .Where(d => d.DraftId == pedido.ReferenciaId)
+            .Select(d => new { d.Name, d.Temporada })
+            .FirstOrDefaultAsync(ct);
+        if (draft is null) return null;
+
+        var picks = await _db.DraftPicks.AsNoTracking()
+            .Where(p => p.DraftId == pedido.ReferenciaId && p.OverallPick >= de && p.OverallPick <= ate && p.PlayerId != null)
+            .OrderBy(p => p.OverallPick)
+            .Select(p => new
+            {
+                p.OverallPick,
+                p.RoundNumber,
+                p.TeamId,
+                PlayerId = p.PlayerId!.Value,
+                Nome = p.Player!.Name,
+                Over = p.Player.Overall,
+                Posicao = p.Player.Position.Name,
+                Idade = p.Player.Age,
+                Clube = p.Team.TeamName
+            })
+            .ToListAsync(ct);
+        if (picks.Count == 0) return null;
+
+        var jogadores = picks.Select(p => p.PlayerId).ToList();
+        var comFoto = (await _db.FotosJogadores.AsNoTracking()
+            .Where(f => jogadores.Contains(f.PlayerId))
+            .Select(f => f.PlayerId).ToListAsync(ct)).ToHashSet();
+        var lista = new List<EscolhaDraftArteDto>();
+        foreach (var p in picks)
+        {
+            lista.Add(new EscolhaDraftArteDto(p.OverallPick, p.RoundNumber, p.Nome, p.Clube, p.Over, p.Posicao, p.Idade,
+                await NumeroAsync(p.PlayerId, p.TeamId, ct), comFoto.Contains(p.PlayerId) ? $"/fotos/jogadores/{p.PlayerId}" : null));
+        }
+
+        var tipo = pedido.Tipo == TipoPedidoArte.DraftGrupo ? "draft-grupo" : "draft";
+        return new PedidoArteDto(pedido.PedidoArteId, tipo, pedido.Titulo, null, null,
+            new DraftArteDto(draft.Name, draft.Temporada, lista));
     }
 
     /// <summary>O número da camisa no clube (aba Camisas); nulo se ainda não escolheram.</summary>

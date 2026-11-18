@@ -22,8 +22,9 @@
     }
 
     <p class="text-muted small mb-3">
-        O site acha o que merece arte e põe na fila: o vencedor de cada prêmio quando a temporada é publicada e as
-        contratações que passam do valor ou do over abaixo. O <strong>Artista CBFV</strong>, no seu PC, busca a fila a
+        O site acha o que merece arte e põe na fila: o vencedor de cada prêmio quando a temporada é publicada, as
+        contratações que passam do valor ou do over abaixo e, no draft, as 3 primeiras escolhas (uma arte cada) e as
+        escolhas 4 a 8 juntas, quando a 8ª sai. O <strong>Artista CBFV</strong>, no seu PC, busca a fila a
         cada 15 minutos (com o token de admin), faz o vídeo e a imagem e manda no seu Telegram. Com o PC desligado,
         o pedido espera aqui.
     </p>
@@ -78,7 +79,7 @@
                         @foreach (var p in _pedidos)
                         {
                             <div class="list-group-item d-flex align-items-center gap-2 flex-wrap">
-                                <span class="etiqueta">@(p.Tipo == TipoPedidoArte.Premio ? "prêmio" : "contratação")</span>
+                                <span class="etiqueta">@(p.Tipo switch { TipoPedidoArte.Premio => "prêmio", TipoPedidoArte.Contratacao => "contratação", _ => "draft" })</span>
                                 <span class="flex-grow-1">
                                     @p.Titulo
                                     @if (p.Erro is not null)

@@ -5,10 +5,11 @@ namespace Fc25Draft.Core.DTOs;
 /// <summary>Um pedido de arte como vai para o Artista CBFV: tudo que ele precisa, já resolvido.</summary>
 public record PedidoArteDto(
     Guid Id,
-    string Tipo,          // "premio" | "contratacao"
+    string Tipo,          // "premio" | "contratacao" | "draft" (1 escolha) | "draft-grupo" (escolhas 4 a 8)
     string Titulo,
     PremioArteDto? Premio,
-    ContratacaoArteDto? Contratacao);
+    ContratacaoArteDto? Contratacao,
+    DraftArteDto? Draft = null);
 
 public record PremioArteDto(
     string Sigla,         // "MVP"
@@ -31,6 +32,22 @@ public record ContratacaoArteDto(
     int? Numero,
     int Over,
     string? Posicao,
+    string? FotoUrl);
+
+public record DraftArteDto(
+    string NomeDraft,     // "Draft — Brasileirão CBFV 2010"
+    int? Temporada,
+    IReadOnlyList<EscolhaDraftArteDto> Escolhas);
+
+public record EscolhaDraftArteDto(
+    int Escolha,          // número geral da escolha (1, 2, 3...)
+    int Rodada,
+    string Nome,
+    string Clube,
+    int Over,
+    string? Posicao,
+    int? Idade,
+    int? Numero,
     string? FotoUrl);
 
 /// <summary>O agente avisa o que aconteceu com o pedido.</summary>
