@@ -77,6 +77,35 @@
                 <div class="secao-titulo"><h2>Fora da curva</h2></div>
                 @Lista(Surpresas)
             }
+
+            @* Todo mundo que mudou, para achar o jogador do seu time. *@
+            <div class="secao-titulo mt-4"><h2>Todos que mudaram</h2></div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Subiram ou caíram">
+                    <button type="button" class="btn @(_direcao > 0 ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => _direcao = 1">
+                        Subiram <span class="numero">@_previa.Linhas.Count(l => l.Variacao > 0)</span>
+                    </button>
+                    <button type="button" class="btn @(_direcao < 0 ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => _direcao = -1">
+                        Caíram <span class="numero">@_previa.Linhas.Count(l => l.Variacao < 0)</span>
+                    </button>
+                </div>
+                <select class="form-select form-select-sm w-auto" @bind="_clube" aria-label="Clube">
+                    <option value="">Todos os clubes</option>
+                    @foreach (var nome in Clubes)
+                    {
+                        <option value="@nome">@nome</option>
+                    }
+                    <option value="@SemClube">Sem clube</option>
+                </select>
+            </div>
+            @if (TodosQueMudaram.Any())
+            {
+                @Lista(TodosQueMudaram)
+            }
+            else
+            {
+                <p class="text-body-secondary small">Ninguém @(_direcao > 0 ? "subiu" : "caiu") @(_clube == SemClube ? "entre os sem clube" : _clube == "" ? "" : $"no {_clube}").</p>
+            }
         }
 
         @if (_aposentadoria is not null)
@@ -140,6 +169,19 @@
 
     private IEnumerable<EvolucaoLinhaDto> MaisCairam =>
         _previa!.Linhas.Where(l => l.Variacao < 0 && l.TimeNome != null).OrderBy(l => l.Variacao).ThenByDescending(l => l.OverallAntes).Take(QuantosNaLista);
+
+    private const string SemClube = "-";
+    private int _direcao = 1;
+    private string _clube = "";
+
+    private IEnumerable<string> Clubes =>
+        _previa!.Linhas.Where(l => l.Variacao != 0 && l.TimeNome != null).Select(l => l.TimeNome!).Distinct().Order();
+
+    private IEnumerable<EvolucaoLinhaDto> TodosQueMudaram =>
+        _previa!.Linhas
+            .Where(l => _direcao > 0 ? l.Variacao > 0 : l.Variacao < 0)
+            .Where(l => _clube == "" || (_clube == SemClube ? l.TimeNome == null : l.TimeNome == _clube))
+            .OrderByDescending(l => Math.Abs(l.Variacao)).ThenByDescending(l => l.OverallDepois).ThenBy(l => l.Nome);
 
     private IEnumerable<EvolucaoLinhaDto> Surpresas =>
         _previa!.Linhas.Where(l => l.Surpresa != 0).OrderByDescending(l => l.Surpresa);
