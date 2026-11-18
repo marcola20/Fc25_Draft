@@ -213,56 +213,178 @@ else
             </div>
         </div>
 
-        <div class="card mb-3">
-            <div class="card-header">Titulares</div>
-            <div class="card-body">
-                <div class="row g-3">
-                    @foreach (var slot in currentEditor.Slots.Where(s => !s.IsBench).OrderBy(s => s.Order))
-                    {
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
-                            <select id="slot-@slot.SlotId"
-                                    class="form-select"
-                                    value="@GetSlotSelectedValue(slot)"
-                                    @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
-                                    disabled="@isSaving">
-                                <option value="">- Nenhum -</option>
-                                @foreach (var option in slot.AvailablePlayers)
+        var titulares = currentEditor.Slots.Where(s => !s.IsBench).OrderBy(s => s.Order).ToList();
+        var reservas = currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order).ToList();
+        var foraDoTime = JogadoresForaDoTime();
+        var escalados = titulares.Count(s => s.SelectedPlayer is not null);
+        var escolhendoLugar = _arrastando ?? _selecionado;
+
+        if (_escolhendo is not null || _selecionado is not null)
+        {
+            <div class="montagem-fundo" @onclick="FecharEscolhas"></div>
+        }
+
+        <div class="row g-3 montagem @(escolhendoLugar is not null ? "escolhendo-lugar" : "")">
+            <div class="col-lg-7">
+                <div class="card h-100">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <span>Titulares</span>
+                        <span class="badge @(escalados == titulares.Count ? "bg-success" : "bg-warning text-dark")">@escalados/@titulares.Count</span>
+                        @if (MediaDosTitulares() is { } media)
+                        {
+                            <span class="small text-muted">média @media</span>
+                        }
+                        <span class="small text-muted ms-auto">Arraste um jogador ou toque no lugar</span>
+                    </div>
+                    <div class="card-body p-2 p-sm-3">
+                        @if (_selecionado is not null)
+                        {
+                            <div class="montagem-aviso">
+                                Toque no lugar para colocar <strong>@_selecionado.Name</strong>
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-2" @onclick="() => _selecionado = null">cancelar</button>
+                            </div>
+                        }
+                        <div class="campo-montagem" @onclick="FecharEscolhas">
+                            <svg class="campo-linhas" viewBox="0 0 100 145" preserveAspectRatio="none" aria-hidden="true">
+                                <rect x="3" y="3" width="94" height="139" />
+                                <line x1="3" y1="72.5" x2="97" y2="72.5" />
+                                <ellipse cx="50" cy="72.5" rx="13" ry="9" />
+                                <rect x="22" y="3" width="56" height="19" />
+                                <rect x="36" y="3" width="28" height="7" />
+                                <rect x="22" y="123" width="56" height="19" />
+                                <rect x="36" y="135" width="28" height="7" />
+                            </svg>
+
+                            @foreach (var ponto in PosicionarTitulares(titulares))
+                            {
+                                var slot = ponto.Slot;
+                                var jogador = slot.SelectedPlayer;
+                                var aberto = _escolhendo == slot.SlotId;
+                                <div class="lugar @(jogador is null ? "vazio" : "") @(aberto ? "aberto" : "") @ClasseDeDestino(slot, escolhendoLugar) @(_arrastando is not null && _arrastando.PlayerId == jogador?.PlayerId ? "saindo" : "")"
+                                     style="left: @Pct(ponto.X); top: @Pct(ponto.Y);"
+                                     role="button" tabindex="0"
+                                     title="@(jogador is null ? $"{slot.DisplayName}: vazio" : $"{slot.DisplayName}: {FormatPlayerOption(jogador)}")"
+                                     draggable="@(jogador is not null && !isSaving ? "true" : "false")"
+                                     data-arrastavel
+                                     @ondragstart="() => ComecarArrastar(jogador)"
+                                     @ondragend="TerminarArrastar"
+                                     @ondragover:preventDefault="true"
+                                     @ondrop="() => SoltarNoLugar(slot.SlotId)"
+                                     @onclick="() => TocarNoLugar(slot.SlotId)"
+                                     @onclick:stopPropagation="true">
+                                    <div class="rosto">
+                                        @if (jogador is not null)
+                                        {
+                                            <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="44" Lazy="false" Alt="@jogador.Name" />
+                                            @if (jogador.Overall > 0)
+                                            {
+                                                <span class="ovr">@jogador.Overall</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="mais"><Icone Nome="plus" Tamanho="18" /></span>
+                                        }
+                                    </div>
+                                    <div class="nome">@(jogador is null ? "vazio" : NomeCurto(jogador.Name))</div>
+                                    <div class="sigla">@SiglaDoLugar(slot)</div>
+                                </div>
+
+                                @if (aberto)
                                 {
-                                    <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
-                                        @FormatPlayerOption(option)
-                                    </option>
+                                    <div class="escolha escolha-campo @(ponto.Y > 50 ? "acima" : "abaixo")"
+                                         style="--x: @Pct(ponto.X); @(ponto.Y > 50 ? $"bottom: {Pct(100 - ponto.Y + 7)}" : $"top: {Pct(ponto.Y + 7)}");"
+                                         @onclick:stopPropagation="true">
+                                        @EscolhaDoLugar(slot)
+                                    </div>
                                 }
-                            </select>
+                            }
                         </div>
-                    }
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="card mb-3">
-            <div class="card-header">Reservas</div>
-            <div class="card-body">
-                <div class="row g-3">
-                    @foreach (var slot in currentEditor.Slots.Where(s => s.IsBench).OrderBy(s => s.Order))
-                    {
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <label class="form-label" for="slot-@slot.SlotId">@slot.DisplayName</label>
-                            <select id="slot-@slot.SlotId"
-                                    class="form-select"
-                                    value="@GetSlotSelectedValue(slot)"
-                                    @onchange="e => OnSlotChanged(slot.SlotId, e.Value?.ToString())"
-                                    disabled="@isSaving">
-                                <option value="">- Nenhum -</option>
-                                @foreach (var option in slot.AvailablePlayers)
+            <div class="col-lg-5 d-flex flex-column gap-3">
+                <div class="card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span>Reservas</span>
+                        <span class="badge bg-secondary">@reservas.Count(s => s.SelectedPlayer is not null)/@reservas.Count</span>
+                    </div>
+                    <ul class="list-group list-group-flush banco">
+                        @foreach (var slot in reservas)
+                        {
+                            var jogador = slot.SelectedPlayer;
+                            var aberto = _escolhendo == slot.SlotId;
+                            <li class="list-group-item banco-lugar @(aberto ? "aberto" : "") @ClasseDeDestino(slot, escolhendoLugar) @(_arrastando is not null && _arrastando.PlayerId == jogador?.PlayerId ? "saindo" : "")"
+                                role="button" tabindex="0"
+                                draggable="@(jogador is not null && !isSaving ? "true" : "false")"
+                                data-arrastavel
+                                @ondragstart="() => ComecarArrastar(jogador)"
+                                @ondragend="TerminarArrastar"
+                                @ondragover:preventDefault="true"
+                                @ondrop="() => SoltarNoLugar(slot.SlotId)"
+                                @onclick="() => TocarNoLugar(slot.SlotId)"
+                                @onclick:stopPropagation="true">
+                                <span class="banco-num">@slot.Order</span>
+                                @if (jogador is not null)
                                 {
-                                    <option value="@option.PlayerId" selected="@(slot.SelectedPlayer?.PlayerId == option.PlayerId)">
-                                        @FormatPlayerOption(option)
-                                    </option>
+                                    <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="28" Alt="@jogador.Name" />
+                                    <span class="flex-grow-1 text-truncate">@jogador.Name</span>
+                                    <span class="chip-pos">@SiglaPes(jogador)</span>
+                                    <span class="chip-ovr">@jogador.Overall</span>
+                                    <button type="button" class="btn btn-sm btn-link text-body-secondary btn-icone" title="Tirar do banco"
+                                            @onclick="() => TirarDoLugar(slot.SlotId)" @onclick:stopPropagation="true" disabled="@isSaving">
+                                        <Icone Nome="x" Tamanho="14" />
+                                    </button>
                                 }
-                            </select>
+                                else
+                                {
+                                    <span class="text-muted flex-grow-1">vazio</span>
+                                }
+                            </li>
+                            @if (aberto)
+                            {
+                                <li class="list-group-item p-0" @onclick:stopPropagation="true">
+                                    <div class="escolha escolha-banco">@EscolhaDoLugar(slot)</div>
+                                </li>
+                            }
+                        }
+                    </ul>
+                </div>
+
+                <div class="card fora-do-time @(_arrastando is not null && EstaEscalado(_arrastando) ? "destino-ok" : "")"
+                     @ondragover:preventDefault="true"
+                     @ondrop="SoltarForaDoTime">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span>Fora da escalação</span>
+                        <span class="badge bg-secondary">@foraDoTime.Count</span>
+                        <span class="small text-muted ms-auto">solte aqui para tirar do time</span>
+                    </div>
+                    <div class="card-body p-2">
+                        @if (foraDoTime.Count == 0)
+                        {
+                            <div class="small text-muted p-1">Todo o elenco está na escalação.</div>
+                        }
+                        <div class="fora-lista">
+                            @foreach (var jogador in foraDoTime)
+                            {
+                                <div class="fora-jogador @(_selecionado?.PlayerId == jogador.PlayerId ? "selecionado" : "") @(_arrastando?.PlayerId == jogador.PlayerId ? "saindo" : "")"
+                                     role="button" tabindex="0"
+                                     title="@FormatPlayerOption(jogador)"
+                                     draggable="@(isSaving ? "false" : "true")"
+                                     data-arrastavel
+                                     @ondragstart="() => ComecarArrastar(jogador)"
+                                     @ondragend="TerminarArrastar"
+                                     @onclick="() => SelecionarDeFora(jogador)"
+                                     @onclick:stopPropagation="true">
+                                    <FotoJogador PlayerId="@jogador.PlayerId" Tamanho="24" Alt="@jogador.Name" />
+                                    <span class="text-truncate">@NomeCurto(jogador.Name)</span>
+                                    <span class="chip-pos">@SiglaPes(jogador)</span>
+                                    <span class="chip-ovr">@jogador.Overall</span>
+                                </div>
+                            }
                         </div>
-                    }
+                    </div>
                 </div>
             </div>
         </div>
@@ -1302,9 +1424,6 @@ else
         currentEditor = currentEditor with { DefensiveInstructions = null };
     }
 
-    private static string GetSlotSelectedValue(LineupSlotState slot)
-        => slot.SelectedPlayer is null ? string.Empty : slot.SelectedPlayer.PlayerId.ToString(CultureInfo.InvariantCulture);
-
     private async Task SaveAsync()
     {
         if (currentEditor is null) return;
@@ -1764,6 +1883,247 @@ else
         Penalties, CornerLeft, CornerRight,
         AttackingPlayer1, AttackingPlayer2, AttackingPlayer3
     }
+
+    // ── Montagem no campo ─────────────────────────────────────────────────────────────────────────────
+    // Os titulares ficam no campo, nos lugares da formação; ao lado, o banco e quem está fora. Dá para arrastar
+    // um jogador de qualquer canto para um lugar (troca com quem estava lá), ou tocar no lugar e escolher na
+    // lista que abre ali mesmo. No celular (onde arrastar não funciona), tocar em quem está fora e depois no lugar.
+
+    /// <summary>Jogador sendo arrastado agora.</summary>
+    private PlayerOption? _arrastando;
+
+    /// <summary>Jogador de fora tocado, esperando o toque no lugar.</summary>
+    private PlayerOption? _selecionado;
+
+    /// <summary>Lugar com a lista de opções aberta.</summary>
+    private Guid? _escolhendo;
+
+    private sealed record PontoNoCampo(LineupSlotState Slot, double X, double Y);
+
+    // O desenho do campo dos jogos põe o mandante na metade de baixo (Y de 54 a 95); aqui o time tem o campo
+    // todo: o ataque lá no alto e o goleiro embaixo.
+    private static IEnumerable<PontoNoCampo> PosicionarTitulares(IReadOnlyList<LineupSlotState> titulares)
+    {
+        var pontos = CampoDaEscalacao.Posicionar(
+            titulares.Select((s, i) => (i, (string?)s.SlotCode, (int)(s.SelectedPlayer?.PositionId ?? 0))),
+            mandante: true);
+        foreach (var p in pontos)
+            yield return new PontoNoCampo(titulares[p.JogadorId], p.X, 12 + (p.Y - 54) / (95 - 54) * 76);
+    }
+
+    private static bool PodeReceber(LineupSlotState slot, PlayerOption jogador)
+        => slot.IsBench || slot.AllowedPositionIds.Count == 0 || slot.AllowedPositionIds.Contains(jogador.PositionId);
+
+    private static string ClasseDeDestino(LineupSlotState slot, PlayerOption? jogador)
+        => jogador is null ? "" : PodeReceber(slot, jogador) ? "destino-ok" : "destino-nao";
+
+    private void ComecarArrastar(PlayerOption? jogador)
+    {
+        if (jogador is null || isSaving) return;
+        _arrastando = jogador;
+        _escolhendo = null;
+        _selecionado = null;
+    }
+
+    private void TerminarArrastar() => _arrastando = null;
+
+    private void SoltarNoLugar(Guid slotId)
+    {
+        var jogador = _arrastando;
+        _arrastando = null;
+        if (jogador is not null) Colocar(jogador, slotId);
+    }
+
+    private void SoltarForaDoTime()
+    {
+        var jogador = _arrastando;
+        _arrastando = null;
+        if (jogador is not null) TirarJogador(jogador);
+    }
+
+    private void TocarNoLugar(Guid slotId)
+    {
+        if (isSaving) return;
+        if (_selecionado is { } jogador)
+        {
+            _selecionado = null;
+            Colocar(jogador, slotId);
+            return;
+        }
+        _escolhendo = _escolhendo == slotId ? null : slotId;
+    }
+
+    private void SelecionarDeFora(PlayerOption jogador)
+    {
+        if (isSaving) return;
+        _escolhendo = null;
+        _selecionado = _selecionado?.PlayerId == jogador.PlayerId ? null : jogador;
+    }
+
+    private void FecharEscolhas()
+    {
+        _escolhendo = null;
+        _selecionado = null;
+    }
+
+    private void EscolherNaLista(Guid slotId, PlayerOption jogador)
+    {
+        _escolhendo = null;
+        Colocar(jogador, slotId);
+    }
+
+    private void TirarDoLugar(Guid slotId)
+    {
+        _escolhendo = null;
+        OnSlotChanged(slotId, null);
+    }
+
+    private void TirarJogador(PlayerOption jogador)
+    {
+        var slot = currentEditor?.Slots.FirstOrDefault(s => s.SelectedPlayer?.PlayerId == jogador.PlayerId);
+        if (slot is not null) TirarDoLugar(slot.SlotId);
+    }
+
+    /// <summary>
+    /// Põe o jogador no lugar. Se ele já estava em outro lugar, quem ocupava o destino vai para o lugar dele
+    /// (troca); se não puder jogar lá, fica fora da escalação.
+    /// </summary>
+    private void Colocar(PlayerOption jogador, Guid alvoId)
+    {
+        if (currentEditor is null || isSaving) return;
+
+        var slots = currentEditor.Slots.ToList();
+        var alvo = slots.FindIndex(s => s.SlotId == alvoId);
+        if (alvo < 0) return;
+
+        if (!PodeReceber(slots[alvo], jogador))
+        {
+            Toasts.ShowError($"{jogador.Name} ({SiglaPes(jogador)}) não pode jogar de {slots[alvo].DisplayName}.");
+            return;
+        }
+
+        var origem = slots.FindIndex(s => s.SelectedPlayer?.PlayerId == jogador.PlayerId);
+        if (origem == alvo) return;
+
+        var anterior = slots[alvo].SelectedPlayer;
+        slots[alvo] = slots[alvo] with { SelectedPlayer = jogador };
+
+        if (origem >= 0)
+        {
+            if (anterior is not null && PodeReceber(slots[origem], anterior))
+            {
+                slots[origem] = slots[origem] with { SelectedPlayer = anterior };
+            }
+            else
+            {
+                slots[origem] = slots[origem] with { SelectedPlayer = null };
+                if (anterior is not null)
+                    Toasts.ShowInfo($"{anterior.Name} não joga de {slots[origem].DisplayName} e ficou fora da escalação.");
+            }
+        }
+
+        var recalculated = RecalculateAvailability(slots);
+        currentEditor = currentEditor with { Slots = recalculated, Roles = SanitizeRoles(currentEditor.Roles, recalculated) };
+    }
+
+    private RenderFragment EscolhaDoLugar(LineupSlotState slot) => @<div>
+        <div class="escolha-topo">
+            <span class="fw-semibold text-truncate">@slot.DisplayName</span>
+            <button type="button" class="btn btn-sm btn-link text-body-secondary btn-icone ms-auto" title="Fechar" @onclick="() => _escolhendo = null">
+                <Icone Nome="x" Tamanho="14" />
+            </button>
+        </div>
+        <div class="escolha-lista">
+            @if (slot.AvailablePlayers.Count == 0)
+            {
+                <div class="small text-muted p-2">Ninguém do elenco joga aqui.</div>
+            }
+            @foreach (var opcao in slot.AvailablePlayers)
+            {
+                var atual = slot.SelectedPlayer?.PlayerId == opcao.PlayerId;
+                var onde = atual ? null : OndeEsta(opcao);
+                <button type="button" class="escolha-item @(atual ? "atual" : "")"
+                        @onclick="() => EscolherNaLista(slot.SlotId, opcao)" disabled="@(atual || isSaving)">
+                    <FotoJogador PlayerId="@opcao.PlayerId" Tamanho="26" Alt="" />
+                    <span class="flex-grow-1 text-truncate text-start">@opcao.Name</span>
+                    @if (atual)
+                    {
+                        <span class="escolha-onde"><Icone Nome="check" Tamanho="12" /> aqui</span>
+                    }
+                    else if (onde is not null)
+                    {
+                        <span class="escolha-onde">@onde</span>
+                    }
+                    <span class="chip-pos">@SiglaPes(opcao)</span>
+                    <span class="chip-ovr">@opcao.Overall</span>
+                </button>
+            }
+        </div>
+        @if (slot.SelectedPlayer is not null)
+        {
+            <button type="button" class="escolha-tirar" @onclick="() => TirarDoLugar(slot.SlotId)" disabled="@isSaving">
+                Deixar o lugar vazio
+            </button>
+        }
+    </div>;
+
+    /// <summary>"em campo · LE" ou "banco", para quem já está na escalação.</summary>
+    private string? OndeEsta(PlayerOption jogador)
+    {
+        var slot = currentEditor?.Slots.FirstOrDefault(s => s.SelectedPlayer?.PlayerId == jogador.PlayerId);
+        if (slot is null) return null;
+        return slot.IsBench ? "banco" : $"em campo · {SiglaDoLugar(slot)}";
+    }
+
+    private bool EstaEscalado(PlayerOption jogador)
+        => currentEditor?.Slots.Any(s => s.SelectedPlayer?.PlayerId == jogador.PlayerId) == true;
+
+    private List<PlayerOption> JogadoresForaDoTime()
+    {
+        var escalados = currentEditor?.Slots
+            .Where(s => s.SelectedPlayer is not null)
+            .Select(s => s.SelectedPlayer!.PlayerId)
+            .ToHashSet() ?? new HashSet<int>();
+        return rosterPlayers
+            .Where(p => !escalados.Contains(p.PlayerId))
+            .OrderBy(p => p.PositionId)
+            .ThenByDescending(p => p.Overall)
+            .ThenBy(p => p.Name)
+            .ToList();
+    }
+
+    private int? MediaDosTitulares()
+    {
+        var overalls = currentEditor?.Slots
+            .Where(s => !s.IsBench && s.SelectedPlayer is { Overall: > 0 })
+            .Select(s => s.SelectedPlayer!.Overall)
+            .ToList();
+        return overalls is { Count: > 0 } ? (int)Math.Round(overalls.Average()) : null;
+    }
+
+    /// <summary>A posição do catálogo que o lugar usa (LE, VOL, CA...).</summary>
+    private string SiglaDoLugar(LineupSlotState slot)
+    {
+        if (slot.IsBench) return "RES";
+        var formacao = LineupTemplateCatalog.Atual.Formacoes
+            .FirstOrDefault(f => string.Equals(f.Nome, currentEditor?.Formation, StringComparison.OrdinalIgnoreCase));
+        var lugar = formacao?.Lugares.FirstOrDefault(l => string.Equals(l.Codigo, slot.SlotCode, StringComparison.OrdinalIgnoreCase));
+        return lugar?.Posicao ?? slot.SlotCode;
+    }
+
+    private static string SiglaPes(PlayerOption jogador)
+        => LineupTemplateCatalog.SiglasPes.TryGetValue(jogador.PositionId, out var sigla) ? sigla : jogador.PositionName;
+
+    private static string NomeCurto(string nome)
+    {
+        if (nome.Length <= 12) return nome;
+        var partes = nome.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (partes.Length < 2) return nome;
+        var ultimo = partes[^1];
+        return ultimo.Length <= 3 ? $"{partes[^2]} {ultimo}" : ultimo;
+    }
+
+    private static string Pct(double v) => v.ToString("0.##", CultureInfo.InvariantCulture) + "%";
 
     private sealed record PlayerOption(int PlayerId, Guid PlayerGuid, string Name, string PositionName, short PositionId, int Overall);
 
