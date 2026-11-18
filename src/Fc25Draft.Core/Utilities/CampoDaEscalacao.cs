@@ -16,15 +16,21 @@ public sealed record LugarNoCampo(int JogadorId, double X, double Y);
 /// </para>
 /// <para>
 /// Os meias pelos lados (LM/RM) acompanham o meio: com meia atacante, ficam na linha dele (4-2-3-1, 3-2-3-2); com
-/// meias de ligação à frente de um volante, um pouco à frente deles (3-3-2-2); senão, no meio-campo (4-4-2, 3-4-3).
-/// Pontas (LW/RW) num time sem laterais e sem LM/RM são os meias pelos lados (a 3-4-1-2 usa esses códigos).
+/// meias de ligação à frente de um volante, um pouco à frente deles (3-3-2-2); com pontas à frente, na linha dos
+/// meias de ligação (3-4-3); senão, um pouco à frente do meio-campo (4-4-2). Pontas (LW/RW) num time sem laterais
+/// e sem LM/RM são os meias pelos lados (a 3-4-1-2 usa esses códigos). O meia atacante sobe um pouco quando há
+/// meias de ligação à frente de um volante (4-3-2-1, 4-3-1-2).
+/// </para>
+/// <para>
+/// Segundo atacante (código SA): sem centroavante, é ele o homem de frente; sozinho com um ponta só, vai para a
+/// ponta que está vazia; sozinho sem pontas, fica ao lado do centroavante; dois, atrás do centroavante, bem abertos.
 /// </para>
 /// </summary>
 public static class CampoDaEscalacao
 {
     // Alturas, do gol (0) ao ataque (Ataque).
     private const double Goleiro = 0, Defesa = 1, Alas = 1.25, Volantes = 2, MeiaPeloLado = 2.3,
-        MeioAFrente = 2.6, MeiaPeloLadoAFrente = 3, Meias = 3.3, SegundoAtacante = 3.8, Pontas = 4, Ataque = 4.4;
+        MeioAFrente = 2.6, MeiaPeloLadoSemPontas = 2.7, MeiaPeloLadoAFrente = 3, Meias = 3.3, MeiasAFrente = 3.65, SegundoAtacante = 3.8, Pontas = 4, Ataque = 4.4;
 
     // Faixa de cada metade: do goleiro (perto do gol) até a linha mais avançada (perto do meio-campo).
     private const double GolY = 95, MeioY = 54;
@@ -59,17 +65,33 @@ public static class CampoDaEscalacao
         var alturaDoCm = volantes == 0 ? MeiaPeloLado
             : volantes == 1 && meiasDeLigacao == 1 ? Volantes
             : MeioAFrente;
-        var alturaPeloLado = lista.Any(l => l.Codigo.Base is "CAM" or "MAT") ? Meias
-            : meiasDeLigacao > 0 && alturaDoCm == MeioAFrente ? MeiaPeloLadoAFrente
-            : MeiaPeloLado;
-
-        var lugares = lista
-            .Select(l => (l.JogadorId, l.Codigo, Lugar: PeloCodigo(l.Codigo, alturaDoCm, alturaPeloLado) ?? new Lugar(MeiaPeloLado, Corredor.Centro, 0)))
-            .ToList();
-
+        var meiasAFrenteDoVolante = meiasDeLigacao > 0 && alturaDoCm == MeioAFrente;
+        var temMeiaAtacante = lista.Any(l => l.Codigo.Base is "CAM" or "MAT");
         var temCentroavante = lista.Any(l => l.Codigo.Base is "ST" or "CA");
         var temPontaEsquerda = lista.Any(l => l.Codigo.Base == "LW");
         var temPontaDireita = lista.Any(l => l.Codigo.Base == "RW");
+        var segundosAtacantes = lista.Count(l => l.Codigo.Base == "SA");
+
+        var alturaPeloLado = temMeiaAtacante ? Meias
+            : meiasAFrenteDoVolante ? MeiaPeloLadoAFrente
+            : temPontaEsquerda || temPontaDireita ? MeiaPeloLado
+            : MeiaPeloLadoSemPontas;
+
+        Lugar Ajustar(Codigo codigo, Lugar lugar) => codigo.Base switch
+        {
+            "CAM" or "MAT" when meiasAFrenteDoVolante => lugar with { Altura = MeiasAFrente },
+            "SA" when !temCentroavante => lugar with { Altura = Ataque },
+            "SA" when segundosAtacantes == 1 && temPontaEsquerda != temPontaDireita =>
+                new Lugar(Pontas, temPontaEsquerda ? Corredor.Direita : Corredor.Esquerda, 0),
+            "SA" when segundosAtacantes == 1 && !temPontaEsquerda && !temPontaDireita => lugar with { Altura = Ataque },
+            _ => lugar
+        };
+
+        var lugares = lista
+            .Select(l => (l.JogadorId, l.Codigo, Lugar: Ajustar(l.Codigo,
+                PeloCodigo(l.Codigo, alturaDoCm, alturaPeloLado) ?? new Lugar(MeiaPeloLado, Corredor.Centro, 0))))
+            .ToList();
+
         var resultado = new List<LugarNoCampo>(lugares.Count);
 
         // Centrais: espalhados pelo meio, por altura.
@@ -81,10 +103,9 @@ public static class CampoDaEscalacao
                 .ThenBy(l => l.JogadorId)
                 .ToList();
             var xs = Espalhar(naAltura.Count);
-            // Segundo atacante sozinho atrás de um centroavante: um pouco para o lado (o que não tem ponta), senão o
-            // meia, ele e o centroavante ficam empilhados no meio.
-            if (naAltura is [{ Codigo.Base: "SA" }] && temCentroavante)
-                xs = new double[] { temPontaEsquerda && !temPontaDireita ? 62 : 38 };
+            // Dois segundos atacantes atrás do centroavante: bem abertos, senão encostam no meia atacante.
+            if (naAltura is [{ Codigo.Base: "SA" }, { Codigo.Base: "SA" }])
+                xs = new double[] { 28, 72 };
             for (var i = 0; i < naAltura.Count; i++)
                 resultado.Add(Ponto(naAltura[i].JogadorId, xs[i], altura.Key, mandante));
         }
@@ -133,8 +154,9 @@ public static class CampoDaEscalacao
         _ => Enumerable.Range(1, n).Select(i => 100.0 * i / (n + 1)).ToArray()
     };
 
-    // Na mesma altura e sem número (volante e meia de ligação lado a lado): o volante à esquerda.
-    private static int OrdemDoTipo(string baseDoCodigo) => baseDoCodigo is "CDM" or "VOL" ? 0 : 1;
+    // Na mesma altura e sem número: o volante à esquerda do meia de ligação, o segundo atacante à esquerda do
+    // centroavante.
+    private static int OrdemDoTipo(string baseDoCodigo) => baseDoCodigo is "CDM" or "VOL" or "SA" ? 0 : 1;
 
     private readonly record struct Codigo(string Base, int Numero);
 
