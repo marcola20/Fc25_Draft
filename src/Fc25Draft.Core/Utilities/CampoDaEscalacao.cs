@@ -14,12 +14,17 @@ public sealed record LugarNoCampo(int JogadorId, double X, double Y);
 /// é o meio-campo; com um volante só e um CM só, fica ao lado dele; senão, um pouco à frente dos volantes (no
 /// losango VOL–2 MLG–MAT, um de cada lado).
 /// </para>
+/// <para>
+/// Os meias pelos lados (LM/RM) acompanham o meio: com meia atacante, ficam na linha dele (4-2-3-1, 3-2-3-2); com
+/// meias de ligação à frente de um volante, um pouco à frente deles (3-3-2-2); senão, no meio-campo (4-4-2, 3-4-3).
+/// Pontas (LW/RW) num time sem laterais e sem LM/RM são os meias pelos lados (a 3-4-1-2 usa esses códigos).
+/// </para>
 /// </summary>
 public static class CampoDaEscalacao
 {
     // Alturas, do gol (0) ao ataque (Ataque).
     private const double Goleiro = 0, Defesa = 1, Alas = 1.25, Volantes = 2, MeiaPeloLado = 2.3,
-        MeioAFrente = 2.6, Meias = 3.3, SegundoAtacante = 3.8, Pontas = 4, Ataque = 4.4;
+        MeioAFrente = 2.6, MeiaPeloLadoAFrente = 3, Meias = 3.3, SegundoAtacante = 3.8, Pontas = 4, Ataque = 4.4;
 
     // Faixa de cada metade: do goleiro (perto do gol) até a linha mais avançada (perto do meio-campo).
     private const double GolY = 95, MeioY = 54;
@@ -33,19 +38,33 @@ public static class CampoDaEscalacao
         IEnumerable<(int JogadorId, string? SlotCode, int PositionId)> titulares, bool mandante)
     {
         var lista = titulares
-            .Select(t => (t.JogadorId, Codigo: Separar(t.SlotCode) is { } c && PeloCodigo(c, MeioAFrente) is not null
+            .Select(t => (t.JogadorId, Codigo: Separar(t.SlotCode) is { } c && PeloCodigo(c, MeioAFrente, MeiaPeloLado) is not null
                 ? c
                 : Separar(CodigoDaPosicao(t.PositionId))!.Value))
             .ToList();
+
+        // 3-4-1-2: os meias pelos lados vêm com os códigos dos pontas (LW/RW). Sem laterais e sem LM/RM, são eles.
+        if (!lista.Any(l => l.Codigo.Base is "LB" or "RB" or "ADE" or "ADD" or "LM" or "RM"))
+            lista = lista
+                .Select(l => l.Codigo.Base switch
+                {
+                    "LW" => (l.JogadorId, Codigo: l.Codigo with { Base = "LM" }),
+                    "RW" => (l.JogadorId, Codigo: l.Codigo with { Base = "RM" }),
+                    _ => l
+                })
+                .ToList();
 
         var volantes = lista.Count(l => l.Codigo.Base is "CDM" or "VOL");
         var meiasDeLigacao = lista.Count(l => l.Codigo.Base is "CM" or "MLG");
         var alturaDoCm = volantes == 0 ? MeiaPeloLado
             : volantes == 1 && meiasDeLigacao == 1 ? Volantes
             : MeioAFrente;
+        var alturaPeloLado = lista.Any(l => l.Codigo.Base is "CAM" or "MAT") ? Meias
+            : meiasDeLigacao > 0 && alturaDoCm == MeioAFrente ? MeiaPeloLadoAFrente
+            : MeiaPeloLado;
 
         var lugares = lista
-            .Select(l => (l.JogadorId, l.Codigo, Lugar: PeloCodigo(l.Codigo, alturaDoCm) ?? new Lugar(MeiaPeloLado, Corredor.Centro, 0)))
+            .Select(l => (l.JogadorId, l.Codigo, Lugar: PeloCodigo(l.Codigo, alturaDoCm, alturaPeloLado) ?? new Lugar(MeiaPeloLado, Corredor.Centro, 0)))
             .ToList();
 
         var temCentroavante = lista.Any(l => l.Codigo.Base is "ST" or "CA");
@@ -88,7 +107,7 @@ public static class CampoDaEscalacao
 
     /// <summary>Se o código do lugar tem posição no campo desenhado (senão vale a posição natural do jogador).</summary>
     public static bool ConheceOCodigo(string? codigo)
-        => Separar(codigo) is { } c && PeloCodigo(c, MeioAFrente) is not null;
+        => Separar(codigo) is { } c && PeloCodigo(c, MeioAFrente, MeiaPeloLado) is not null;
 
     private static LugarNoCampo Ponto(int jogadorId, double x, double altura, bool mandante)
     {
@@ -129,7 +148,7 @@ public static class CampoDaEscalacao
     }
 
     /// <summary>Pelo código do lugar. Os números (CDM1, CAM2...) vão da esquerda para a direita.</summary>
-    private static Lugar? PeloCodigo(Codigo codigo, double alturaDoCm)
+    private static Lugar? PeloCodigo(Codigo codigo, double alturaDoCm, double alturaPeloLado)
     {
         var ordem = (double)codigo.Numero;
         return codigo.Base switch
@@ -143,9 +162,9 @@ public static class CampoDaEscalacao
             "RB" => new Lugar(Defesa, Corredor.Direita, 0),
             "ADD" => new Lugar(Alas, Corredor.Direita, 0),
             "CDM" or "VOL" => new Lugar(Volantes, Corredor.Centro, ordem),
-            "LM" => new Lugar(MeiaPeloLado, Corredor.Esquerda, 0),
+            "LM" => new Lugar(alturaPeloLado, Corredor.Esquerda, 0),
             "CM" or "MLG" => new Lugar(alturaDoCm, Corredor.Centro, ordem),
-            "RM" => new Lugar(MeiaPeloLado, Corredor.Direita, 0),
+            "RM" => new Lugar(alturaPeloLado, Corredor.Direita, 0),
             "CAM" or "MAT" => new Lugar(Meias, Corredor.Centro, ordem),
             "SA" => new Lugar(SegundoAtacante, Corredor.Centro, ordem),
             "LW" => new Lugar(Pontas, Corredor.Esquerda, 0),
