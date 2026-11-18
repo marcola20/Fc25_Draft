@@ -421,51 +421,18 @@ public class PremiosService : IPremiosService
 
         var titulo = PremiosTemporada.Titulo(candidato.Categoria, candidato.Temporada);
         var motivo = alvoId == candidato.PlayerId ? $"Prêmio {titulo}" : $"Prêmio {titulo} (repasse)";
-        var antesOverall = jogador.Overall;
-        var agora = _time.GetUtcNow().UtcDateTime;
 
-        if (jogador.Atributos?.PosicaoPes is not int pos)
-        {
-            // Sem atributos do jogo não há o que mandar ao Editor PES: só o overall do site sobe.
-            candidato.OverParaPlayerId = alvoId;
-            candidato.OverAplicadoEm = Agora;
-            jogador.Overall = Math.Min(AtributosPes.Maximo, jogador.Overall + 1);
-            await _db.SaveChangesAsync(ct);
-            return $"{jogador.Name}: overall {antesOverall} → {jogador.Overall} só no site (sem atributos do jogo — dê o over no PES à mão).";
-        }
-
-        var dto = AtributosPes.ParaDto(jogador.Atributos);
-        var antes = OverallPes.Valores(dto);
-        var evolucao = OverallPes.Evoluir(antes, pos, dto.EstiloDeJogo, dto.PeFracoUso, dto.PeFracoPrecisao, antesOverall + 1);
-        if (evolucao.Novos.SequenceEqual(antes))
-            throw new InvalidOperationException($"{jogador.Name}: os atributos já estão no limite, nada mudou.");
-
-        // Só marca depois do último "não dá": senão a marca ficava na memória e ia junto no próximo salvar.
+        // O "não dá" vem antes de qualquer mudança; só depois marca o candidato (senão a marca ia junto no próximo salvar).
+        var (registro, resumo) = OverDePremio.Dar(_db, jogador, motivo, _time.GetUtcNow().UtcDateTime);
         candidato.OverParaPlayerId = alvoId;
         candidato.OverAplicadoEm = Agora;
-
-        for (var i = 0; i < antes.Length; i++)
-            AtributosPes.Todos[i].Set(dto, evolucao.Novos[i]);
-        AtributosPes.Aplicar(dto, jogador.Atributos);
-        OverallPes.Recalcular(jogador);
-
-        var registro = new EvolucaoPes
-        {
-            PlayerId = jogador.PlayerId,
-            Motivo = motivo,
-            CriadaEmUtc = agora,
-            OverallAntes = antesOverall,
-            OverallDepois = jogador.Overall,
-            Mudancas = EvolucaoPes.EscreverMudancas(antes, evolucao.Novos),
-        };
-        _db.EvolucoesPes.Add(registro);
         await _db.SaveChangesAsync(ct);
+
+        if (registro is null) return resumo;
 
         candidato.EvolucaoPesId = registro.EvolucaoPesId;
         await _db.SaveChangesAsync(ct);
-
-        return $"{jogador.Name}: overall {antesOverall} → {jogador.Overall} · {OverallPes.DescreverMudancas(antes, evolucao.Novos)}. " +
-               "Abra o Editor PES para levar ao save.";
+        return resumo + ". Abra o Editor PES para levar ao save.";
     }
 
     public async Task<string> DesfazerOverAsync(Guid candidatoId, CancellationToken ct)
@@ -477,25 +444,10 @@ public class PremiosService : IPremiosService
 
         var jogador = await _db.Players.Include(p => p.Atributos).FirstAsync(p => p.PlayerId == playerId, ct);
 
-        if (candidato.EvolucaoPesId is int evolucaoId)
-        {
-            var evolucao = await _db.EvolucoesPes.FirstAsync(e => e.EvolucaoPesId == evolucaoId, ct);
-            if (evolucao.AplicadaNoJogoEmUtc is not null)
-                throw new InvalidOperationException("O Editor PES já levou esse over para o save: desfaça no jogo e ajuste na ficha.");
-
-            var dto = AtributosPes.ParaDto(jogador.Atributos!);
-            var valores = OverallPes.Valores(dto);
-            var mudancas = evolucao.LerMudancas();
-            for (var i = 0; i < valores.Length; i++)
-                AtributosPes.Todos[i].Set(dto, Math.Clamp(valores[i] - mudancas[i], AtributosPes.Minimo, AtributosPes.Maximo));
-            AtributosPes.Aplicar(dto, jogador.Atributos!);
-            OverallPes.Recalcular(jogador);
-            _db.EvolucoesPes.Remove(evolucao);
-        }
-        else
-        {
-            jogador.Overall = Math.Max(1, jogador.Overall - 1);
-        }
+        var evolucao = candidato.EvolucaoPesId is int evolucaoId
+            ? await _db.EvolucoesPes.FirstAsync(e => e.EvolucaoPesId == evolucaoId, ct)
+            : null;
+        OverDePremio.Desfazer(_db, jogador, evolucao);
 
         candidato.OverParaPlayerId = null;
         candidato.OverAplicadoEm = null;

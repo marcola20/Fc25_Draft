@@ -503,7 +503,7 @@ public class LayoutNavigationService
         {
             Route = "/admin/stats-temporada",
             Title = "Stats da Temporada",
-            Subtitle = "Top 3 de gols, assistências, clean sheets e nota para o grupo",
+            Subtitle = "Top 3 de gols, assistências, clean sheets e nota para o grupo, e os prêmios de estatística (dinheiro + over)",
             Breadcrumbs = new List<BreadcrumbSegment>
             {
                 new("Início", "/home"),

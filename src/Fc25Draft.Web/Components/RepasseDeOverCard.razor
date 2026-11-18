@@ -1,0 +1,89 @@
+@inject IPremiosEstatisticaService PremiosEstatSvc
+@inject IJSRuntime JS
+
+@*
+    Overs de prêmio de estatística que o técnico precisa repassar: o premiado já levou over por outra estatística
+    da temporada, então o +1 vai para um companheiro que o técnico escolhe aqui. Some quando não há nada.
+*@
+@if (_pendentes.Count > 0)
+{
+    <div class="card mb-3 border-warning">
+        <div class="card-header fw-semibold d-flex align-items-center gap-2">
+            <Icone Nome="award" Tamanho="14" Classe="texto-aviso" /> Escolha quem recebe o over
+        </div>
+        <ul class="list-group list-group-flush">
+            @foreach (var r in _pendentes)
+            {
+                <li class="list-group-item py-3">
+                    <div class="mb-2">
+                        <strong>@r.JogadorNome</strong> foi <strong>@r.Motivo</strong>@(string.IsNullOrEmpty(r.JaLevou) ? "" : $", mas já levou o over como {r.JaLevou}").
+                        Pela regra, esse +1 over vai para um companheiro: escolha quem recebe.
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <select class="form-select form-select-sm w-auto" style="min-width:16rem;"
+                                value="@_escolhido.GetValueOrDefault(r.PremioId)"
+                                @onchange="e => _escolhido[r.PremioId] = int.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+                            <option value="0">Escolha o jogador…</option>
+                            @foreach (var c in r.Companheiros)
+                            {
+                                <option value="@c.PlayerId">@c.Nome · @c.Posicao · @c.Overall</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-primary" disabled="@(_ocupado || _escolhido.GetValueOrDefault(r.PremioId) == 0)"
+                                @onclick="() => Repassar(r)">
+                            Dar o +1 over
+                        </button>
+                    </div>
+                </li>
+            }
+        </ul>
+        @if (_erro is not null)
+        {
+            <div class="card-footer small text-danger">@_erro</div>
+        }
+    </div>
+}
+@if (_ok is not null)
+{
+    <div class="alert alert-success alert-dismissible small">
+        @_ok
+        <button type="button" class="btn-close" @onclick="() => _ok = null"></button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+    [Parameter, EditorRequired] public string? Token { get; set; }
+
+    private IReadOnlyList<RepasseDeOverDto> _pendentes = [];
+    private readonly Dictionary<Guid, int> _escolhido = new();
+    private bool _ocupado;
+    private string? _erro, _ok;
+
+    protected override async Task OnParametersSetAsync() => await Carregar();
+
+    private async Task Carregar()
+    {
+        try { _pendentes = await PremiosEstatSvc.RepassesPendentesAsync(TeamId, CancellationToken.None); }
+        catch { _pendentes = []; }
+    }
+
+    private async Task Repassar(RepasseDeOverDto r)
+    {
+        var para = _escolhido.GetValueOrDefault(r.PremioId);
+        var nome = r.Companheiros.FirstOrDefault(c => c.PlayerId == para)?.Nome;
+        if (nome is null) return;
+        if (!await JS.InvokeAsync<bool>("confirm", $"Dar o +1 over de {r.JogadorNome} para {nome}? Não dá para trocar depois.")) return;
+
+        _ocupado = true; _erro = null;
+        try
+        {
+            await PremiosEstatSvc.RepassarPeloTreinadorAsync(Token, r.PremioId, para, CancellationToken.None);
+            _ok = $"{nome} ganhou o +1 over. A mudança vai para o save pelo Editor PES.";
+            _escolhido.Remove(r.PremioId);
+            await Carregar();
+        }
+        catch (InvalidOperationException ex) { _erro = ex.Message; }
+        finally { _ocupado = false; }
+    }
+}

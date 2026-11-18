@@ -2,9 +2,11 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Utilities
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject ILigaPublicService LigaService
+@inject IPremiosEstatisticaService PremiosEstatSvc
 @inject IJSRuntime JSRuntime
 @inject LayoutState LayoutState
 @inject LayoutNavigationService NavigationService
@@ -73,6 +75,87 @@
                 </div>
             </div>
         </div>
+
+        @if (_premios is { } pr)
+        {
+            <div class="card mt-3">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <Icone Nome="award" Tamanho="16" />
+                    <span class="fw-bold">Prêmios de estatística</span>
+                    <span class="text-muted small">top 3 · dinheiro para o clube e +1 over para o jogador · quem entra em duas repassa um over (o treinador escolhe na Minha Área)</span>
+                    <div class="ms-auto d-flex gap-2">
+                        @if (pr.JaDado)
+                        {
+                            <span class="badge bg-success align-self-center">Dados em @pr.DadoEm?.ToString("dd/MM HH:mm")</span>
+                            <button class="btn btn-sm btn-outline-danger" disabled="@_ocupado" @onclick="DesfazerPremios">Desfazer</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-primary" disabled="@(_ocupado || pr.Impedimento is not null)" @onclick="DarPremios">
+                                <Icone Nome="award" Tamanho="14" /> Dar prêmios e overs
+                            </button>
+                        }
+                    </div>
+                </div>
+                @if (pr.Impedimento is not null && !pr.JaDado)
+                {
+                    <div class="alert alert-warning m-3 mb-0 py-2 small">@pr.Impedimento</div>
+                }
+                @if (pr.Linhas.Count > 0)
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr class="small text-muted">
+                                    <th>Prêmio</th><th>Jogador</th><th class="text-end">Clube recebe</th><th>Over</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var l in pr.Linhas)
+                                {
+                                    <tr>
+                                        <td class="text-nowrap">@PremiosEstatistica.Titulo(l.Categoria, l.Posicao) <span class="text-muted small">(@l.Numero)</span></td>
+                                        <td>@l.JogadorNome <span class="text-muted small">@l.TimeNome</span></td>
+                                        <td class="text-end text-nowrap">@Dinheiro.Curto(l.Valor)</td>
+                                        <td class="small">
+                                            @if (l.OverDado)
+                                            {
+                                                <span class="text-success">+1 em @(l.OverParaNome ?? l.JogadorNome)</span>
+                                                @if (l.Repasse) { <span class="text-muted"> (repasse)</span> }
+                                                @if (l.NoSave) { <span class="badge bg-secondary ms-1">no save</span> }
+                                            }
+                                            else if (!pr.JaDado)
+                                            {
+                                                @(l.Repasse ? "repasse — o treinador escolhe o companheiro" : "+1 nele")
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex flex-wrap gap-1 align-items-center">
+                                                    <span class="text-warning-emphasis">@(l.Repasse ? "esperando o treinador escolher" : "over não foi dado")</span>
+                                                    @if (l.Repasse && _companheiros.TryGetValue(l.PremioId!.Value, out var opcoes))
+                                                    {
+                                                        var id = l.PremioId!.Value;
+                                                        <select class="form-select form-select-sm w-auto" value="@_escolhido.GetValueOrDefault(id)"
+                                                                @onchange="e => _escolhido[id] = int.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+                                                            <option value="0">companheiro…</option>
+                                                            @foreach (var o in opcoes)
+                                                            {
+                                                                <option value="@o.PlayerId">@o.Nome (@o.Posicao @o.Overall)</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                    <button class="btn btn-sm btn-outline-primary" disabled="@_ocupado" @onclick="() => DarOver(l)">Dar over</button>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
     }
 </div>
 
@@ -83,6 +166,11 @@
     private IReadOnlyList<LigaEdicaoDto> _edicoes = Array.Empty<LigaEdicaoDto>();
     private Guid _ligaId;
     private string _texto = "";
+
+    private PremiosEstatisticaDto? _premios;
+    private bool _ocupado;
+    private readonly Dictionary<Guid, IReadOnlyList<PremioJogadorOpcaoDto>> _companheiros = new();
+    private readonly Dictionary<Guid, int> _escolhido = new();
 
     protected override void OnInitialized()
     {
@@ -134,8 +222,48 @@
                      .Select(n => new StatJogador(n.JogadorNome, n.TimeNome, Math.Round(n.Media, 2)))
                      .ToList(),
                 minimo);
+
+            await CarregarPremios();
         }
         catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task CarregarPremios()
+    {
+        _premios = await PremiosEstatSvc.GetAsync(_ligaId, CancellationToken.None);
+        _companheiros.Clear();
+        _escolhido.Clear();
+        foreach (var l in _premios.Linhas.Where(l => l.PremioId is not null && l.Repasse && !l.OverDado))
+            _companheiros[l.PremioId!.Value] = await PremiosEstatSvc.CompanheirosAsync(l.PremioId.Value, CancellationToken.None);
+    }
+
+    private Task DarPremios() => Acao(
+        $"Dar os prêmios de estatística da {_premios?.LigaNome}? Os clubes recebem o dinheiro e os jogadores o +1 over agora.",
+        () => PremiosEstatSvc.DarAsync(_ligaId, CancellationToken.None));
+
+    private Task DesfazerPremios() => Acao(
+        "Desfazer os prêmios de estatística dessa competição? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou).",
+        () => PremiosEstatSvc.DesfazerAsync(_ligaId, CancellationToken.None));
+
+    private Task DarOver(PremioEstatisticaLinhaDto l)
+    {
+        int? para = l.Repasse ? _escolhido.GetValueOrDefault(l.PremioId!.Value) : null;
+        if (l.Repasse && para is not > 0) { _erro = "Escolha o companheiro que recebe o over."; return Task.CompletedTask; }
+        return Acao($"Dar o +1 over do prêmio de {l.JogadorNome}?",
+            () => PremiosEstatSvc.DarOverAsync(l.PremioId!.Value, para, CancellationToken.None));
+    }
+
+    private async Task Acao(string pergunta, Func<Task<string>> passo)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", pergunta)) return;
+        _erro = null; _ok = null; _ocupado = true;
+        try
+        {
+            _ok = await passo();
+            await CarregarPremios();
+        }
+        catch (InvalidOperationException ex) { _erro = ex.Message; }
+        finally { _ocupado = false; }
     }
 
     private async Task Copiar()

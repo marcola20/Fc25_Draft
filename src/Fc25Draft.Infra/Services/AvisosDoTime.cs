@@ -31,6 +31,7 @@ internal static class AvisosDoTime
     public const string Treino = "TREINO";
     public const string PediuParaSair = "PEDIU_PARA_SAIR";
     public const string Promessa = "PROMESSA";
+    public const string Premio = "PREMIO";
 
     public static void Criar(DraftDbContext db, Guid teamId, string tipo, string texto, string? link, DateTime quando)
     {

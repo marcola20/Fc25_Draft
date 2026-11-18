@@ -173,74 +173,28 @@
         <p class="prem-section-desc">Top 3 de cada categoria recebem prêmio em dinheiro e +1 over.</p>
 
         <div class="prem-stats-grid">
-
-            <div class="prem-stat-card">
-                <div class="prem-stat-title">Artilharia</div>
-                <div class="prem-stat-rows">
-                    <div class="prem-stat-row">
-                        <span class="prem-medal ouro">1</span>
-                        <span class="prem-stat-money">8 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal prata">2</span>
-                        <span class="prem-stat-money">6 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal bronze">3</span>
-                        <span class="prem-stat-money">4 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
+            @foreach (var regra in PremiosEstatistica.Todas)
+            {
+                <div class="prem-stat-card">
+                    <div class="prem-stat-title">@regra.Nome</div>
+                    <div class="prem-stat-rows">
+                        @for (var i = 0; i < regra.Valores.Count; i++)
+                        {
+                            <div class="prem-stat-row">
+                                <span class="prem-medal @(i == 0 ? "ouro" : i == 1 ? "prata" : "bronze")">@(i + 1)</span>
+                                <span class="prem-stat-money">@Moeda(regra.Valores[i])</span>
+                                <span class="prem-over-badge">+1 over</span>
+                            </div>
+                        }
                     </div>
                 </div>
-            </div>
-
-            <div class="prem-stat-card">
-                <div class="prem-stat-title">Assistências</div>
-                <div class="prem-stat-rows">
-                    <div class="prem-stat-row">
-                        <span class="prem-medal ouro">1</span>
-                        <span class="prem-stat-money">6 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal prata">2</span>
-                        <span class="prem-stat-money">4 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal bronze">3</span>
-                        <span class="prem-stat-money">2 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="prem-stat-card">
-                <div class="prem-stat-title">Clean sheets</div>
-                <div class="prem-stat-rows">
-                    <div class="prem-stat-row">
-                        <span class="prem-medal ouro">1</span>
-                        <span class="prem-stat-money">6 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal prata">2</span>
-                        <span class="prem-stat-money">4 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                    <div class="prem-stat-row">
-                        <span class="prem-medal bronze">3</span>
-                        <span class="prem-stat-money">2 Mi</span>
-                        <span class="prem-over-badge">+1 over</span>
-                    </div>
-                </div>
-            </div>
-
+            }
         </div>
 
         <div class="prem-note-box">
-            <Icone Nome="triangle-alert" Tamanho="14" Classe="me-1" />Se um jogador receber <strong>2 overs</strong> por premiação individual, <strong>1 é repassado a um companheiro</strong> (escolha do treinador).
+            <Icone Nome="triangle-alert" Tamanho="14" Classe="me-1" />Empatados dividem a posição e cada um leva o prêmio dela.
+            Se um jogador receber <strong>2 overs</strong> por premiação individual, <strong>1 é repassado a um companheiro</strong>
+            (o treinador escolhe na Minha Área).
         </div>
     </section>
 
