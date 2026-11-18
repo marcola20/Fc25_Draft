@@ -71,6 +71,30 @@ window.fc25Share = {
     }
 };
 
+/** Copia o texto; se o navegador barrar a área de transferência, tenta pelo jeito antigo. Devolve se deu certo. */
+window.fc25Copiar = async function (texto) {
+    try {
+        await navigator.clipboard.writeText(texto);
+        return true;
+    } catch {
+        // tenta o jeito antigo abaixo
+    }
+
+    try {
+        const campo = document.createElement('textarea');
+        campo.value = texto;
+        campo.style.position = 'fixed';
+        campo.style.opacity = '0';
+        document.body.appendChild(campo);
+        campo.select();
+        const ok = document.execCommand('copy');
+        campo.remove();
+        return ok;
+    } catch {
+        return false;
+    }
+};
+
 window.fc25Files = {
     saveFileFromBase64: function (fileName, contentType, base64Data) {
         try {

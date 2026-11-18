@@ -53,7 +53,11 @@ public interface IPremiosService
     Task<IReadOnlyList<PremioVotosDoEleitorDto>> CedulasAsync(int temporada, CancellationToken ct);
 
     Task MarcarVencedorAsync(Guid candidatoId, bool vencedor, CancellationToken ct);
-    Task PublicarAsync(int temporada, CancellationToken ct);
+    /// <summary>
+    /// Publica (Plantão, página e ficha) e já dá o +1 over de cada vencedor. Quem ganhou dois prêmios leva o over
+    /// do primeiro; o do outro fica pendente para o admin repassar a um companheiro. Devolve o que foi feito.
+    /// </summary>
+    Task<string> PublicarAsync(int temporada, CancellationToken ct);
 
     /// <summary>
     /// +1 over do prêmio: sobe os atributos até a fórmula dar +1 e deixa a mudança pendente para o Editor PES.

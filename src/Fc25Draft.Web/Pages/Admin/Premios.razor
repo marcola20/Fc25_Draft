@@ -133,6 +133,39 @@
                 </div>
             }
 
+            @if (v.Situacao == SituacaoVotacao.Publicada)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                        <Icone Nome="message-circle" Tamanho="16" />
+                        <span class="fw-semibold">Textos para o WhatsApp</span>
+                        <span class="text-muted small">um com todos e um de cada prêmio, para soltar aos poucos</span>
+                        <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => _verTextos = !_verTextos">
+                            @(_verTextos ? "Esconder" : "Mostrar")
+                        </button>
+                    </div>
+                    @if (_verTextos)
+                    {
+                        <div class="card-body bg-body-tertiary">
+                            <div class="row g-3">
+                                @foreach (var (titulo, texto) in Textos(v))
+                                {
+                                    <div class="col-12 col-md-6 col-xl-4" @key="titulo">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <span class="fw-semibold small">@titulo</span>
+                                            <button class="btn btn-sm btn-success ms-auto" @onclick="() => Copiar(titulo, texto)">
+                                                <Icone Nome="copy" Tamanho="14" /> @(_copiado == titulo ? "Copiado!" : "Copiar")
+                                            </button>
+                                        </div>
+                                        <div class="p-3 rounded border" style="background:var(--bs-body-bg); white-space:pre-wrap; font-size:.9rem;">@((MarkupString)Prever(texto))</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
             @foreach (var categoria in v.Categorias)
             {
                 var regra = categoria.Regra;
@@ -327,8 +360,43 @@
 
     private Task Reabrir() => Fazer(() => PremiosSvc.ReabrirAsync(_temporada, default), "Votação reaberta.");
 
-    private Task Publicar() => Confirmar("Publicar o resultado? Ele vai para a página, para o Plantão e para a ficha dos jogadores.",
-        () => Fazer(() => PremiosSvc.PublicarAsync(_temporada, default), "Resultado publicado! Agora dê o +1 over dos vencedores."));
+    private Task Publicar() => Confirmar("Publicar o resultado? Ele vai para a página, para o Plantão e para a ficha dos jogadores, e os vencedores já ganham o +1 over.",
+        async () =>
+        {
+            await Mostrar(() => PremiosSvc.PublicarAsync(_temporada, default));
+            if (_erro is null) _verTextos = true;
+        });
+
+    private bool _verTextos = true;
+    private string? _copiado;
+
+    /// <summary>O texto com todos os vencedores e um de cada prêmio, com o link da página pública no fim.</summary>
+    private IEnumerable<(string Titulo, string Texto)> Textos(VotacaoPremiosDto v)
+    {
+        var link = $"{Navigation.BaseUri}premios?temporada={v.Temporada}";
+        yield return ("Todos os prêmios", PremiosTexto.Todos(v, link));
+        foreach (var categoria in v.Categorias.Where(c => c.Vencedores.Count > 0))
+            yield return ($"{categoria.Regra.Emoji} {categoria.Regra.Sigla}", PremiosTexto.Premio(categoria, v.Temporada, link));
+    }
+
+    private async Task Copiar(string titulo, string texto)
+    {
+        var ok = false;
+        try { ok = await JS.InvokeAsync<bool>("fc25Copiar", texto); }
+        catch (JSException) { }
+
+        _copiado = ok ? titulo : null;
+        _erro = ok ? null : "O navegador não deixou copiar sozinho — selecione o texto e copie na mão.";
+    }
+
+    /// <summary>Mostra o negrito e o itálico como o WhatsApp mostra.</summary>
+    private static string Prever(string texto)
+    {
+        var seguro = System.Net.WebUtility.HtmlEncode(texto);
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"\*([^*\n]+)\*", "<strong>$1</strong>");
+        seguro = System.Text.RegularExpressions.Regex.Replace(seguro, @"_([^_\n]+)_", "<em>$1</em>");
+        return seguro;
+    }
 
     private Task SugerirDeNovo(PremiosTemporada.Regra regra) => Confirmar($"Trocar os finalistas de {regra.Sigla} pelas sugestões do site?",
         () => Fazer(() => PremiosSvc.SugerirDeNovoAsync(_temporada, regra.Categoria, default), "Sugestões refeitas."));
@@ -395,7 +463,7 @@
         SituacaoVotacao.Preparando => "1. Montando os finalistas (ninguém vê ainda)",
         SituacaoVotacao.Aberta => "2. Votação aberta",
         SituacaoVotacao.Encerrada => "3. Apuração: confira os vencedores (empate você decide) e publique",
-        _ => "4. Resultado publicado: dê o +1 over"
+        _ => "4. Resultado publicado: mande os textos no grupo e leve o over ao save pelo Editor PES"
     };
 
     /// <summary>Na linha de corte com outro de mesmos votos, quando não cabem todos.</summary>

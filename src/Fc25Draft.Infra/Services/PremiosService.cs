@@ -339,7 +339,7 @@ public class PremiosService : IPremiosService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task PublicarAsync(int temporada, CancellationToken ct)
+    public async Task<string> PublicarAsync(int temporada, CancellationToken ct)
     {
         var votacao = await ExigirAsync(temporada, SituacaoVotacao.Encerrada, "Encerre a votação antes de publicar.", ct);
 
@@ -353,6 +353,54 @@ public class PremiosService : IPremiosService
         votacao.Situacao = SituacaoVotacao.Publicada;
         votacao.PublicadaEm = Agora;
         await _db.SaveChangesAsync(ct);
+
+        return await DarOversDaTemporadaAsync(temporada, ct);
+    }
+
+    /// <summary>
+    /// O +1 over de cada vencedor, na ordem dos prêmios (MVP primeiro). Quem já levou over por outro prêmio da
+    /// temporada fica pendente: o admin escolhe o companheiro que recebe no lugar.
+    /// </summary>
+    private async Task<string> DarOversDaTemporadaAsync(int temporada, CancellationToken ct)
+    {
+        var vencedores = await _db.PremiosCandidatos.AsNoTracking()
+            .Where(c => c.Temporada == temporada && c.Vencedor)
+            .Select(c => new { c.CandidatoId, c.Categoria, c.PlayerId, c.OverParaPlayerId, c.OverAplicadoEm, Nome = c.Player != null ? c.Player.Name : null })
+            .ToListAsync(ct);
+
+        var jaLevaram = vencedores.Where(c => c.OverAplicadoEm is not null && c.OverParaPlayerId is not null)
+            .Select(c => c.OverParaPlayerId!.Value).ToHashSet();
+
+        var dados = new List<string>();
+        var pendentes = new List<string>();
+        var ordem = PremiosTemporada.Todas.Select(r => r.Categoria).ToList();
+
+        foreach (var c in vencedores.Where(c => PremiosTemporada.De(c.Categoria).DaOver && c.PlayerId is not null && c.OverAplicadoEm is null)
+                     .OrderBy(c => ordem.IndexOf(c.Categoria)).ThenBy(c => c.Nome))
+        {
+            var sigla = PremiosTemporada.De(c.Categoria).Sigla;
+            if (jaLevaram.Contains(c.PlayerId!.Value))
+            {
+                pendentes.Add($"{c.Nome} ({sigla}, já levou over por outro prêmio — repasse a um companheiro)");
+                continue;
+            }
+
+            try
+            {
+                await AplicarOverAsync(c.CandidatoId, null, ct);
+                jaLevaram.Add(c.PlayerId.Value);
+                dados.Add($"{c.Nome} ({sigla})");
+            }
+            catch (InvalidOperationException ex)
+            {
+                pendentes.Add($"{c.Nome} ({sigla}: {ex.Message})");
+            }
+        }
+
+        var resumo = "Resultado publicado no Plantão.";
+        if (dados.Count > 0) resumo += $" +1 over dado em: {string.Join(", ", dados)} — abra o Editor PES para levar ao save.";
+        if (pendentes.Count > 0) resumo += $" Falta dar à mão: {string.Join("; ", pendentes)}.";
+        return resumo;
     }
 
     public async Task<string> AplicarOverAsync(Guid candidatoId, int? paraPlayerId, CancellationToken ct)
@@ -376,12 +424,11 @@ public class PremiosService : IPremiosService
         var antesOverall = jogador.Overall;
         var agora = _time.GetUtcNow().UtcDateTime;
 
-        candidato.OverParaPlayerId = alvoId;
-        candidato.OverAplicadoEm = Agora;
-
         if (jogador.Atributos?.PosicaoPes is not int pos)
         {
             // Sem atributos do jogo não há o que mandar ao Editor PES: só o overall do site sobe.
+            candidato.OverParaPlayerId = alvoId;
+            candidato.OverAplicadoEm = Agora;
             jogador.Overall = Math.Min(AtributosPes.Maximo, jogador.Overall + 1);
             await _db.SaveChangesAsync(ct);
             return $"{jogador.Name}: overall {antesOverall} → {jogador.Overall} só no site (sem atributos do jogo — dê o over no PES à mão).";
@@ -392,6 +439,10 @@ public class PremiosService : IPremiosService
         var evolucao = OverallPes.Evoluir(antes, pos, dto.EstiloDeJogo, dto.PeFracoUso, dto.PeFracoPrecisao, antesOverall + 1);
         if (evolucao.Novos.SequenceEqual(antes))
             throw new InvalidOperationException($"{jogador.Name}: os atributos já estão no limite, nada mudou.");
+
+        // Só marca depois do último "não dá": senão a marca ficava na memória e ia junto no próximo salvar.
+        candidato.OverParaPlayerId = alvoId;
+        candidato.OverAplicadoEm = Agora;
 
         for (var i = 0; i < antes.Length; i++)
             AtributosPes.Todos[i].Set(dto, evolucao.Novos[i]);
