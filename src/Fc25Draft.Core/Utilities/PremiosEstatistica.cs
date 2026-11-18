@@ -16,6 +16,9 @@ public static class PremiosEstatistica
 {
     private const decimal Mi = 1_000_000m;
 
+    /// <summary>Quem recebe um over repassado precisa estar com overall até este.</summary>
+    public const int OverallMaximoDoRepasse = 87;
+
     public static readonly IReadOnlyList<RegraEstatistica> Todas = new[]
     {
         new RegraEstatistica(CategoriaEstatistica.Artilharia, "Artilharia", "artilheiro", new[] { 8 * Mi, 6 * Mi, 4 * Mi }),

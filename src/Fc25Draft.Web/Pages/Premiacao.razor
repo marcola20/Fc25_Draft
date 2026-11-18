@@ -170,7 +170,7 @@
             <Icone Nome="chart-column" Tamanho="18" Classe="prem-section-icon" />
             <h3>Premiações Individuais de Estatística</h3>
         </div>
-        <p class="prem-section-desc">Top 3 de cada categoria recebem prêmio em dinheiro e +1 over.</p>
+        <p class="prem-section-desc">Top 3 da temporada em cada categoria, <strong>somando Série A, Série B e Copa</strong>: o clube recebe o dinheiro e o jogador +1 over.</p>
 
         <div class="prem-stats-grid">
             @foreach (var regra in PremiosEstatistica.Todas)
@@ -194,7 +194,7 @@
         <div class="prem-note-box">
             <Icone Nome="triangle-alert" Tamanho="14" Classe="me-1" />Empatados dividem a posição e cada um leva o prêmio dela.
             Se um jogador receber <strong>2 overs</strong> por premiação individual, <strong>1 é repassado a um companheiro</strong>
-            (o treinador escolhe na Minha Área).
+            (o treinador escolhe na Minha Área, entre os que têm overall até @PremiosEstatistica.OverallMaximoDoRepasse).
         </div>
     </section>
 

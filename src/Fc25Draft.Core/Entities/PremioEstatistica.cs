@@ -9,26 +9,28 @@ public enum CategoriaEstatistica
 }
 
 /// <summary>
-/// Um jogador premiado no top 3 de uma estatística de uma competição: o dinheiro vai para o clube dele e o
+/// Um jogador premiado no top 3 de uma estatística da temporada (Série A, Série B e Copa somadas): o dinheiro vai para o clube dele e o
 /// +1 over para ele. Quem já levou over por outra estatística da temporada tem o over repassado a um
 /// companheiro, que o treinador do clube escolhe na Minha Área.
 /// </summary>
 public class PremioEstatistica
 {
     public Guid PremioId { get; set; }
-    public Guid LigaId { get; set; }
     public int Temporada { get; set; }
     public CategoriaEstatistica Categoria { get; set; }
 
     /// <summary>1, 2 ou 3. Empatados dividem a posição e cada um leva o prêmio inteiro dela.</summary>
     public int Posicao { get; set; }
 
-    /// <summary>Gols, assistências ou clean sheets.</summary>
+    /// <summary>Gols, assistências ou clean sheets na temporada.</summary>
     public int Numero { get; set; }
+
+    /// <summary>De onde veio o número: "Série A 9 · Copa 3".</summary>
+    public string? Detalhe { get; set; }
 
     public int PlayerId { get; set; }
 
-    /// <summary>Clube que recebeu o dinheiro (o do jogador na competição).</summary>
+    /// <summary>Clube que recebeu o dinheiro (o do jogador quando o prêmio foi dado).</summary>
     public Guid? TimeId { get; set; }
     public decimal Valor { get; set; }
     public DateTime PagoEm { get; set; }
@@ -42,7 +44,6 @@ public class PremioEstatistica
     /// <summary>A mudança de atributos que vai para o save pelo Editor PES; nula se o jogador não tem atributos do jogo.</summary>
     public int? EvolucaoPesId { get; set; }
 
-    public Liga Liga { get; set; } = null!;
     public Player Player { get; set; } = null!;
     public Team? Time { get; set; }
     public Player? OverPara { get; set; }

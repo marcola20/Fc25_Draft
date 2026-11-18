@@ -81,8 +81,8 @@
             <div class="card mt-3">
                 <div class="card-header d-flex flex-wrap align-items-center gap-2">
                     <Icone Nome="award" Tamanho="16" />
-                    <span class="fw-bold">Prêmios de estatística</span>
-                    <span class="text-muted small">top 3 · dinheiro para o clube e +1 over para o jogador · quem entra em duas repassa um over (o treinador escolhe na Minha Área)</span>
+                    <span class="fw-bold">Prêmios de estatística da temporada @pr.Temporada</span>
+                    <span class="text-muted small">soma @string.Join(", ", pr.Competicoes) · top 3 · dinheiro para o clube e +1 over para o jogador · quem entra em duas repassa um over (o treinador escolhe na Minha Área, overall até @PremiosEstatistica.OverallMaximoDoRepasse)</span>
                     <div class="ms-auto d-flex gap-2">
                         @if (pr.JaDado)
                         {
@@ -114,7 +114,9 @@
                                 @foreach (var l in pr.Linhas)
                                 {
                                     <tr>
-                                        <td class="text-nowrap">@PremiosEstatistica.Titulo(l.Categoria, l.Posicao) <span class="text-muted small">(@l.Numero)</span></td>
+                                        <td class="text-nowrap">@PremiosEstatistica.Titulo(l.Categoria, l.Posicao) <span class="text-muted small">(@l.Numero)</span>
+                                            @if (!string.IsNullOrEmpty(l.Detalhe)) { <div class="text-muted small">@l.Detalhe</div> }
+                                        </td>
                                         <td>@l.JogadorNome <span class="text-muted small">@l.TimeNome</span></td>
                                         <td class="text-end text-nowrap">@Dinheiro.Curto(l.Valor)</td>
                                         <td class="small">
@@ -230,7 +232,11 @@
 
     private async Task CarregarPremios()
     {
-        _premios = await PremiosEstatSvc.GetAsync(_ligaId, CancellationToken.None);
+        _premios = null;
+        _companheiros.Clear();
+        if (_edicoes.FirstOrDefault(e => e.LigaId == _ligaId)?.Temporada is not int temporada) return;
+
+        _premios = await PremiosEstatSvc.GetAsync(temporada, CancellationToken.None);
         _companheiros.Clear();
         _escolhido.Clear();
         foreach (var l in _premios.Linhas.Where(l => l.PremioId is not null && l.Repasse && !l.OverDado))
@@ -238,12 +244,12 @@
     }
 
     private Task DarPremios() => Acao(
-        $"Dar os prêmios de estatística da {_premios?.LigaNome}? Os clubes recebem o dinheiro e os jogadores o +1 over agora.",
-        () => PremiosEstatSvc.DarAsync(_ligaId, CancellationToken.None));
+        $"Dar os prêmios de estatística da temporada {_premios?.Temporada} (Série A, Série B e Copa somadas)? Os clubes recebem o dinheiro e os jogadores o +1 over agora.",
+        () => PremiosEstatSvc.DarAsync(_premios!.Temporada, CancellationToken.None));
 
     private Task DesfazerPremios() => Acao(
-        "Desfazer os prêmios de estatística dessa competição? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou).",
-        () => PremiosEstatSvc.DesfazerAsync(_ligaId, CancellationToken.None));
+        $"Desfazer os prêmios de estatística da temporada {_premios?.Temporada}? Tira o dinheiro dos clubes e os overs (se o Editor PES ainda não levou).",
+        () => PremiosEstatSvc.DesfazerAsync(_premios!.Temporada, CancellationToken.None));
 
     private Task DarOver(PremioEstatisticaLinhaDto l)
     {

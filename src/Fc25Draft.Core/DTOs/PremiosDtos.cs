@@ -58,11 +58,13 @@ public record PremioConquistadoDto(int Temporada, CategoriaPremio Categoria, str
     public PremiosTemporada.Regra Regra => PremiosTemporada.De(Categoria);
 }
 
-/// <summary>Premiações de estatística de uma competição: as já dadas ou a prévia do que vai ser dado.</summary>
+/// <summary>
+/// Premiações de estatística da temporada (Série A, Série B e Copa somadas): as já dadas ou a prévia do que vai
+/// ser dado. <c>Competicoes</c> são as que entram na soma.
+/// </summary>
 public record PremiosEstatisticaDto(
-    Guid LigaId,
-    string LigaNome,
-    int? Temporada,
+    int Temporada,
+    IReadOnlyList<string> Competicoes,
     bool Encerrada,
     bool JaDado,
     DateTime? DadoEm,
@@ -78,6 +80,7 @@ public record PremioEstatisticaLinhaDto(
     Fc25Draft.Core.Entities.CategoriaEstatistica Categoria,
     int Posicao,
     int Numero,
+    string? Detalhe,
     int PlayerId,
     string JogadorNome,
     Guid? TimeId,

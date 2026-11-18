@@ -419,6 +419,9 @@ public class PremiosService : IPremiosService
         var jogador = await _db.Players.Include(p => p.Atributos).FirstOrDefaultAsync(p => p.PlayerId == alvoId, ct)
             ?? throw new InvalidOperationException("Jogador não encontrado.");
 
+        if (alvoId != candidato.PlayerId && jogador.Overall > PremiosEstatistica.OverallMaximoDoRepasse)
+            throw new InvalidOperationException($"{jogador.Name} tem overall {jogador.Overall}: o over repassado só vai para quem tem até {PremiosEstatistica.OverallMaximoDoRepasse}.");
+
         var titulo = PremiosTemporada.Titulo(candidato.Categoria, candidato.Temporada);
         var motivo = alvoId == candidato.PlayerId ? $"Prêmio {titulo}" : $"Prêmio {titulo} (repasse)";
 
@@ -466,7 +469,8 @@ public class PremiosService : IPremiosService
         if (candidato?.Clube is not Guid clube) return Array.Empty<PremioJogadorOpcaoDto>();
 
         var jogadores = await _db.Players.AsNoTracking()
-            .Where(p => p.CurrentTeamId == clube && p.PlayerId != candidato.PlayerId && p.AposentadoNaTemporada == null)
+            .Where(p => p.CurrentTeamId == clube && p.PlayerId != candidato.PlayerId && p.AposentadoNaTemporada == null
+                        && p.Overall <= PremiosEstatistica.OverallMaximoDoRepasse)
             .OrderByDescending(p => p.Overall)
             .Select(p => new { p.PlayerId, p.Name, p.PositionId, p.Overall, Time = p.CurrentTeam!.TeamName })
             .ToListAsync(ct);
