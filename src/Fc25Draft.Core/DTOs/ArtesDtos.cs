@@ -5,13 +5,12 @@ namespace Fc25Draft.Core.DTOs;
 /// <summary>Um pedido de arte como vai para o Artista CBFV: tudo que ele precisa, já resolvido.</summary>
 public record PedidoArteDto(
     Guid Id,
-    string Tipo,          // "premio" | "contratacao" | "draft" (1 escolha) | "draft-grupo" (escolhas 4 a 8) | "selecao" | "loteria"
+    string Tipo,          // "premio" | "contratacao" | "draft" (1 escolha) | "draft-grupo" (escolhas 4 a 8) | "selecao"
     string Titulo,
     PremioArteDto? Premio,
     ContratacaoArteDto? Contratacao,
     DraftArteDto? Draft = null,
-    SelecaoArteDto? Selecao = null,
-    LoteriaArteDto? Loteria = null);
+    SelecaoArteDto? Selecao = null);
 
 public record PremioArteDto(
     string Sigla,         // "MVP"
@@ -68,17 +67,6 @@ public record JogadorSelecaoDto(
     bool Craque,          // a maior nota da seleção
     int? Numero,
     string? FotoUrl);
-
-public record LoteriaArteDto(
-    string Nome,          // "Brasileirão CBFV 2010"
-    IReadOnlyList<PickLoteriaArteDto> Picks);    // round 1 e round 2, na ordem
-
-public record PickLoteriaArteDto(
-    int Rodada,           // round do draft (1 ou 2)
-    int Pick,
-    string Clube,
-    int Posicao,          // posição na tabela de onde veio
-    string? Origem);      // "8º da Série B", "Eliminado nas quartas" (nulo nas loterias antigas)
 
 /// <summary>O agente avisa o que aconteceu com o pedido.</summary>
 public record ConcluirPedidoArteRequest(bool Ok, string? Erro);
