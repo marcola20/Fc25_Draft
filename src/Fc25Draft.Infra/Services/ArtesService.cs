@@ -14,10 +14,10 @@ public class ArtesService : IArtesService
     /// <summary>Um pedido entregue tantas vezes sem resposta do agente vira "falhou" (o admin manda refazer).</summary>
     private const int MaximoDeEntregas = 3;
 
-    // Draft: até a 3ª escolha, uma arte cada; da 4ª à 8ª, uma arte com as cinco.
+    // Draft: até a 3ª escolha, uma arte cada; depois, de 5 em 5 até o fim (4–8, 9–13, 14–18...; o último bloco
+    // fecha com a última escolha do draft).
     private const int UltimaIndividual = 3;
-    private const int PrimeiraDoGrupo = 4;
-    private const int UltimaDoGrupo = 8;
+    private const int TamanhoDoGrupo = 5;
 
     private static readonly TransferType[] TiposDeContratacao =
         [TransferType.MarketAuction, TransferType.TeamSale, TransferType.TeamTrade, TransferType.Loan, TransferType.LoanPurchase];
@@ -156,16 +156,15 @@ public class ArtesService : IArtesService
             novos.Add(Novo(TipoPedidoArte.Contratacao, chave, t.TransferId, $"{t.Jogador} {seta} {t.Para}{valor} · over {t.Over}"));
         }
 
-        // Draft: as 3 primeiras escolhas, uma arte cada, e as escolhas 4 a 8 juntas quando a 8ª sai.
+        // Draft: as 3 primeiras escolhas, uma arte cada; depois um bloco de 5 por vez, quando a última dele sai.
         var escolhas = await _db.DraftPicks.AsNoTracking()
-            .Where(p => p.PlayerId != null && p.PickedAtUtc >= desde && p.OverallPick <= UltimaDoGrupo)
+            .Where(p => p.PlayerId != null && p.PickedAtUtc >= desde)
             .Select(p => new { p.DraftId, p.OverallPick, Jogador = p.Player!.Name, Clube = p.Team.TeamName, NomeDraft = p.Draft.Name })
             .ToListAsync(ct);
         var draftIds = escolhas.Select(e => e.DraftId).Distinct().ToList();
-        var faixas = await _db.DraftPicks.AsNoTracking()
-            .Where(p => draftIds.Contains(p.DraftId) && p.OverallPick >= PrimeiraDoGrupo && p.OverallPick <= UltimaDoGrupo)
-            .GroupBy(p => p.DraftId)
-            .Select(g => new { DraftId = g.Key, Total = g.Count(), Feitas = g.Count(p => p.PlayerId != null) })
+        var todas = await _db.DraftPicks.AsNoTracking()
+            .Where(p => draftIds.Contains(p.DraftId))
+            .Select(p => new { p.DraftId, p.OverallPick, Feita = p.PlayerId != null })
             .ToListAsync(ct);
         foreach (var e in escolhas.Where(e => e.OverallPick <= UltimaIndividual).OrderBy(e => e.OverallPick))
         {
@@ -174,12 +173,21 @@ public class ArtesService : IArtesService
             novos.Add(Novo(TipoPedidoArte.DraftEscolha, chave, e.DraftId,
                 $"{e.NomeDraft} · {e.OverallPick}ª escolha · {e.Jogador} ({e.Clube})"));
         }
-        foreach (var f in faixas.Where(f => f.Total > 0 && f.Feitas == f.Total))
+        foreach (var draftId in draftIds)
         {
-            var chave = $"draft:{f.DraftId}:{PrimeiraDoGrupo}-{UltimaDoGrupo}";
-            if (chaves.Contains(chave)) continue;
-            var nome = escolhas.First(e => e.DraftId == f.DraftId).NomeDraft;
-            novos.Add(Novo(TipoPedidoArte.DraftGrupo, chave, f.DraftId, $"{nome} · escolhas {PrimeiraDoGrupo} a {UltimaDoGrupo}"));
+            var picks = todas.Where(p => p.DraftId == draftId).ToList();
+            var ultima = picks.Max(p => p.OverallPick);
+            var nome = escolhas.First(e => e.DraftId == draftId).NomeDraft;
+            foreach (var (de, ate) in ArtesRegras.BlocosDoDraft(UltimaIndividual, TamanhoDoGrupo, ultima))
+            {
+                var bloco = picks.Where(p => p.OverallPick >= de && p.OverallPick <= ate).ToList();
+                if (bloco.Count == 0 || !bloco.All(p => p.Feita)) continue;
+                // só blocos com alguma escolha feita depois de ligar (nada de arte de draft antigo)
+                if (!escolhas.Any(e => e.DraftId == draftId && e.OverallPick >= de && e.OverallPick <= ate)) continue;
+                var chave = $"draft:{draftId}:{de}-{ate}";
+                if (chaves.Contains(chave)) continue;
+                novos.Add(Novo(TipoPedidoArte.DraftGrupo, chave, draftId, $"{nome} · escolhas {de} a {ate}"));
+            }
         }
 
         // Seleção da rodada: rodada de liga (Série A, Série B) com todos os jogos encerrados, o último depois de ligar.
