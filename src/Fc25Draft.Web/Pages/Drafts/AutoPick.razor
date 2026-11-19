@@ -67,7 +67,8 @@
 }
 
 <div class="row g-4">
-    <div class="col-lg-4 order-lg-2">
+    @* Logado e sem lista para montar: o aviso fica na coluna principal, sem card vazio ao lado. *@
+    <div class="col-lg-4 order-lg-2 @(SemListaLogado ? "d-none" : string.Empty)">
         <div class="card shadow-sm sticky-lg-top" style="top: 1rem;">
             <div class="card-body">
                 @if (!authInitialized)
@@ -96,7 +97,7 @@
                     </div>
                 }
 
-                @if (!string.IsNullOrWhiteSpace(tokenNotice))
+                @if (!string.IsNullOrWhiteSpace(tokenNotice) && !AdminAuth.IsAuthenticated)
                 {
                     <p class="small text-warning mb-3">@tokenNotice</p>
                 }
@@ -311,7 +312,14 @@
         }
         else if (config is null && authInitialized && !isLoading)
         {
-            <p class="text-muted">Informe o seu token para montar a lista.</p>
+            @if (AdminAuth.IsAuthenticated && !string.IsNullOrWhiteSpace(tokenNotice))
+            {
+                <div class="alert alert-info" role="status">@tokenNotice</div>
+            }
+            else if (!AdminAuth.IsAuthenticated && string.IsNullOrWhiteSpace(tokenNotice))
+            {
+                <p class="text-muted">Informe o seu token para montar a lista.</p>
+            }
         }
     </div>
 </div>
@@ -348,7 +356,9 @@
         ? AdminAuth.Token
         : (string.IsNullOrWhiteSpace(tokenInput) ? null : tokenInput.Trim());
 
-    private List<short> PosicoesEscolhidas => posicaoPorRodada.Values
+    private bool SemListaLogado => authInitialized && AdminAuth.IsAuthenticated && config is null && !isLoading;
+
+    private List<short> PosicoesEscolhidas =>posicaoPorRodada.Values
         .Where(v => v.HasValue)
         .Select(v => v!.Value)
         .Distinct()

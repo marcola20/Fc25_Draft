@@ -32,7 +32,7 @@ public class DraftAutoPickService
         var draft = await GetDraftDoTimeAsync(team.TeamId, ct);
         return draft is not null
             ? await MontarAsync(draft, team.TeamId, team.TeamName, ct)
-            : await MontarPreviaAsync(await GetPlanoObrigatorioAsync(ct), team.TeamId, team.TeamName, ct);
+            : await MontarPreviaAsync(await GetPlanoObrigatorioAsync(team.TeamId, ct), team.TeamId, team.TeamName, ct);
     }
 
     public async Task<DraftAutoPickSaveResultDto> SalvarAsync(string? token, DraftAutoPickSaveRequestDto request, CancellationToken ct = default)
@@ -42,7 +42,7 @@ public class DraftAutoPickService
 
         if (draft is null)
         {
-            var plano = await GetPlanoObrigatorioAsync(ct);
+            var plano = await GetPlanoObrigatorioAsync(team.TeamId, ct);
             var (itensPrevia, rodadasPrevia) = await ValidarAsync(request, plano.Select(r => r.Round).ToList(), ct);
             await SalvarPreviaAsync(team.TeamId, request, itensPrevia, rodadasPrevia, ct);
             return new DraftAutoPickSaveResultDto(await MontarPreviaAsync(plano, team.TeamId, team.TeamName, ct), null);
@@ -477,13 +477,25 @@ public class DraftAutoPickService
         return temEscolha ? draft : null;
     }
 
-    private async Task<IReadOnlyList<DraftPlanoRodadaDto>> GetPlanoObrigatorioAsync(CancellationToken ct)
+    private async Task<IReadOnlyList<DraftPlanoRodadaDto>> GetPlanoObrigatorioAsync(Guid teamId, CancellationToken ct)
     {
         var plano = await GetPlanoAsync(ct);
-        if (plano.Count == 0)
-            throw new InvalidOperationException(
-                "Seu time não tem escolhas no draft atual, e o admin ainda não planejou o próximo draft. Assim que ele planejar, você já pode montar a lista.");
-        return plano;
+        if (plano.Count > 0)
+            return plano;
+
+        // Sem escolha em aberto: ou o time já usou todas as dele, ou não estava neste draft.
+        var ultimoDraftId = await _db.Drafts
+            .AsNoTracking()
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Select(d => (Guid?)d.DraftId)
+            .FirstOrDefaultAsync(ct);
+
+        var jaEscolheuTudo = ultimoDraftId is Guid draftId
+            && await _db.DraftPicks.AnyAsync(p => p.DraftId == draftId && p.TeamId == teamId, ct);
+
+        throw new InvalidOperationException(jaEscolheuTudo
+            ? "Seu time já fez todas as escolhas deste draft, então não há lista para montar agora. A lista do próximo draft abre aqui assim que o admin planejar as rodadas dele."
+            : "Seu time não tem escolhas no draft em andamento. A lista do próximo draft abre aqui assim que o admin planejar as rodadas dele.");
     }
 
     private void Soltar(Func<object, bool> filtro)
