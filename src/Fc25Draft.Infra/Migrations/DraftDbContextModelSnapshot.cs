@@ -23,6 +23,20 @@ namespace Fc25Draft.Infra.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "unaccent");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.AbaEscondida", b =>
+                {
+                    b.Property<string>("Rota")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("EscondidaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Rota");
+
+                    b.ToTable("AbasEscondidas", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.AberturaTemporada", b =>
                 {
                     b.Property<int>("Temporada")

@@ -6,4 +6,5 @@ public record MenuItem(
     string Icon,
     string? RequiredRole = null,
     bool IsOptional = false,
-    bool MatchPrefix = false);
+    bool MatchPrefix = false,
+    bool Escondida = false);

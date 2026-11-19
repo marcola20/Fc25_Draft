@@ -7,6 +7,16 @@ namespace Fc25Draft.Web.Services;
 
 public class LayoutNavigationService
 {
+    private readonly AbasEscondidas _escondidas;
+
+    public LayoutNavigationService(AbasEscondidas escondidas)
+    {
+        _escondidas = escondidas;
+    }
+
+    /// <summary>A Central é a página inicial: não dá para esconder.</summary>
+    private static readonly HashSet<string> NuncaEscondidas = new(StringComparer.OrdinalIgnoreCase) { "/home" };
+
     // Menu por assunto. O título de cada item vira o título do cabeçalho e o caminho "Início › grupo ›
     // página" das telas que não têm PageDefinition própria (ver GetPageDefinition).
     private static readonly IReadOnlyList<MenuGroup> MenuDefinition = new List<MenuGroup>
@@ -118,6 +128,7 @@ public class LayoutNavigationService
             new("Gerenciar Escalações", "/admin/escalacoes", "users"),
             new("Formações e Posições", "/admin/formacoes", "goal"),
             new("Configurações", "/admin/configuracoes", "settings"),
+            new("Abas do Site", "/admin/abas", "eye"),
             new("Administradores", "/admin/administradores", "key", RequiredRole: "AdminPrincipal")
         }, RequiredRole: "Admin", CollapseByDefault: true)
     };
@@ -463,6 +474,18 @@ public class LayoutNavigationService
                 new("Formações e Posições")
             }
         },
+        ["/admin/abas"] = new PageDefinition
+        {
+            Route = "/admin/abas",
+            Title = "Abas do Site",
+            Subtitle = "Quais páginas aparecem no menu para o pessoal — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Abas do Site")
+            }
+        },
         ["/admin/configuracoes"] = new PageDefinition
         {
             Route = "/admin/configuracoes",
@@ -800,9 +823,12 @@ public class LayoutNavigationService
                 continue;
             }
 
+            // Item escondido em /admin/abas: some para todo mundo; o admin continua vendo, marcado.
             var filteredItems = group.Items
                 .Where(item => IsRoleAllowed(item.RequiredRole, isAdmin, isPrincipal))
                 .Where(item => sorteioDaCopaNoAr || item.Href != "/copa/sorteio")
+                .Where(item => isAdmin || !EstaEscondida(item.Href))
+                .Select(item => EstaEscondida(item.Href) ? item with { Escondida = true } : item)
                 .ToList();
 
             if (filteredItems.Count == 0)
@@ -815,6 +841,25 @@ public class LayoutNavigationService
 
         return groups;
     }
+
+    /// <summary>O item do menu com esse endereço foi escondido em /admin/abas.</summary>
+    public bool EstaEscondida(string? href) => !NuncaEscondidas.Contains(href ?? "") && _escondidas.Escondida(href);
+
+    /// <summary>
+    /// Os grupos e itens do menu que o público vê (sem os de admin), para a tela /admin/abas escolher quais
+    /// esconder. A Central fica de fora: é a página inicial.
+    /// </summary>
+    public IReadOnlyList<MenuGroup> ItensQuePodemSerEscondidos() =>
+        MenuDefinition
+            .Where(g => string.IsNullOrWhiteSpace(g.RequiredRole))
+            .Select(g => g with
+            {
+                Items = g.Items
+                    .Where(i => string.IsNullOrWhiteSpace(i.RequiredRole) && !NuncaEscondidas.Contains(i.Href))
+                    .ToList()
+            })
+            .Where(g => g.Items.Count > 0)
+            .ToList();
 
     public PageDefinition? GetPageDefinition(string? route)
     {

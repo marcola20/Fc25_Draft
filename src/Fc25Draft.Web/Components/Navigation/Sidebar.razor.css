@@ -176,3 +176,14 @@
     flex: 1;
     text-align: left;
 }
+
+/* Item escondido em Admin › Abas do Site: só o admin vê, apagado e com o olho cortado. */
+.app-sidebar ::deep .sidebar-link-escondida:not(.active) .sidebar-link-text {
+    opacity: 0.55;
+}
+
+.app-sidebar ::deep .sidebar-link-escondida-icone {
+    margin-left: auto;
+    flex-shrink: 0;
+    color: var(--cbfv-moldura-texto-3);
+}

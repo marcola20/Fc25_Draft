@@ -37,9 +37,14 @@
                                 {
                                     var match = item.MatchPrefix ? NavLinkMatch.Prefix : NavLinkMatch.All;
                                     <li class="sidebar-item">
-                                        <NavLink class="sidebar-link" href="@item.Href" Match="@match">
+                                        <NavLink class="@(item.Escondida ? "sidebar-link sidebar-link-escondida" : "sidebar-link")" href="@item.Href" Match="@match"
+                                                 title="@(item.Escondida ? "Escondida para o pessoal (Admin › Abas do Site)" : null)">
                                             <Icone Nome="@item.Icon" Classe="sidebar-link-icone" />
                                             <span class="sidebar-link-text">@item.Title</span>
+                                            @if (item.Escondida)
+                                            {
+                                                <Icone Nome="eye-off" Tamanho="13" Classe="sidebar-link-escondida-icone" />
+                                            }
                                         </NavLink>
                                     </li>
                                 }

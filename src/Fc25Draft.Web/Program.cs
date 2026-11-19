@@ -63,6 +63,17 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogError(ex, "Falha ao carregar o catálogo da escalação; seguindo com o de fábrica");
     }
 
+    // Itens do menu escondidos em /admin/abas.
+    try
+    {
+        var escondidas = await scope.ServiceProvider.GetRequiredService<IAbasEscondidasService>().ListarAsync(CancellationToken.None);
+        app.Services.GetRequiredService<AbasEscondidas>().Usar(escondidas);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao carregar as abas escondidas; o menu aparece inteiro");
+    }
+
     // País dos jogadores que ainda não têm (vem da nacionalidade na base do PES).
     try
     {

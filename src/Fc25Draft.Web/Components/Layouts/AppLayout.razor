@@ -12,6 +12,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject CopaSorteioAoVivoService SorteioDaCopa
 @inject AbasService Abas
+@inject AbasEscondidas AbasEscondidas
 @implements IDisposable
 
 <div class="app-shell @(isSidebarCollapsed ? "collapsed" : string.Empty)">
@@ -160,6 +161,7 @@
         LayoutState.StateChanged += OnLayoutStateChanged;
         SorteioDaCopa.OnChange += OnSorteioDaCopaChanged;
         Abas.Mudou += OnAbasMudou;
+        AbasEscondidas.Mudou += OnAbasEscondidasMudou;
         homeRoute = NavigationService.HasRoute("/home") ? Navigation.ToAbsoluteUri("/home").ToString() : null;
     }
 
@@ -481,6 +483,17 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    // O admin escondeu ou mostrou itens em /admin/abas: o menu de quem está com o site aberto muda na hora.
+    private void OnAbasEscondidasMudou()
+    {
+        if (!authReady) return;
+        _ = InvokeAsync(async () =>
+        {
+            await RebuildMenuAsync();
+            StateHasChanged();
+        });
+    }
+
     // O sorteio avisa a cada time revelado; o menu só muda quando ele entra ou sai do ar.
     private void OnSorteioDaCopaChanged()
     {
@@ -501,6 +514,7 @@
         LayoutState.StateChanged -= OnLayoutStateChanged;
         SorteioDaCopa.OnChange -= OnSorteioDaCopaChanged;
         Abas.Mudou -= OnAbasMudou;
+        AbasEscondidas.Mudou -= OnAbasEscondidasMudou;
     }
 
     private record struct AuditContext(string UserId, string Role);

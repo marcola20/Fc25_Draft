@@ -27,7 +27,8 @@
         <h2 id="atalhos-titulo">Atalhos</h2>
     </div>
     <nav class="atalhos">
-        @foreach (var atalho in Atalhos)
+        @* Atalho de página escondida em Admin › Abas do Site não aparece. *@
+        @foreach (var atalho in Atalhos.Where(a => !NavigationService.EstaEscondida(a.Href)))
         {
             <a class="atalho" href="@atalho.Href">
                 <Icone Nome="@atalho.Icone" Tamanho="18" Classe="atalho-icone" />
