@@ -31,7 +31,7 @@
             }
             @foreach (var c in _selosNaTroca)
             {
-                <div class="fw-semibold mt-2">@(c.Tipo == TipoConquistaAlbum.AlbumCompleto ? "Você completou o álbum" : $"Página do {c.TimeNome} completa")</div>
+                <div class="fw-semibold mt-2">@(c.Tipo == TipoConquistaAlbum.AlbumCompleto ? "Você completou o álbum" : $"Página {c.DaPagina} completa")</div>
             }
             <button type="button" class="btn-close" @onclick="LimparOk"></button>
         </div>
@@ -750,6 +750,7 @@
     {
         TipoFigurinha.Escudo => $"Escudo do {f.TimeNome}",
         TipoFigurinha.Treinador => $"{f.PapelTexto} {f.Perfil?.NomeCurto ?? f.NomeImpresso}",
+        TipoFigurinha.Especial when f.Destaque is not null => $"{f.NomeImpresso} ({f.Destaque})",
         _ => f.NomeImpresso
     };
 

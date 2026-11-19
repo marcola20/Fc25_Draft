@@ -3,27 +3,55 @@
 
 @* A figurinha do álbum, em HTML/CSS: escala com a largura e não depende de imagem pronta. Vazia, vira a
    vaga do álbum (número e nome em cinza, como no álbum de verdade). A de técnico tem visual próprio
-   (prancheta, campinho do esquema favorito e a frase) e mostra o perfil de agora. *@
+   (prancheta, campinho do esquema favorito e a frase) e mostra o perfil de agora. A especial (Organização,
+   Campeões, Lendários) mostra a arte inteira que o admin subiu; sem arte, monta uma com foto ou escudo. *@
 @if (Vazia)
 {
-    <div class="carta vaga @(Figurinha.Tipo == TipoFigurinha.Escudo ? "t-escudo" : Figurinha.Tipo == TipoFigurinha.Treinador ? "t-treinador" : "")" style="--w: @(Largura)px"
+    <div class="carta vaga @ClasseDaVaga" style="--w: @(Largura)px"
          title="@Titulo">
+        @if (InfoEspecial is { } info)
+        {
+            <span class="vaga-icone"><Icone Nome="@info.Icone" Tamanho="@((int)(Largura * 0.16))" /></span>
+        }
         <span class="vaga-num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
         <span class="vaga-nome">@Figurinha.NomeImpresso</span>
-        @if (Figurinha.PosicaoSigla is not null)
+        @if (Figurinha.Especial && Figurinha.Destaque is not null)
+        {
+            <span class="vaga-pos">@Figurinha.Destaque</span>
+        }
+        else if (Figurinha.PosicaoSigla is not null && !Figurinha.Especial)
         {
             <span class="vaga-pos">@Figurinha.PosicaoSigla</span>
         }
-        @if (Figurinha.DaAtualizacao)
+        @if (Figurinha.DaAtualizacao && !Figurinha.Especial)
         {
             <span class="vaga-atualizacao" title="Chegou ao clube depois do lançamento do álbum">atualização</span>
         }
     </div>
 }
+else if (Figurinha.Especial && Figurinha.TemArte)
+{
+    @* A arte é a carta inteira: só o número e o reflexo da raridade vão por cima. *@
+    <div class="carta t-especial com-arte @ClasseDaRaridade @ClasseDaPagina @(Colar ? "colando" : "")" style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
+        <div class="moldura">
+            <img class="arte" src="/fotos/figurinhas/@Figurinha.FigurinhaId?v=@Figurinha.VersaoArte" alt="@Titulo" loading="@(Lazy ? "lazy" : "eager")" decoding="async" />
+            <span class="num num-arte">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
+            <div class="brilho" aria-hidden="true"></div>
+        </div>
+        @if (Nova)
+        {
+            <span class="marca-nova">NOVA</span>
+        }
+        @if (Quantidade > 1)
+        {
+            <span class="marca-qtd" title="@(Quantidade - 1) repetida(s)">×@Quantidade</span>
+        }
+    </div>
+}
 else
 {
-    <div class="carta @ClasseDaRaridade @ClasseDoTipo @(Figurinha.Lenda ? "lenda" : "")"
-         style="--w: @(Largura)px" title="@Titulo">
+    <div class="carta @ClasseDaRaridade @ClasseDoTipo @ClasseDaPagina @(Figurinha.Lenda ? "lenda" : "") @(Colar ? "colando" : "")"
+         style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
         <div class="moldura">
             @if (Figurinha.Tipo == TipoFigurinha.Treinador)
             {
@@ -32,6 +60,10 @@ else
             @if (Figurinha.Lenda)
             {
                 <div class="selo">Lenda</div>
+            }
+            else if (InfoEspecial is { } especial)
+            {
+                <div class="selo">@especial.Titulo</div>
             }
             else if (Figurinha.Raridade == RaridadeFigurinha.Lendaria && SeloLendaria is not null)
             {
@@ -43,6 +75,12 @@ else
                     <div class="ovr">
                         <span class="ovr-n">@Figurinha.Overall</span>
                         <span class="ovr-pos">@Figurinha.PosicaoSigla</span>
+                    </div>
+                }
+                else if (Figurinha.Especial)
+                {
+                    <div class="papel">
+                        <span class="papel-sigla">@Figurinha.PosicaoSigla</span>
                     </div>
                 }
                 else if (Figurinha.Tipo == TipoFigurinha.Treinador)
@@ -58,7 +96,33 @@ else
                 <span class="num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
             </div>
 
-            @if (Figurinha.Tipo == TipoFigurinha.Escudo)
+            @if (Figurinha.Especial)
+            {
+                @* Sem arte ainda: a foto de quem é (jogador ou pessoa), o escudo do clube ou o símbolo da página. *@
+                @if (Figurinha.PlayerId is { } jogador)
+                {
+                    <div class="foto">
+                        <FotoJogador PlayerId="@jogador" Tamanho="@((int)(Largura * 0.78))" Alt="@Figurinha.NomeImpresso" Lazy="@Lazy" />
+                    </div>
+                }
+                else if (Figurinha.TreinadorId is { } pessoa)
+                {
+                    <div class="foto">
+                        <FotoTreinador TreinadorId="@pessoa" Tamanho="@((int)(Largura * 0.78))" Versao="@Perfil?.VersaoFoto" Alt="@Figurinha.NomeImpresso" Lazy="@Lazy" />
+                    </div>
+                }
+                else if (Figurinha.TimeNome is not null)
+                {
+                    <div class="escudo-grande">
+                        <img src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="@Figurinha.TimeNome" loading="lazy" />
+                    </div>
+                }
+                else
+                {
+                    <div class="escudo-grande simbolo"><Icone Nome="@(InfoEspecial?.Icone ?? "star")" Tamanho="@((int)(Largura * 0.45))" /></div>
+                }
+            }
+            else if (Figurinha.Tipo == TipoFigurinha.Escudo)
             {
                 <div class="escudo-grande">
                     <img src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="@Figurinha.TimeNome" loading="lazy" />
@@ -85,7 +149,7 @@ else
             }
 
             <div class="faixa">
-                @if (Figurinha.Tipo != TipoFigurinha.Escudo)
+                @if (Figurinha.Tipo != TipoFigurinha.Escudo && Figurinha.TimeNome is not null)
                 {
                     <img class="escudo-mini" src="@Escudos.GetEscudo(Figurinha.TimeNome)" alt="" loading="lazy" />
                 }
@@ -145,6 +209,12 @@ else
 
     [Parameter] public bool Lazy { get; set; } = true;
 
+    /// <summary>Acabou de ser colada (página aberta pela primeira vez depois do pacote): entra com a animação de colar.</summary>
+    [Parameter] public bool Colar { get; set; }
+
+    /// <summary>Atraso da animação de colar, para as novas da página entrarem uma depois da outra.</summary>
+    [Parameter] public int AtrasoColar { get; set; }
+
     private PerfilTreinadorDto? Perfil => Figurinha.Perfil;
 
     /// <summary>Na de técnico vai o apelido (se tiver); o nome completo fica embaixo.</summary>
@@ -161,7 +231,22 @@ else
     {
         TipoFigurinha.Escudo => "t-escudo",
         TipoFigurinha.Treinador => "t-treinador",
+        // Especial com foto se comporta como a de jogador (topo claro sobre a foto).
+        TipoFigurinha.Especial => Figurinha.PlayerId is not null || Figurinha.TreinadorId is not null ? "t-especial t-jogador" : "t-especial t-escudo",
         _ => "t-jogador"
+    };
+
+    private AlbumFigurinhas.InfoPaginaEspecial? InfoEspecial => Figurinha.Pagina is { } p ? AlbumFigurinhas.Especial(p) : null;
+
+    /// <summary>"p-organizacao", "p-lendarios"…: o detalhe de cor de cada página especial.</summary>
+    private string ClasseDaPagina => InfoEspecial is { } info ? $"p-{info.Endereco}" : "";
+
+    private string ClasseDaVaga => Figurinha.Tipo switch
+    {
+        TipoFigurinha.Escudo => "t-escudo",
+        TipoFigurinha.Treinador => "t-treinador",
+        TipoFigurinha.Especial => $"t-especial {ClasseDaPagina}",
+        _ => ""
     };
 
     // Nome comprido diminui a letra em vez de cortar.
@@ -172,7 +257,9 @@ else
         _ => ""
     };
 
-    private string Titulo => Figurinha.Tipo == TipoFigurinha.Escudo
+    private string Titulo => Figurinha.Especial
+        ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.NomeImpresso}{(Figurinha.Destaque is null ? "" : $" · {Figurinha.Destaque}")}"
+        : Figurinha.Tipo == TipoFigurinha.Escudo
         ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · Escudo do {Figurinha.TimeNome}"
         : Figurinha.Tipo == TipoFigurinha.Treinador
         ? $"{AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)} · {Figurinha.PapelTexto} {Figurinha.NomeImpresso} · {Figurinha.TimeNome}"

@@ -353,6 +353,36 @@ O admin roda a atualização **à mão, com prévia**, em `/admin/album` (cartã
 - Página do clube: escudo, técnicos, elenco pela `Ordem` (não mais pelo número). A vaga de quem chegou mostra
   "atualização". Na reciclagem, a que saiu aparece com "saiu do álbum" e `RepetidaDto.ForaDoAlbum`.
 
+### Fase 7 — Páginas especiais e o álbum como livro
+Pedido (19/11/2026): ADMs no álbum (o admin escolhe quem entra), Hall da Fama com uma figurinha personalizada por
+campeão (uma página da Liga e uma da Copa), uns 5 jogadores lendários (ainda na liga ou de outras edições) e uma
+animação mais de álbum (capa, folhear as páginas). Feito na branch `feat/album-especiais`.
+
+**Feito (19/11/2026).** Como ficou:
+- `TipoFigurinha.Especial` + `Figurinha.Pagina` (`PaginaEspecial`: Organização, Campeões da Liga, Campeões da Copa,
+  Lendários). `Figurinha.TeamId` virou opcional (na especial é só o clube impresso na carta) e `Figurinha.HallOfFameId`
+  liga a figurinha de campeão ao título. Arte inteira em `FigurinhaArte` (tabela `FigurinhasArtes`), servida em
+  `GET /fotos/figurinhas/{id}?v=`. Migração `PaginasEspeciaisDoAlbum`.
+- As páginas especiais ficam em `AlbumFigurinhas.PaginasEspeciais` (título, endereço, ícone, raridade padrão, antes ou
+  depois dos clubes). A Organização abre o álbum; Campeões e Lendários vêm depois dos clubes. Página sem figurinha não
+  aparece. A página é identificada por `ChaveDaPagina` (clube ou especial); o selo de página completa ganhou
+  `AlbumConquista.Pagina`.
+- Entram com o próximo número do álbum e já valem nos pacotes, sorteadas pela raridade escolhida (padrão: ADM e
+  campeões brilhantes, lendários lendária). Com dono não saem mais; nome, texto, raridade, clube e arte mudam sempre.
+  A atualização do álbum não mexe nelas.
+- Admin: `/admin/album/especiais` (serviço em `AlbumService.Especiais.cs`, log `FigurinhasEspeciais`). ADMs da lista
+  de tokens ativos (quem tem pessoa ligada sai com a foto do perfil até a arte chegar); "Colocar os campeões do Hall da
+  Fama" cria uma por título de Liga e de Copa (a Supercopa fica de fora), do mais antigo para o mais novo, com o
+  escudo quando o clube existe; Lendários com nome, texto e, se quiser, o jogador da liga.
+- Arte: **600×840 px (5:7)**, WebP/PNG/JPEG; fora disso o `cbfvFoto.ler` (agora com proporção e limite) recorta no
+  meio e comprime até 300 KB. O número vai num selinho no canto de cima à direita.
+- `/album` virou livro (`cbfvAlbum` no `app.js`): capa fechada uma vez por sessão (abre girando pela lombada; botão
+  "Capa" volta a ela), sumário em seções (Abertura, Clubes, Hall da Fama e Lendas) com número de página, folhas de
+  papel com cabeçalho por página e rodapé "pág. N de M". Trocar de página vira a folha (cópia da folha atual girando por
+  cima; estilos em `site.css`), também pelas setas do teclado e arrastando para o lado no celular. A figurinha nova entra
+  "colando" (`CartaFigurinha.Colar`). Endereço novo `/album?pagina={id do clube | organizacao | campeoes-liga |
+  campeoes-copa | lendarios}`; o antigo `?clube=` continua valendo. Com "menos movimento" no sistema nada gira.
+
 ## Fotos das figurinhas
 
 Medida e enquadramento das fotos (jogador e técnico), para o álbum ficar padronizado:
@@ -375,6 +405,5 @@ Medida e enquadramento das fotos (jogador e técnico), para o álbum ficar padro
 
 ## Ideias para depois
 
-Páginas especiais (lendas do Hall da Fama, treinadores, momentos da temporada da linha do tempo),
-figurinha de edição limitada do craque da rodada (só sai nos pacotes daquela semana), torcedores
+Momentos da temporada da linha do tempo, figurinha de edição limitada do craque da rodada (só sai nos pacotes daquela semana), torcedores
 colecionando também, álbum físico em PDF para imprimir.

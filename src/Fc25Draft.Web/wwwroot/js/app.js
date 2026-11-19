@@ -390,10 +390,12 @@ window.cbfvPush = (function () {
 // rosto), reduz e comprime: WebP; onde o navegador não gera WebP, PNG para não perder o fundo transparente e,
 // se ainda ficar grande, JPEG sobre fundo branco.
 window.cbfvFoto = {
-    ler: async function (inputId, largura) {
+    // proporcao: largura ÷ altura (4:5 na foto de jogador; 5:7 na arte inteira da figurinha especial).
+    // limiteKb: o mesmo do servidor (300 nas fotos, 400 nas artes).
+    ler: async function (inputId, largura, proporcao, limiteKb) {
         largura = largura || 600;
-        const LIMITE = 300 * 1024; // o mesmo do servidor
-        const PROPORCAO = 4 / 5;   // largura ÷ altura
+        const LIMITE = (limiteKb || 300) * 1024;
+        const PROPORCAO = proporcao || 4 / 5;
         const input = document.getElementById(inputId);
         const arquivo = input && input.files && input.files[0];
         if (!arquivo) return null;
@@ -716,3 +718,135 @@ document.addEventListener('dragstart', (e) => {
         try { e.dataTransfer.setData('text/plain', 'jogador'); } catch { /* ignorado */ }
     }
 }, true);
+
+// Álbum de figurinhas como livro: a capa que abre (uma vez por sessão), a folha que vira ao trocar de página
+// (uma cópia da folha atual gira por cima enquanto o Blazor desenha a próxima embaixo), o arrastar para o lado
+// no celular e as setas do teclado. Com "menos movimento" no sistema, nada gira: a página só troca.
+window.cbfvAlbum = (function () {
+    const CHAVE_CAPA = 'cbfv-album-capa-aberta';
+    const reduzido = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let ponte = null;
+    let toque = null;
+    // A navegação do Blazor volta a tela para o topo; a posição de antes de virar é restaurada depois.
+    let rolagem = null;
+
+    function capaJaAberta() {
+        try { return sessionStorage.getItem(CHAVE_CAPA) === '1'; } catch { return true; }
+    }
+
+    function marcarCapaAberta() {
+        try { sessionStorage.setItem(CHAVE_CAPA, '1'); } catch { /* sem armazenamento: a capa volta na próxima */ }
+    }
+
+    function esquecerCapa() {
+        try { sessionStorage.removeItem(CHAVE_CAPA); } catch { }
+    }
+
+    // direcao > 0: para a frente (a folha vira para a esquerda, como num livro); < 0: volta.
+    function virar(direcao) {
+        rolagem = window.scrollY;
+        if (reduzido.matches) return;
+        const folha = document.querySelector('.livro-folhas .folha');
+        if (!folha) return;
+        const r = folha.getBoundingClientRect();
+        if (r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) return;
+
+        // Só a parte que está na tela gira (folha comprida no celular não vira um bloco gigante).
+        const topo = Math.max(r.top, 0);
+        const altura = Math.min(r.bottom, window.innerHeight) - topo;
+
+        const palco = document.createElement('div');
+        palco.className = 'folha-virando ' + (direcao < 0 ? 'para-tras' : 'para-frente');
+        Object.assign(palco.style, {
+            left: r.left + 'px', top: topo + 'px', width: r.width + 'px', height: altura + 'px'
+        });
+
+        const lamina = document.createElement('div');
+        lamina.className = 'lamina';
+        const frente = folha.cloneNode(true);
+        frente.removeAttribute('id');
+        frente.classList.add('lamina-frente');
+        frente.style.marginTop = (r.top - topo) + 'px';
+        const verso = document.createElement('div');
+        verso.className = 'lamina-verso';
+        const sombra = document.createElement('div');
+        sombra.className = 'lamina-sombra';
+        lamina.append(frente, verso, sombra);
+        palco.appendChild(lamina);
+        document.body.appendChild(palco);
+
+        // A folha de verdade some até o Blazor trocar o conteúdo (ela tem @key: a nova nasce sem esta classe).
+        folha.classList.add('folha-saindo');
+
+        const angulo = direcao < 0 ? 180 : -180;
+        const duracao = 750;
+        const curva = 'cubic-bezier(.45, .05, .3, 1)';
+        lamina.animate([
+            { transform: 'rotateY(0deg)' },
+            { transform: `rotateY(${angulo * 0.55}deg) skewY(${direcao < 0 ? -1 : 1}deg)`, offset: 0.55 },
+            { transform: `rotateY(${angulo}deg)` }
+        ], { duration: duracao, easing: curva, fill: 'forwards' });
+        sombra.animate([{ opacity: 0 }, { opacity: 0.55, offset: 0.5 }, { opacity: 0 }], { duration: duracao, easing: 'ease-in-out', fill: 'forwards' });
+        palco.animate([{ opacity: 1 }, { opacity: 1, offset: 0.85 }, { opacity: 0 }], { duration: duracao, fill: 'forwards' })
+            .onfinish = () => { palco.remove(); folha.classList.remove('folha-saindo'); };
+    }
+
+    function digitando(el) {
+        return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+    }
+
+    function aoTeclar(e) {
+        if (!ponte || e.altKey || e.ctrlKey || e.metaKey || digitando(document.activeElement)) return;
+        if (!document.querySelector('.livro-folhas')) return;
+        if (document.querySelector('.abertura-fundo, .compartilhar-fundo, .modal.show')) return;
+        if (e.key === 'ArrowRight') { e.preventDefault(); ponte.invokeMethodAsync('Virar', true); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); ponte.invokeMethodAsync('Virar', false); }
+    }
+
+    function aoTocar(e) {
+        if (!e.target.closest || !e.target.closest('.livro-folhas') || e.touches.length !== 1) { toque = null; return; }
+        toque = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+    }
+
+    function aoSoltar(e) {
+        if (!ponte || !toque) return;
+        const dx = e.changedTouches[0].clientX - toque.x;
+        const dy = e.changedTouches[0].clientY - toque.y;
+        const rapido = Date.now() - toque.t < 600;
+        toque = null;
+        // Arrasto de verdade para o lado (não rolagem): longe o bastante, mais de lado que para cima e rápido.
+        if (rapido && Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.8)
+            ponte.invokeMethodAsync('Virar', dx < 0);
+    }
+
+    function ligar(dotnet) {
+        desligar();
+        ponte = dotnet;
+        document.addEventListener('keydown', aoTeclar);
+        document.addEventListener('touchstart', aoTocar, { passive: true });
+        document.addEventListener('touchend', aoSoltar, { passive: true });
+    }
+
+    function desligar() {
+        ponte = null;
+        document.removeEventListener('keydown', aoTeclar);
+        document.removeEventListener('touchstart', aoTocar);
+        document.removeEventListener('touchend', aoSoltar);
+    }
+
+    function topoDoLivro() {
+        if (rolagem !== null) {
+            window.scrollTo({ top: rolagem, behavior: 'instant' });
+            rolagem = null;
+        }
+        const livro = document.querySelector('.livro-folhas');
+        if (!livro) return;
+        const r = livro.getBoundingClientRect();
+        if (r.top < 0) window.scrollBy({ top: r.top - 70, behavior: reduzido.matches ? 'auto' : 'smooth' });
+    }
+
+    return {
+        capaJaAberta, marcarCapaAberta, esquecerCapa, virar, ligar, desligar, topoDoLivro,
+        movimentoReduzido: () => reduzido.matches
+    };
+})();

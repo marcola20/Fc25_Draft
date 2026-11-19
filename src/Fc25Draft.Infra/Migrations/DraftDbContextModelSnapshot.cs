@@ -181,6 +181,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime>("Em")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<int?>("Pagina")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid");
 
@@ -196,10 +199,10 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasIndex("AlbumId", "Tipo", "Em");
 
-                    b.HasIndex("TreinadorId", "AlbumId", "Tipo", "TeamId")
+                    b.HasIndex("TreinadorId", "AlbumId", "Tipo", "TeamId", "Pagina")
                         .IsUnique();
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TreinadorId", "AlbumId", "Tipo", "TeamId"), false);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("TreinadorId", "AlbumId", "Tipo", "TeamId", "Pagina"), false);
 
                     b.ToTable("AlbumConquistas", (string)null);
                 });
@@ -1198,6 +1201,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime?>("EntrouEm")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<Guid?>("HallOfFameId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("Lenda")
                         .HasColumnType("boolean");
 
@@ -1213,6 +1219,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int?>("Overall")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Pagina")
                         .HasColumnType("integer");
 
                     b.Property<int?>("Papel")
@@ -1231,7 +1240,7 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime?>("SaiuEm")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<Guid>("TeamId")
+                    b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Tipo")
@@ -1251,11 +1260,35 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasIndex("AlbumId", "Numero")
                         .IsUnique();
 
+                    b.HasIndex("AlbumId", "Pagina");
+
                     b.HasIndex("AlbumId", "Raridade");
 
                     b.HasIndex("AlbumId", "SaiuEm");
 
                     b.ToTable("Figurinhas", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.FigurinhaArte", b =>
+                {
+                    b.Property<Guid>("FigurinhaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AtualizadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<byte[]>("Imagem")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("FigurinhaId");
+
+                    b.ToTable("FigurinhasArtes", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.FigurinhaDoTreinador", b =>
@@ -4695,8 +4728,7 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
                         .WithMany()
                         .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
                         .WithMany()
@@ -4710,6 +4742,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Time");
 
                     b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.FigurinhaArte", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Figurinha", "Figurinha")
+                        .WithOne()
+                        .HasForeignKey("Fc25Draft.Core.Entities.FigurinhaArte", "FigurinhaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Figurinha");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.FigurinhaDoTreinador", b =>

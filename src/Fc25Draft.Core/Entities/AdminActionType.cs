@@ -18,5 +18,8 @@ public enum AdminActionType
     ContarJogosAntesDoLancamento = 13,
     ColocarLenda = 14,
     TirarLenda = 15,
-    AtualizarAlbum = 16
+    AtualizarAlbum = 16,
+
+    /// <summary>Colocou, mudou, tirou ou trocou a arte de figurinha das páginas especiais (Organização, Campeões, Lendários).</summary>
+    FigurinhasEspeciais = 17
 }

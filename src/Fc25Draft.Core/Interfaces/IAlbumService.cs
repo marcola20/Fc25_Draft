@@ -1,4 +1,5 @@
 using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.Interfaces;
 
@@ -54,6 +55,34 @@ public interface IAlbumService
     /// e quem ficou com página completa ganha o selo.
     /// </summary>
     Task<AtualizacaoAplicadaDto> AtualizarAsync(Guid albumId, string? adminToken, CancellationToken ct);
+
+    // ---- Páginas especiais (Organização, Campeões da Liga, Campeões da Copa, Lendários) ----
+
+    /// <summary>As figurinhas das páginas especiais (com quantas pessoas têm cada uma) e quem ainda pode entrar.</summary>
+    Task<EspeciaisDoAlbumDto?> GetEspeciaisAsync(Guid albumId, CancellationToken ct);
+
+    /// <summary>Coloca uma figurinha no fim da página especial, com o próximo número do álbum. Devolve o id.</summary>
+    Task<Guid> ColocarEspecialAsync(Guid albumId, NovaEspecialDto nova, string? adminToken, CancellationToken ct);
+
+    /// <summary>Uma figurinha de campeão para cada título de Liga e de Copa do Hall da Fama que ainda não está no álbum.</summary>
+    Task<int> ColocarCampeoesAsync(Guid albumId, string? adminToken, CancellationToken ct);
+
+    /// <summary>Muda nome, texto, raridade, clube e jogador da especial (a página não muda). Vale mesmo com dono.</summary>
+    Task EditarEspecialAsync(Guid figurinhaId, NovaEspecialDto dados, string? adminToken, CancellationToken ct);
+
+    /// <summary>Sobe ou desce a especial um lugar dentro da página.</summary>
+    Task MoverEspecialAsync(Guid figurinhaId, bool paraCima, CancellationToken ct);
+
+    /// <summary>Tira a especial, só enquanto ninguém a tirou em pacote; as de número maior descem um.</summary>
+    Task TirarEspecialAsync(Guid figurinhaId, string? adminToken, CancellationToken ct);
+
+    /// <summary>Guarda a arte inteira da especial (WebP, PNG ou JPEG; 5:7).</summary>
+    Task SalvarArteAsync(Guid figurinhaId, byte[] imagem, string? adminToken, CancellationToken ct);
+
+    Task ApagarArteAsync(Guid figurinhaId, string? adminToken, CancellationToken ct);
+
+    /// <summary>A arte para o endereço público <c>/fotos/figurinhas/{id}</c>; nula se não tiver.</summary>
+    Task<FigurinhaArte?> ObterArteAsync(Guid figurinhaId, CancellationToken ct);
 
     /// <summary>Jogadores do álbum que estão sem foto hoje.</summary>
     Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct);

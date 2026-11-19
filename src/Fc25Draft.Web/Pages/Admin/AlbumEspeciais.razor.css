@@ -1,0 +1,9 @@
+.especial-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    width: 150px;
+}
+
+.especial-edicao { width: 100%; background: var(--bs-tertiary-bg); }

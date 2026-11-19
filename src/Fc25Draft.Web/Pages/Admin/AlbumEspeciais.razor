@@ -1,0 +1,446 @@
+@page "/admin/album/especiais"
+@using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Album
+@attribute [Authorize(Roles = "Admin")]
+@inject IAlbumService AlbumSvc
+@inject ITeamService TeamSvc
+@inject IPlayerService PlayerSvc
+@inject AdminAuthService AdminAuth
+@inject IJSRuntime JS
+
+<PageTitle>Páginas especiais do álbum — Admin</PageTitle>
+
+<div class="container-fluid py-3" style="max-width: 1100px;">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_albuns.Count == 0)
+    {
+        <div class="alert alert-secondary">Nenhum álbum lançado ainda. <a href="/admin/album">Lançar o álbum</a></div>
+    }
+    else if (_dados is not null)
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            <select class="form-select w-auto" value="@_albumId" @onchange="TrocarAlbumAsync">
+                @foreach (var a in _albuns)
+                {
+                    <option value="@a.AlbumId">@a.Nome</option>
+                }
+            </select>
+            <a class="btn btn-sm btn-outline-secondary ms-auto" href="/album?pagina=organizacao" target="_blank"><Icone Nome="book-open" Tamanho="14" /> Ver no álbum</a>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body small">
+                <p class="mb-2">
+                    Páginas que não são de clube: <strong>A Organização</strong> abre o álbum; <strong>Campeões da Liga</strong>,
+                    <strong>Campeões da Copa</strong> e <strong>Lendários</strong> vêm depois dos clubes. Cada figurinha entra com o
+                    próximo número do álbum e já vale nos pacotes (sorteada pela raridade que você escolher). Com dono, ela não sai
+                    mais — nome, texto, raridade e arte dá para mudar a qualquer hora.
+                </p>
+                <p class="mb-0">
+                    <strong>Arte:</strong> a imagem é a figurinha inteira, de borda a borda. Faça em <strong>600×840 px (5:7, em pé)</strong>,
+                    WebP, PNG ou JPEG. Fora dessa medida o navegador recorta no meio e comprime até 300 KB. O número da figurinha
+                    vai num selinho no canto de cima à direita; deixe esse canto sem nada importante. Sem arte, a figurinha sai montada
+                    com a foto (pessoa ou jogador), o escudo do clube ou o símbolo da página.
+                </p>
+            </div>
+        </div>
+
+        @foreach (var info in AlbumFigurinhas.PaginasEspeciais.OrderBy(p => p.AntesDosClubes ? -1 : p.Ordem))
+        {
+            var daPagina = _dados.Figurinhas.Where(f => f.Figurinha.Pagina == info.Pagina).OrderBy(f => f.Figurinha.Ordem).ThenBy(f => f.Figurinha.Numero).ToList();
+            var form = Form(info.Pagina);
+
+            <div class="card mb-4">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <Icone Nome="@info.Icone" Tamanho="18" />
+                    <strong>@info.Titulo</strong>
+                    <span class="badge text-bg-secondary">@daPagina.Count/@AlbumFigurinhas.MaximoPorPaginaEspecial</span>
+                    <span class="small text-muted">@info.Subtitulo · sai como @NomeDaRaridade(info.RaridadePadrao).ToLowerInvariant() (padrão)</span>
+                    @if (daPagina.Count > 0)
+                    {
+                        <a class="small ms-auto" href="/album?pagina=@info.Endereco" target="_blank">abrir a página</a>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (daPagina.Count == 0)
+                    {
+                        <p class="small text-muted">Página vazia: ela só aparece no álbum quando tiver pelo menos uma figurinha.</p>
+                    }
+                    else
+                    {
+                        <div class="grade-cartas mb-3">
+                            @foreach (var e in daPagina)
+                            {
+                                var f = e.Figurinha;
+                                var idArquivo = $"arte-{f.FigurinhaId:N}";
+                                <div class="especial-item" @key="f.FigurinhaId">
+                                    <CartaFigurinha Figurinha="@f" Largura="130" Lazy="false" />
+                                    <div class="small text-center text-muted">
+                                        @if (e.Donos > 0)
+                                        {
+                                            <span title="Já saiu em pacote: não sai mais do álbum"><Icone Nome="lock" Tamanho="12" /> com @e.Donos</span>
+                                        }
+                                        else
+                                        {
+                                            <span>ninguém tem</span>
+                                        }
+                                    </div>
+                                    <div class="d-flex flex-wrap justify-content-center gap-1">
+                                        <label class="btn btn-sm @(f.TemArte ? "btn-outline-secondary" : "btn-primary") mb-0" title="Subir a arte (600×840)">
+                                            <Icone Nome="camera" Tamanho="14" /> @(f.TemArte ? "Trocar" : "Arte")
+                                            <input type="file" id="@idArquivo" accept="image/webp,image/png,image/jpeg" class="d-none" disabled="@_salvando"
+                                                   @onchange="() => SubirArteAsync(f, idArquivo)" />
+                                        </label>
+                                        @if (f.TemArte)
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary" title="Apagar a arte (volta a montada)" disabled="@_salvando" @onclick="() => ApagarArteAsync(f)"><Icone Nome="eye-off" Tamanho="14" /></button>
+                                        }
+                                        <button class="btn btn-sm btn-outline-secondary" title="Editar" disabled="@_salvando" @onclick="() => Editar(f)"><Icone Nome="pencil" Tamanho="14" /></button>
+                                        <button class="btn btn-sm btn-outline-secondary" title="Subir" disabled="@(_salvando || f == daPagina[0].Figurinha)" @onclick="() => MoverAsync(f, true)"><Icone Nome="arrow-left" Tamanho="14" /></button>
+                                        <button class="btn btn-sm btn-outline-secondary" title="Descer" disabled="@(_salvando || f == daPagina[^1].Figurinha)" @onclick="() => MoverAsync(f, false)"><Icone Nome="arrow-right" Tamanho="14" /></button>
+                                        @if (e.Donos == 0)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" title="Tirar do álbum" disabled="@_salvando" @onclick="() => TirarAsync(f)"><Icone Nome="x" Tamanho="14" /></button>
+                                        }
+                                    </div>
+
+                                    @if (_editando?.FigurinhaId == f.FigurinhaId)
+                                    {
+                                        <div class="especial-edicao border rounded p-2 mt-1">
+                                            <input class="form-control form-control-sm mb-1" maxlength="@AlbumFigurinhas.TamanhoNomeEspecial" placeholder="Nome" @bind="_edicao.Nome" />
+                                            <input class="form-control form-control-sm mb-1" maxlength="@AlbumFigurinhas.TamanhoDestaque" placeholder="Texto (opcional)" @bind="_edicao.Destaque" />
+                                            <select class="form-select form-select-sm mb-1" @bind="_edicao.Raridade">
+                                                @foreach (var r in Enum.GetValues<RaridadeFigurinha>())
+                                                {
+                                                    <option value="@r">@NomeDaRaridade(r)</option>
+                                                }
+                                            </select>
+                                            <select class="form-select form-select-sm mb-1" @bind="_edicao.TeamId">
+                                                <option value="">Sem clube</option>
+                                                @foreach (var t in _times)
+                                                {
+                                                    <option value="@t.TeamId">@t.TeamName</option>
+                                                }
+                                            </select>
+                                            <div class="d-flex gap-1">
+                                                <button class="btn btn-sm btn-primary" disabled="@_salvando" @onclick="() => SalvarEdicaoAsync(f)">Salvar</button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => _editando = null">Cancelar</button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (info.Pagina == PaginaEspecial.Organizacao)
+                    {
+                        var faltam = _dados.Admins.Where(x => !x.JaNoAlbum).ToList();
+                        @if (faltam.Count > 0)
+                        {
+                            <div class="mb-3">
+                                <div class="small fw-semibold mb-1">Administradores que ainda não estão na página</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var adm in faltam)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary" disabled="@_salvando" @onclick="() => ColocarAdminAsync(adm)">
+                                            <Icone Nome="plus" Tamanho="14" /> @adm.Nome
+                                        </button>
+                                    }
+                                </div>
+                                <div class="small text-muted mt-1">Quem tem pessoa ligada ao token sai com a foto do perfil até a arte chegar.</div>
+                            </div>
+                        }
+                    }
+                    else if (info.Pagina is PaginaEspecial.CampeoesLiga or PaginaEspecial.CampeoesCopa)
+                    {
+                        var titulos = _dados.Campeoes.Where(c => c.Pagina == info.Pagina).ToList();
+                        var faltam = titulos.Count(c => !c.JaNoAlbum);
+                        <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
+                            @if (faltam > 0)
+                            {
+                                <button class="btn btn-sm btn-primary" disabled="@_salvando" @onclick="ColocarCampeoesAsync">
+                                    <Icone Nome="trophy" Tamanho="14" /> Colocar os @_dados.Campeoes.Count(c => !c.JaNoAlbum) campeões do Hall da Fama que faltam (Liga e Copa)
+                                </button>
+                            }
+                            <span class="small text-muted">
+                                @titulos.Count título@(titulos.Count == 1 ? "" : "s") no <a href="/admin/hall-of-fame" target="_blank">Hall da Fama</a>,
+                                @(titulos.Count - faltam) já no álbum. Um por figurinha, do mais antigo para o mais novo.
+                            </span>
+                        </div>
+                    }
+
+                    <details class="mt-2" open="@(daPagina.Count == 0 && info.Pagina == PaginaEspecial.Lendarios)">
+                        <summary class="small fw-semibold">Colocar outra figurinha nesta página</summary>
+                        <div class="row g-2 mt-1">
+                            <div class="col-12 col-md-4">
+                                <input class="form-control form-control-sm" maxlength="@AlbumFigurinhas.TamanhoNomeEspecial" placeholder="Nome impresso" @bind="form.Nome" />
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <input class="form-control form-control-sm" maxlength="@AlbumFigurinhas.TamanhoDestaque"
+                                       placeholder="@(info.Pagina == PaginaEspecial.Lendarios ? "Texto (ex.: Lenda da edição de 2019)" : "Texto (opcional)")" @bind="form.Destaque" />
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <select class="form-select form-select-sm" @bind="form.Raridade">
+                                    @foreach (var r in Enum.GetValues<RaridadeFigurinha>())
+                                    {
+                                        <option value="@r">@NomeDaRaridade(r)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-2">
+                                <select class="form-select form-select-sm" @bind="form.TeamId">
+                                    <option value="">Sem clube</option>
+                                    @foreach (var t in _times)
+                                    {
+                                        <option value="@t.TeamId">@t.TeamName</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (info.Pagina == PaginaEspecial.Lendarios)
+                            {
+                                <div class="col-12">
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <input class="form-control form-control-sm" style="max-width: 260px;" placeholder="Jogador ainda na liga (opcional)" @bind="_buscaJogador" @bind:event="oninput" />
+                                        <button class="btn btn-sm btn-outline-secondary" @onclick="BuscarJogadorAsync"><Icone Nome="search" Tamanho="14" /> Buscar</button>
+                                        @if (form.Jogador is { } j)
+                                        {
+                                            <span class="etiqueta">@j.Nome <button class="btn btn-sm p-0 ms-1" title="Tirar" @onclick="() => form.Jogador = null"><Icone Nome="x" Tamanho="12" /></button></span>
+                                        }
+                                    </div>
+                                    @if (_achados.Count > 0)
+                                    {
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            @foreach (var p in _achados)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary" @onclick="() => EscolherJogador(form, p)">@p.Nome · @p.Overall</button>
+                                            }
+                                        </div>
+                                    }
+                                    <div class="small text-muted mt-1">Ligar ao jogador é opcional: sem arte, a figurinha usa a foto dele. Jogador de outras edições: só o nome.</div>
+                                </div>
+                            }
+                            <div class="col-12">
+                                <button class="btn btn-sm btn-success" disabled="@(_salvando || string.IsNullOrWhiteSpace(form.Nome))" @onclick="() => ColocarAsync(info)">
+                                    <Icone Nome="plus" Tamanho="14" /> Colocar em “@info.Titulo”
+                                </button>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private sealed record FotoLida(string Base64, string Tipo);
+    private sealed record JogadorAchado(int PlayerId, string Nome, int Overall);
+
+    /// <summary>O formulário de figurinha nova de uma página.</summary>
+    private sealed class FormEspecial
+    {
+        public string? Nome { get; set; }
+        public string? Destaque { get; set; }
+        public RaridadeFigurinha Raridade { get; set; }
+        public Guid? TeamId { get; set; }
+        public JogadorAchado? Jogador { get; set; }
+    }
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro;
+    private string? _ok;
+
+    private IReadOnlyList<AlbumDto> _albuns = Array.Empty<AlbumDto>();
+    private Guid _albumId;
+    private EspeciaisDoAlbumDto? _dados;
+    private IReadOnlyList<Team> _times = Array.Empty<Team>();
+
+    private readonly Dictionary<PaginaEspecial, FormEspecial> _forms = new();
+    private FigurinhaDto? _editando;
+    private FormEspecial _edicao = new();
+
+    private string _buscaJogador = string.Empty;
+    private List<JogadorAchado> _achados = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _albuns = await AlbumSvc.ListarAsync(CancellationToken.None);
+            var (times, _) = await TeamSvc.SearchAsync(null, 1, 1000);
+            _times = times.Where(t => !t.IsAdmin).OrderBy(t => t.TeamName, StringComparer.CurrentCulture).ToList();
+            var inicial = _albuns.FirstOrDefault(a => a.Ativo) ?? _albuns.FirstOrDefault();
+            if (inicial is not null)
+            {
+                _albumId = inicial.AlbumId;
+                await CarregarAsync();
+            }
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task CarregarAsync() => _dados = await AlbumSvc.GetEspeciaisAsync(_albumId, CancellationToken.None);
+
+    private async Task TrocarAlbumAsync(ChangeEventArgs e)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var id)) return;
+        _albumId = id;
+        _editando = null;
+        try { await CarregarAsync(); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private FormEspecial Form(PaginaEspecial pagina)
+    {
+        if (!_forms.TryGetValue(pagina, out var form))
+            _forms[pagina] = form = new FormEspecial { Raridade = AlbumFigurinhas.Especial(pagina).RaridadePadrao };
+        return form;
+    }
+
+    private static string NomeDaRaridade(RaridadeFigurinha r) => r switch
+    {
+        RaridadeFigurinha.Brilhante => "Brilhante",
+        RaridadeFigurinha.Lendaria => "Lendária",
+        _ => "Comum"
+    };
+
+    /// <summary>Roda a ação com o botão travado, mostra o resultado e recarrega as páginas.</summary>
+    private async Task ExecutarAsync(Func<Task<string?>> acao)
+    {
+        _salvando = true;
+        _erro = null;
+        _ok = null;
+        try
+        {
+            _ok = await acao();
+            await CarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    private async Task<string?> Token() => await AdminAuth.GetTokenAsync();
+
+    private Task ColocarAdminAsync(AdminCandidatoDto adm) => ExecutarAsync(async () =>
+    {
+        var info = AlbumFigurinhas.Especial(PaginaEspecial.Organizacao);
+        await AlbumSvc.ColocarEspecialAsync(_albumId,
+            new NovaEspecialDto(PaginaEspecial.Organizacao, adm.Nome, "Administração da CBFV", info.RaridadePadrao, TreinadorId: adm.TreinadorId),
+            await Token(), CancellationToken.None);
+        return $"{adm.Nome} entrou na página da Organização. Suba a arte quando estiver pronta.";
+    });
+
+    private async Task ColocarCampeoesAsync()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Colocar uma figurinha para cada título de Liga e de Copa do Hall da Fama que ainda não está no álbum? Elas entram nos pacotes na hora (sem arte, saem com o escudo).")) return;
+        await ExecutarAsync(async () =>
+        {
+            var n = await AlbumSvc.ColocarCampeoesAsync(_albumId, await Token(), CancellationToken.None);
+            return $"{n} campeõ{(n == 1 ? "o" : "es")} no álbum. Agora é subir as artes.";
+        });
+    }
+
+    private Task ColocarAsync(AlbumFigurinhas.InfoPaginaEspecial info) => ExecutarAsync(async () =>
+    {
+        var form = Form(info.Pagina);
+        await AlbumSvc.ColocarEspecialAsync(_albumId,
+            new NovaEspecialDto(info.Pagina, form.Nome ?? "", form.Destaque, form.Raridade, form.TeamId, form.Jogador?.PlayerId),
+            await Token(), CancellationToken.None);
+        var nome = form.Nome;
+        _forms.Remove(info.Pagina);
+        _achados.Clear();
+        _buscaJogador = string.Empty;
+        return $"{nome} entrou em “{info.Titulo}”.";
+    });
+
+    private void Editar(FigurinhaDto f)
+    {
+        _editando = f;
+        _edicao = new FormEspecial
+        {
+            Nome = f.NomeImpresso,
+            Destaque = f.Destaque,
+            Raridade = f.Raridade,
+            TeamId = f.TeamId,
+            Jogador = f.PlayerId is { } id ? new JogadorAchado(id, f.NomeImpresso, f.Overall ?? 0) : null
+        };
+    }
+
+    private Task SalvarEdicaoAsync(FigurinhaDto f) => ExecutarAsync(async () =>
+    {
+        await AlbumSvc.EditarEspecialAsync(f.FigurinhaId,
+            new NovaEspecialDto(f.Pagina!.Value, _edicao.Nome ?? "", _edicao.Destaque, _edicao.Raridade, _edicao.TeamId, _edicao.Jogador?.PlayerId),
+            await Token(), CancellationToken.None);
+        _editando = null;
+        return "Figurinha atualizada.";
+    });
+
+    private Task MoverAsync(FigurinhaDto f, bool paraCima) => ExecutarAsync(async () =>
+    {
+        await AlbumSvc.MoverEspecialAsync(f.FigurinhaId, paraCima, CancellationToken.None);
+        return null;
+    });
+
+    private async Task TirarAsync(FigurinhaDto f)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Tirar {f.NomeImpresso} do álbum? As figurinhas de número maior descem um.")) return;
+        await ExecutarAsync(async () =>
+        {
+            await AlbumSvc.TirarEspecialAsync(f.FigurinhaId, await Token(), CancellationToken.None);
+            return $"{f.NomeImpresso} saiu do álbum.";
+        });
+    }
+
+    private Task SubirArteAsync(FigurinhaDto f, string idArquivo) => ExecutarAsync(async () =>
+    {
+        // Recorta 5:7 e reduz no navegador (até 600 de largura e 300 KB) antes de subir.
+        var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", idArquivo, 600, 5.0 / 7.0, 300);
+        if (lida is null) return "Nenhuma imagem escolhida.";
+        await AlbumSvc.SalvarArteAsync(f.FigurinhaId, Convert.FromBase64String(lida.Base64), await Token(), CancellationToken.None);
+        return $"Arte de {f.NomeImpresso} no ar.";
+    });
+
+    private async Task ApagarArteAsync(FigurinhaDto f)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Apagar a arte de {f.NomeImpresso}? A figurinha volta a sair montada.")) return;
+        await ExecutarAsync(async () =>
+        {
+            await AlbumSvc.ApagarArteAsync(f.FigurinhaId, await Token(), CancellationToken.None);
+            return "Arte apagada.";
+        });
+    }
+
+    private async Task BuscarJogadorAsync()
+    {
+        var termo = _buscaJogador.Trim();
+        if (termo.Length < 2) { _achados.Clear(); return; }
+        try
+        {
+            var (jogadores, _) = await PlayerSvc.SearchAsync(termo, null, 1, 8);
+            _achados = jogadores.Select(p => new JogadorAchado(p.PlayerId, p.Name, p.Overall)).ToList();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void EscolherJogador(FormEspecial form, JogadorAchado p)
+    {
+        form.Jogador = p;
+        if (string.IsNullOrWhiteSpace(form.Nome)) form.Nome = p.Nome;
+        _achados.Clear();
+    }
+}

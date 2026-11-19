@@ -8,8 +8,8 @@ public record FigurinhaDto(
     int Numero,
     TipoFigurinha Tipo,
     RaridadeFigurinha Raridade,
-    Guid TeamId,
-    string TimeNome,
+    Guid? TeamId,
+    string? TimeNome,
     int? PlayerId,
     string NomeImpresso,
     string? PosicaoSigla,
@@ -21,10 +21,21 @@ public record FigurinhaDto(
     PerfilTreinadorDto? Perfil = null,
     bool Lenda = false,
     DateTime? EntrouEm = null,
-    bool Fora = false)
+    bool Fora = false,
+    PaginaEspecial? Pagina = null,
+    string? VersaoArte = null)
 {
     /// <summary>Chegou numa atualização do álbum (depois do lançamento).</summary>
     public bool DaAtualizacao => EntrouEm is not null;
+
+    /// <summary>Figurinha de página especial (Organização, Campeões, Lendários).</summary>
+    public bool Especial => Tipo == TipoFigurinha.Especial;
+
+    /// <summary>Tem a arte inteira enviada pelo admin (<c>/fotos/figurinhas/{id}?v=</c>).</summary>
+    public bool TemArte => VersaoArte is not null;
+
+    /// <summary>A página onde a figurinha é colada.</summary>
+    public ChaveDaPagina ChavePagina => new(Pagina is null ? TeamId : null, Pagina);
 
     /// <summary>"Técnico" ou "Auxiliar", na figurinha de técnico.</summary>
     public string? PapelTexto => Tipo == TipoFigurinha.Treinador ? (Papel == PapelTreinador.Auxiliar ? "Auxiliar" : "Técnico") : null;
@@ -53,8 +64,18 @@ public record VagaDoAlbumDto(FigurinhaDto Figurinha, int Quantidade, bool Nova)
     public int Repetidas => Math.Max(0, Quantidade - 1);
 }
 
-public record PaginaDoAlbumDto(Guid TeamId, string TimeNome, IReadOnlyList<VagaDoAlbumDto> Vagas)
+/// <summary>Qual é a página: a do clube (<paramref name="TeamId"/>) ou uma especial (<paramref name="Pagina"/>).</summary>
+public readonly record struct ChaveDaPagina(Guid? TeamId, PaginaEspecial? Pagina)
 {
+    /// <summary>O que vai no endereço (<c>/album?pagina=</c>): o id do clube ou o nome da página especial.</summary>
+    public string NoEndereco => Pagina is { } p ? Utilities.AlbumFigurinhas.Especial(p).Endereco : TeamId?.ToString() ?? "";
+}
+
+/// <param name="Titulo">Nome do clube ou da página especial.</param>
+public record PaginaDoAlbumDto(Guid? TeamId, string Titulo, IReadOnlyList<VagaDoAlbumDto> Vagas, PaginaEspecial? Especial = null)
+{
+    public ChaveDaPagina Chave => new(Especial is null ? TeamId : null, Especial);
+
     public int Total => Vagas.Count;
     public int Coladas => Vagas.Count(v => v.Colada);
     public bool Completa => Total > 0 && Coladas == Total;
@@ -78,9 +99,9 @@ public record MeuAlbumDto(
 
     public ConquistaAlbumDto? AlbumCompleto => Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.AlbumCompleto);
 
-    /// <summary>O selo da página do clube, se a pessoa já completou.</summary>
-    public ConquistaAlbumDto? SeloDaPagina(Guid teamId) =>
-        Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta && c.TeamId == teamId);
+    /// <summary>O selo da página (de clube ou especial), se a pessoa já completou.</summary>
+    public ConquistaAlbumDto? SeloDaPagina(ChaveDaPagina pagina) =>
+        Conquistas.FirstOrDefault(c => c.Tipo == TipoConquistaAlbum.PaginaCompleta && c.Chave == pagina);
 
     public int Total => TotalPorRaridade.Total;
     public int Coladas => ColadasPorRaridade.Total;
@@ -117,8 +138,17 @@ public record PacoteAbertoDto(
     Guid PacoteId, string Origem, string? Motivo, IReadOnlyList<FigurinhaTiradaDto> Figurinhas, int PacotesRestantes,
     IReadOnlyList<ConquistaAlbumDto> Conquistas, bool Estrelas = false);
 
-/// <summary>Um selo do álbum: página completa (com o clube) ou álbum completo.</summary>
-public record ConquistaAlbumDto(TipoConquistaAlbum Tipo, Guid? TeamId, string? TimeNome, DateTime Em);
+/// <summary>
+/// Um selo do álbum: página completa (do clube ou especial) ou álbum completo. <paramref name="TimeNome"/> é o nome
+/// do clube ou, na página especial, o título dela.
+/// </summary>
+public record ConquistaAlbumDto(TipoConquistaAlbum Tipo, Guid? TeamId, string? TimeNome, DateTime Em, PaginaEspecial? Pagina = null)
+{
+    public ChaveDaPagina Chave => new(TeamId, Pagina);
+
+    /// <summary>"do Flamengo", "Lendários"…: para "Página {DaPagina} completa".</summary>
+    public string DaPagina => Pagina is null ? $"do {TimeNome}" : $"“{TimeNome}”";
+}
 
 /// <summary>Uma figurinha rara (brilhante de jogador ou lendária) que alguém tirou num pacote.</summary>
 public record RaraTiradaDto(Guid TreinadorId, string Nome, FigurinhaDto Figurinha, DateTime Quando);
@@ -224,6 +254,33 @@ public record ResultadoDaTrocaDto(bool Executou, string Mensagem, IReadOnlyList<
 public record AlbumCompletoDto(int Ordem, Guid TreinadorId, string Nome, string AlbumNome, int Temporada, DateTime Em);
 
 // ---- Admin ----
+
+/// <summary>Uma figurinha de página especial, vista pelo admin: quantas pessoas já têm (com dono, não sai mais).</summary>
+public record EspecialNoAlbumDto(FigurinhaDto Figurinha, int Donos);
+
+/// <summary>Administrador que pode entrar na página da Organização (com a pessoa ligada ao token, se tiver).</summary>
+public record AdminCandidatoDto(Guid AdminTokenId, string Nome, Guid? TreinadorId, bool JaNoAlbum);
+
+/// <summary>Título do Hall da Fama (Liga ou Copa) que pode virar figurinha de campeão.</summary>
+public record CampeaoCandidatoDto(Guid HallOfFameId, PaginaEspecial Pagina, string Time, Guid? TeamId, string Titulo, bool JaNoAlbum);
+
+/// <summary>As páginas especiais de um álbum e quem ainda pode entrar nelas.</summary>
+public record EspeciaisDoAlbumDto(
+    AlbumDto Album,
+    IReadOnlyList<EspecialNoAlbumDto> Figurinhas,
+    IReadOnlyList<AdminCandidatoDto> Admins,
+    IReadOnlyList<CampeaoCandidatoDto> Campeoes);
+
+/// <summary>Figurinha especial nova (ou a edição de uma): o que vai impresso e de quem é.</summary>
+public record NovaEspecialDto(
+    PaginaEspecial Pagina,
+    string Nome,
+    string? Destaque,
+    RaridadeFigurinha Raridade,
+    Guid? TeamId = null,
+    int? PlayerId = null,
+    Guid? TreinadorId = null,
+    Guid? HallOfFameId = null);
 
 /// <summary>Uma lendária escolhida pelo admin, com o texto curto opcional.</summary>
 public record LendariaEscolhaDto(int PlayerId, string? Destaque);

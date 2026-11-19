@@ -151,7 +151,7 @@ public partial class AlbumService : IAlbumService
 
         var figurinhas = await FigurinhasAsync(albumId, ct);
         // As figurinhas de Lenda (aposentados) têm tela própria: ficam fora das lendárias "Melhores de".
-        var jogadores = figurinhas.Where(f => f.PlayerId is not null && !f.Lenda).ToList();
+        var jogadores = figurinhas.Where(f => f.Tipo == TipoFigurinha.Jogador && f.PlayerId is not null && !f.Lenda).ToList();
         var comFoto = await ComFotoAsync(jogadores.Select(f => f.PlayerId!.Value), ct);
 
         var pacotes = await _db.PacotesGanhos.AsNoTracking()
@@ -172,23 +172,23 @@ public partial class AlbumService : IAlbumService
         var pontosPorPacote = await _db.Albuns.Where(a => a.AlbumId == albumId).Select(a => a.PontosBolaoPorPacote).FirstAsync(ct);
 
         var notas = await NotasDaTemporadaAsync(album.Temporada - 1, jogadores.Select(f => f.PlayerId!.Value).ToList(), ct);
-        var brilhantes = BrilhantesPorClube(jogadores.Select(f => (f.TeamId, f.PlayerId!.Value, f.Overall ?? 0, f.NomeImpresso)));
+        var brilhantes = BrilhantesPorClube(jogadores.Select(f => (f.TeamId!.Value, f.PlayerId!.Value, f.Overall ?? 0, f.NomeImpresso)));
         var donos = await DonosPorJogadorAsync(albumId, ct);
         var candidatos = jogadores
-            .Select(f => Candidato(f.PlayerId!.Value, f.NomeImpresso, f.TeamId, f.TimeNome, f.PosicaoSigla ?? "?", f.Overall ?? 0, notas, brilhantes)
+            .Select(f => Candidato(f.PlayerId!.Value, f.NomeImpresso, f.TeamId!.Value, f.TimeNome ?? "", f.PosicaoSigla ?? "?", f.Overall ?? 0, notas, brilhantes)
                 with { Donos = donos.GetValueOrDefault(f.PlayerId!.Value) })
             .OrderBy(c => c.Nome, StringComparer.CurrentCulture)
             .ToList();
 
         return new AlbumAdminDto(
             album,
-            figurinhas.Select(f => f.TeamId).Distinct().Count(),
+            figurinhas.Where(f => f.Tipo == TipoFigurinha.Escudo).Select(f => f.TeamId).Distinct().Count(),
             Contar(figurinhas.Select(f => f.Raridade)),
             jogadores.Count(f => !comFoto.Contains(f.PlayerId!.Value)),
             pacotes?.Dados ?? 0,
             pacotes?.Abertos ?? 0,
             colecionadores,
-            figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria && !f.Lenda).ToList(),
+            figurinhas.Where(f => f.Raridade == RaridadeFigurinha.Lendaria && !f.Lenda && f.Tipo == TipoFigurinha.Jogador).ToList(),
             candidatos,
             pontosPorPacote,
             porOrigem,
@@ -257,8 +257,8 @@ public partial class AlbumService : IAlbumService
             .ToList();
 
         // Quem já tem figurinha neste álbum ou já foi lenda em outro não entra de novo.
-        var clubes = figurinhas.Select(f => f.TeamId).ToHashSet();
-        var jaNoAlbum = figurinhas.Where(f => f.PlayerId is not null).Select(f => f.PlayerId!.Value).ToHashSet();
+        var clubes = figurinhas.Where(f => f.Tipo == TipoFigurinha.Escudo && f.TeamId is not null).Select(f => f.TeamId!.Value).ToHashSet();
+        var jaNoAlbum = figurinhas.Where(f => f.Tipo == TipoFigurinha.Jogador && f.PlayerId is not null).Select(f => f.PlayerId!.Value).ToHashSet();
         var jaForamLenda = (await _db.Figurinhas.AsNoTracking()
                 .Where(f => f.Lenda && f.PlayerId != null)
                 .Select(f => f.PlayerId!.Value)
@@ -296,7 +296,7 @@ public partial class AlbumService : IAlbumService
         if (p.AposentadoNaTemporada is not int temporada)
             throw new InvalidOperationException($"{p.Name} não está aposentado: só aposentado vira lenda.");
         // A figurinha de jogador que saiu do álbum (aposentou depois do lançamento) não impede a de Lenda.
-        if (await _db.Figurinhas.AnyAsync(f => f.AlbumId == albumId && f.PlayerId == playerId && f.SaiuEm == null, ct))
+        if (await _db.Figurinhas.AnyAsync(f => f.AlbumId == albumId && f.PlayerId == playerId && f.Tipo == TipoFigurinha.Jogador && f.SaiuEm == null, ct))
             throw new InvalidOperationException($"{p.Name} já tem figurinha neste álbum.");
         if (await _db.Figurinhas.AnyAsync(f => f.Lenda && f.PlayerId == playerId, ct))
             throw new InvalidOperationException($"{p.Name} já foi lenda em outro álbum.");
@@ -364,9 +364,9 @@ public partial class AlbumService : IAlbumService
     public async Task<IReadOnlyList<FigurinhaSemFotoDto>> SemFotoAsync(Guid albumId, CancellationToken ct)
     {
         var jogadores = await _db.Figurinhas.AsNoTracking()
-            .Where(f => f.AlbumId == albumId && f.PlayerId != null && f.SaiuEm == null
+            .Where(f => f.AlbumId == albumId && f.Tipo == TipoFigurinha.Jogador && f.PlayerId != null && f.SaiuEm == null
                         && !_db.FotosJogadores.Any(foto => foto.PlayerId == f.PlayerId))
-            .Select(f => new FigurinhaSemFotoDto(f.PlayerId, f.Numero, f.NomeImpresso, f.TeamId, f.Time.TeamName,
+            .Select(f => new FigurinhaSemFotoDto(f.PlayerId, f.Numero, f.NomeImpresso, f.TeamId!.Value, f.Time!.TeamName,
                 f.PosicaoSigla, f.Overall, f.Raridade, null))
             .ToListAsync(ct);
 
@@ -374,7 +374,7 @@ public partial class AlbumService : IAlbumService
         var tecnicos = await _db.Figurinhas.AsNoTracking()
             .Where(f => f.AlbumId == albumId && f.Tipo == TipoFigurinha.Treinador && f.SaiuEm == null
                         && !_db.PerfisTreinadores.Any(p => p.TreinadorId == f.TreinadorId && p.Imagem != null))
-            .Select(f => new FigurinhaSemFotoDto(null, f.Numero, f.NomeImpresso, f.TeamId, f.Time.TeamName,
+            .Select(f => new FigurinhaSemFotoDto(null, f.Numero, f.NomeImpresso, f.TeamId!.Value, f.Time!.TeamName,
                 f.PosicaoSigla, null, f.Raridade, f.TreinadorId))
             .ToListAsync(ct);
 
@@ -522,21 +522,38 @@ public partial class AlbumService : IAlbumService
     }
 
     /// <summary>
-    /// As páginas na ordem do escudo. Dentro de cada uma: escudo, técnico e auxiliar (também os que chegaram
+    /// As páginas: a Organização abre o álbum, depois os clubes na ordem do escudo e, no fim, Campeões da Liga,
+    /// Campeões da Copa e Lendários. Dentro da página do clube: escudo, técnico e auxiliar (também os que chegaram
     /// depois) e o elenco na ordem do lançamento, com quem chegou nas atualizações no fim (quem mudou de clube leva
-    /// o número de antes, então o número sozinho não dá a ordem).
+    /// o número de antes, então o número sozinho não dá a ordem). Na especial vale a ordem que o admin deu.
     /// </summary>
-    private static List<PaginaDoAlbumDto> Paginas(IEnumerable<FigurinhaDto> figurinhas, Func<FigurinhaDto, VagaDoAlbumDto> vaga) =>
-        figurinhas
+    private static List<PaginaDoAlbumDto> Paginas(IEnumerable<FigurinhaDto> figurinhas, Func<FigurinhaDto, VagaDoAlbumDto> vaga)
+    {
+        var lista = figurinhas.ToList();
+        var especiais = lista.Where(f => f.Pagina is not null).ToLookup(f => f.Pagina!.Value);
+        var clubes = lista
+            .Where(f => f.Pagina is null)
             .GroupBy(f => f.TeamId)
             .OrderBy(g => g.Where(f => f.Tipo == TipoFigurinha.Escudo).Select(f => f.Numero).DefaultIfEmpty(g.Min(f => f.Numero)).Min())
-            .Select(g => new PaginaDoAlbumDto(g.Key, g.First().TimeNome, g
+            .Select(g => new PaginaDoAlbumDto(g.Key, g.First().TimeNome ?? "", g
                 .OrderBy(f => f.Tipo switch { TipoFigurinha.Escudo => 0, TipoFigurinha.Treinador => 1, _ => 2 })
                 .ThenBy(f => f.Tipo == TipoFigurinha.Treinador ? f.Papel : null)
                 .ThenBy(f => f.Ordem).ThenBy(f => f.Numero)
                 .Select(vaga)
                 .ToList()))
             .ToList();
+
+        PaginaDoAlbumDto? Especial(AlbumFigurinhas.InfoPaginaEspecial info) =>
+            especiais[info.Pagina].Any()
+                ? new PaginaDoAlbumDto(null, info.Titulo, especiais[info.Pagina].OrderBy(f => f.Ordem).ThenBy(f => f.Numero).Select(vaga).ToList(), info.Pagina)
+                : null;
+
+        var ordem = AlbumFigurinhas.PaginasEspeciais.OrderBy(p => p.Ordem).ToList();
+        return ordem.Where(p => p.AntesDosClubes).Select(Especial).OfType<PaginaDoAlbumDto>()
+            .Concat(clubes)
+            .Concat(ordem.Where(p => !p.AntesDosClubes).Select(Especial).OfType<PaginaDoAlbumDto>())
+            .ToList();
+    }
 
     public async Task<AlbumResumoDoTreinadorDto?> ResumoAsync(Guid treinadorId, CancellationToken ct)
     {
@@ -921,7 +938,7 @@ public partial class AlbumService : IAlbumService
             await _db.SaveChangesAsync(ct);
 
             var conquistas = await GravarConquistasAsync(treinadorId, albumId, figurinhas,
-                tiradas.Where(t => t.Nova).Select(t => t.Figurinha.TeamId).ToHashSet(), agora, ct);
+                tiradas.Where(t => t.Nova).Select(t => t.Figurinha.ChavePagina).ToHashSet(), agora, ct);
 
             var restantes = await _db.PacotesGanhos.CountAsync(p => p.TreinadorId == treinadorId && p.AbertoEm == null
                                                                      && (p.AlbumId == albumId || p.AlbumId == null), ct);
@@ -936,64 +953,76 @@ public partial class AlbumService : IAlbumService
     public static event Action? ConquistasGravadas;
 
     /// <summary>
-    /// Selos que as figurinhas novas deste pacote fecharam: a página de cada clube que ficou completa e o
-    /// álbum inteiro. Roda dentro da transação do pacote (com a pessoa travada), então cada selo sai uma vez.
+    /// Selos que as figurinhas novas deste pacote fecharam: cada página (de clube ou especial) que ficou completa e
+    /// o álbum inteiro. Roda dentro da transação do pacote (com a pessoa travada), então cada selo sai uma vez.
     /// </summary>
     private async Task<List<ConquistaAlbumDto>> GravarConquistasAsync(
-        Guid treinadorId, Guid albumId, List<FigurinhaDto> figurinhas, HashSet<Guid> timesComNova, DateTime agora, CancellationToken ct)
+        Guid treinadorId, Guid albumId, List<FigurinhaDto> figurinhas, HashSet<ChaveDaPagina> paginasComNova, DateTime agora, CancellationToken ct)
     {
-        if (timesComNova.Count == 0) return new();
+        if (paginasComNova.Count == 0) return new();
 
-        var coladasPorTime = (await _db.FigurinhasDosTreinadores.AsNoTracking()
+        var noAlbum = figurinhas.ToDictionary(f => f.FigurinhaId);
+        var coladasPorPagina = (await _db.FigurinhasDosTreinadores.AsNoTracking()
                 .Where(f => f.TreinadorId == treinadorId && f.Figurinha.AlbumId == albumId && f.Figurinha.SaiuEm == null)
-                .Select(f => f.Figurinha.TeamId)
+                .Select(f => f.FigurinhaId)
                 .ToListAsync(ct))
-            .GroupBy(t => t)
+            .Where(noAlbum.ContainsKey)
+            .GroupBy(id => noAlbum[id].ChavePagina)
             .ToDictionary(g => g.Key, g => g.Count());
-        var totalPorTime = figurinhas.GroupBy(f => f.TeamId).ToDictionary(g => g.Key, g => (Nome: g.First().TimeNome, Total: g.Count()));
+        var totalPorPagina = figurinhas.GroupBy(f => f.ChavePagina).ToDictionary(g => g.Key, g => (Nome: NomeDaPagina(g.First()), Total: g.Count()));
         var jaTem = (await _db.AlbumConquistas.AsNoTracking()
                 .Where(c => c.TreinadorId == treinadorId && c.AlbumId == albumId)
-                .Select(c => new { c.Tipo, c.TeamId })
+                .Select(c => new { c.Tipo, c.TeamId, c.Pagina })
                 .ToListAsync(ct))
-            .Select(c => (c.Tipo, c.TeamId))
+            .Select(c => (c.Tipo, new ChaveDaPagina(c.TeamId, c.Pagina)))
             .ToHashSet();
 
         var novas = new List<ConquistaAlbumDto>();
-        void Gravar(TipoConquistaAlbum tipo, Guid? teamId, string? timeNome)
+        void Gravar(TipoConquistaAlbum tipo, ChaveDaPagina pagina, string? nome)
         {
-            if (!jaTem.Add((tipo, teamId))) return;
+            if (!jaTem.Add((tipo, pagina))) return;
             _db.AlbumConquistas.Add(new AlbumConquista
             {
                 ConquistaId = Guid.NewGuid(),
                 TreinadorId = treinadorId,
                 AlbumId = albumId,
                 Tipo = tipo,
-                TeamId = teamId,
+                TeamId = pagina.TeamId,
+                Pagina = pagina.Pagina,
                 Em = agora
             });
-            novas.Add(new ConquistaAlbumDto(tipo, teamId, timeNome, agora));
+            novas.Add(new ConquistaAlbumDto(tipo, pagina.TeamId, nome, agora, pagina.Pagina));
         }
 
-        foreach (var teamId in timesComNova.OrderBy(t => figurinhas.First(f => f.TeamId == t).Numero))
+        foreach (var pagina in paginasComNova.Where(totalPorPagina.ContainsKey).OrderBy(p => figurinhas.Where(f => f.ChavePagina == p).Min(f => f.Numero)))
         {
-            var (nome, total) = totalPorTime[teamId];
-            if (coladasPorTime.GetValueOrDefault(teamId) == total)
-                Gravar(TipoConquistaAlbum.PaginaCompleta, teamId, nome);
+            var (nome, total) = totalPorPagina[pagina];
+            if (coladasPorPagina.GetValueOrDefault(pagina) == total)
+                Gravar(TipoConquistaAlbum.PaginaCompleta, pagina, nome);
         }
 
-        if (coladasPorTime.Values.Sum() == figurinhas.Count)
-            Gravar(TipoConquistaAlbum.AlbumCompleto, null, null);
+        if (coladasPorPagina.Values.Sum() == figurinhas.Count)
+            Gravar(TipoConquistaAlbum.AlbumCompleto, default, null);
 
         if (novas.Count > 0) await _db.SaveChangesAsync(ct);
         return novas;
     }
 
     private async Task<List<ConquistaAlbumDto>> ConquistasAsync(Guid treinadorId, Guid albumId, CancellationToken ct) =>
-        await _db.AlbumConquistas.AsNoTracking()
+        (await _db.AlbumConquistas.AsNoTracking()
             .Where(c => c.TreinadorId == treinadorId && c.AlbumId == albumId)
             .OrderBy(c => c.Em)
-            .Select(c => new ConquistaAlbumDto(c.Tipo, c.TeamId, c.Time != null ? c.Time.TeamName : null, c.Em))
-            .ToListAsync(ct);
+            .Select(c => new { c.Tipo, c.TeamId, Time = c.Time != null ? c.Time.TeamName : null, c.Em, c.Pagina })
+            .ToListAsync(ct))
+            .Select(c => Conquista(c.Tipo, c.TeamId, c.Time, c.Em, c.Pagina))
+            .ToList();
+
+    /// <summary>O selo para a tela: na página especial, o "nome do time" é o título da página.</summary>
+    private static ConquistaAlbumDto Conquista(TipoConquistaAlbum tipo, Guid? teamId, string? time, DateTime em, PaginaEspecial? pagina) =>
+        new(tipo, teamId, pagina is { } p ? AlbumFigurinhas.Especial(p).Titulo : time, em, pagina);
+
+    /// <summary>Nome da página da figurinha: o clube ou o título da página especial.</summary>
+    private static string NomeDaPagina(FigurinhaDto f) => f.Pagina is { } p ? AlbumFigurinhas.Especial(p).Titulo : f.TimeNome ?? "";
 
     // ---------------------------------------------------------------- Feed, ranking e Hall da Fama
 
@@ -1003,7 +1032,7 @@ public partial class AlbumService : IAlbumService
         if (albumId is null || quantas <= 0) return Array.Empty<RaraTiradaDto>();
 
         var raras = (await _db.Figurinhas.AsNoTracking()
-                .Where(f => f.AlbumId == albumId && (f.Raridade == RaridadeFigurinha.Lendaria
+                .Where(f => f.AlbumId == albumId && (f.Raridade == RaridadeFigurinha.Lendaria || f.Tipo == TipoFigurinha.Especial
                                                      || (f.Raridade == RaridadeFigurinha.Brilhante && f.Tipo == TipoFigurinha.Jogador)))
                 .Select(f => f.FigurinhaId)
                 .ToListAsync(ct))
@@ -1059,9 +1088,9 @@ public partial class AlbumService : IAlbumService
         var conquistas = (await _db.AlbumConquistas.AsNoTracking()
                 .Where(c => c.AlbumId == album.AlbumId)
                 .OrderBy(c => c.Em)
-                .Select(c => new { c.TreinadorId, Dto = new ConquistaAlbumDto(c.Tipo, c.TeamId, c.Time != null ? c.Time.TeamName : null, c.Em) })
+                .Select(c => new { c.TreinadorId, c.Tipo, c.TeamId, Time = c.Time != null ? c.Time.TeamName : null, c.Em, c.Pagina })
                 .ToListAsync(ct))
-            .ToLookup(c => c.TreinadorId, c => c.Dto);
+            .ToLookup(c => c.TreinadorId, c => Conquista(c.Tipo, c.TeamId, c.Time, c.Em, c.Pagina));
 
         var linhas = porPessoa
             .Select(p => new
@@ -1240,7 +1269,7 @@ public partial class AlbumService : IAlbumService
     /// <summary>Quantas pessoas já têm a figurinha de cada jogador do álbum.</summary>
     private async Task<Dictionary<int, int>> DonosPorJogadorAsync(Guid albumId, CancellationToken ct) =>
         await _db.FigurinhasDosTreinadores.AsNoTracking()
-            .Where(f => f.Figurinha.AlbumId == albumId && f.Figurinha.PlayerId != null)
+            .Where(f => f.Figurinha.AlbumId == albumId && f.Figurinha.PlayerId != null && f.Figurinha.Tipo == TipoFigurinha.Jogador)
             .GroupBy(f => f.Figurinha.PlayerId!.Value)
             .Select(g => new { PlayerId = g.Key, Donos = g.Count() })
             .ToDictionaryAsync(x => x.PlayerId, x => x.Donos, ct);
@@ -1308,8 +1337,9 @@ public partial class AlbumService : IAlbumService
             .OrderBy(f => f.Numero)
             .Select(f => new
             {
-                f.FigurinhaId, f.Numero, f.Tipo, f.Raridade, f.TeamId, TimeNome = f.Time.TeamName, f.PlayerId, f.NomeImpresso,
-                f.PosicaoSigla, f.Overall, f.Destaque, f.Ordem, f.TreinadorId, f.Papel, f.Lenda, f.EntrouEm, f.SaiuEm,
+                f.FigurinhaId, f.Numero, f.Tipo, f.Raridade, f.TeamId, TimeNome = f.Time != null ? f.Time.TeamName : null, f.PlayerId, f.NomeImpresso,
+                f.PosicaoSigla, f.Overall, f.Destaque, f.Ordem, f.TreinadorId, f.Papel, f.Lenda, f.EntrouEm, f.SaiuEm, f.Pagina,
+                Arte = _db.FigurinhasArtes.Where(a => a.FigurinhaId == f.FigurinhaId).Select(a => (DateTime?)a.AtualizadaEm).FirstOrDefault(),
                 Pessoa = f.Treinador == null ? null : f.Treinador.Nome,
                 Perfil = _db.PerfisTreinadores
                     .Where(p => p.TreinadorId == f.TreinadorId)
@@ -1324,7 +1354,7 @@ public partial class AlbumService : IAlbumService
                     : f.Perfil is null ? PerfilTreinadorDto.SoNome(pessoa, f.Pessoa ?? f.NomeImpresso)
                     : new PerfilTreinadorDto(pessoa, f.Pessoa ?? f.NomeImpresso, f.Perfil.Apelido, f.Perfil.Frase, f.Perfil.Esquema,
                         f.Perfil.TemFoto, PerfilTreinadorService.Versao(f.Perfil.TemFoto, f.Perfil.FotoAtualizadaEm)),
-                f.Lenda, f.EntrouEm, f.SaiuEm is not null))
+                f.Lenda, f.EntrouEm, f.SaiuEm is not null, f.Pagina, f.Arte is { } arte ? arte.Ticks.ToString("x") : null))
             .ToList();
     }
 

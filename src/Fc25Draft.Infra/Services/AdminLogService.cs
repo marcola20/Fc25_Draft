@@ -66,6 +66,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.ColocarLenda => "Colocou uma lenda no álbum",
         AdminActionType.TirarLenda => "Tirou uma lenda do álbum",
         AdminActionType.AtualizarAlbum => "Atualizou o álbum com os elencos de hoje",
+        AdminActionType.FigurinhasEspeciais => "Mexeu nas páginas especiais do álbum",
         _ => tipo.ToString()
     };
 

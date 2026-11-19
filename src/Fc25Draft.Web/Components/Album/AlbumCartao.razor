@@ -46,7 +46,14 @@
                             </span>
                             @foreach (var p in r.PaginasCompletas.Take(8))
                             {
-                                <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" title="@p.TimeNome" width="18" height="18" loading="lazy" />
+                                @if (p.Pagina is { } especial)
+                                {
+                                    <span title="@p.TimeNome"><Icone Nome="@Fc25Draft.Core.Utilities.AlbumFigurinhas.Especial(especial).Icone" Tamanho="16" /></span>
+                                }
+                                else
+                                {
+                                    <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" title="@p.TimeNome" width="18" height="18" loading="lazy" />
+                                }
                             }
                         }
                     </div>

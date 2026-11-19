@@ -79,7 +79,14 @@
                                                 <Icone Nome="award" Tamanho="12" /> @l.PaginasCompletas.Count
                                                 @foreach (var p in l.PaginasCompletas.Take(6))
                                                 {
-                                                    <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" width="16" height="16" loading="lazy" />
+                                                    @if (p.Pagina is { } especial)
+                                                    {
+                                                        <span title="@p.TimeNome"><Icone Nome="@Fc25Draft.Core.Utilities.AlbumFigurinhas.Especial(especial).Icone" Tamanho="14" /></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <img src="@Escudos.GetEscudo(p.TimeNome)" alt="@p.TimeNome" width="16" height="16" loading="lazy" />
+                                                    }
                                                 }
                                             </span>
                                         }

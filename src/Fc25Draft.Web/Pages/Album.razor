@@ -7,7 +7,8 @@
 @inject AdminAuthService AdminAuth
 @inject EscudoService Escudos
 @inject NavigationManager Navigation
-@implements IDisposable
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Álbum de Figurinhas</PageTitle>
 
@@ -36,25 +37,61 @@
     {
         <div class="alert alert-secondary">O álbum desta temporada ainda não foi lançado. Quando sair, ele aparece aqui.</div>
     }
+    else if (_mostrarCapa)
+    {
+        var a = _album;
+        @* ---- A capa do álbum fechado: abre uma vez por sessão ---- *@
+        <div class="capa-livro @(_abrindoCapa ? "abrindo" : "")">
+            <div class="capa-frente" @onclick="AbrirCapaAsync">
+                <div class="capa-brilho" aria-hidden="true"></div>
+                <span class="capa-faixa">Álbum oficial de figurinhas</span>
+                <img src="images/logobranca.png" class="capa-logo" alt="CBFV" />
+                <h1 class="capa-nome">@a.Album.Nome</h1>
+                <span class="capa-temporada">Temporada @a.Album.Temporada</span>
+                <div class="capa-leque" aria-hidden="true">
+                    @{ var i = 0; }
+                    @foreach (var f in CartasDaCapa(a))
+                    {
+                        <div class="capa-carta c@(i++)"><CartaFigurinha Figurinha="@f" Largura="120" Lazy="false" SeloLendaria="@Selo" /></div>
+                    }
+                </div>
+                <div class="capa-rodape">
+                    <span class="capa-progresso"><strong>@a.Coladas</strong> de @a.Total figurinhas · @a.Percentual%</span>
+                    @if (a.PacotesParaAbrir > 0)
+                    {
+                        <span class="capa-pacotes"><Icone Nome="package" Tamanho="14" /> @a.PacotesParaAbrir pacote@(a.PacotesParaAbrir == 1 ? "" : "s") esperando</span>
+                    }
+                    <button type="button" class="btn btn-warning capa-abrir" @onclick="AbrirCapaAsync" @onclick:stopPropagation="true">
+                        <Icone Nome="book-open" Tamanho="16" /> Abrir o álbum
+                    </button>
+                </div>
+            </div>
+            <div class="capa-miolo" aria-hidden="true"></div>
+        </div>
+    }
     else
     {
         var a = _album;
 
-        @* ---- Capa ---- *@
+        <div class="@(_capaVerificada ? "" : "aguardando-capa") @(_recemAberto ? "recem-aberto" : "")">
+        @* ---- Topo: progresso e pacotes ---- *@
         <div class="card capa mb-3">
             <div class="card-body d-flex flex-wrap gap-4 align-items-center">
                 <div class="flex-grow-1" style="min-width: 240px;">
                     <div class="text-body-tertiary small">Temporada @a.Album.Temporada</div>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                         <h1 class="h3 mb-0">@a.Album.Nome</h1>
-                        <a href="/album/trocas" class="btn btn-sm btn-outline-secondary ms-auto position-relative">
-                            <Icone Nome="arrow-left-right" Tamanho="14" /> Trocas
-                            @if (a.TrocasEsperando > 0)
-                            {
-                                <span class="sino-contador numero" title="Propostas esperando a sua resposta">@a.TrocasEsperando</span>
-                            }
-                        </a>
-                        <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary"><Icone Nome="award" Tamanho="14" /> Colecionadores</a>
+                        <div class="d-flex flex-wrap gap-2 ms-auto">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Fechar o álbum e ver a capa" @onclick="VerCapa"><Icone Nome="book-open" Tamanho="14" /> Capa</button>
+                            <a href="/album/trocas" class="btn btn-sm btn-outline-secondary position-relative">
+                                <Icone Nome="arrow-left-right" Tamanho="14" /> Trocas
+                                @if (a.TrocasEsperando > 0)
+                                {
+                                    <span class="sino-contador numero" title="Propostas esperando a sua resposta">@a.TrocasEsperando</span>
+                                }
+                            </a>
+                            <a href="/album/colecionadores" class="btn btn-sm btn-outline-secondary"><Icone Nome="award" Tamanho="14" /> Colecionadores</a>
+                        </div>
                     </div>
                     @if (a.AlbumCompleto is { } completo)
                     {
@@ -133,7 +170,7 @@
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-baseline gap-2">
                     <strong>Últimas raras tiradas</strong>
-                    <span class="small text-muted">brilhantes e lendárias que saíram nos pacotes</span>
+                    <span class="small text-muted">brilhantes, lendárias e especiais que saíram nos pacotes</span>
                 </div>
                 <div class="card-body py-2">
                     <div class="faixa-raras">
@@ -152,15 +189,17 @@
 
         @* ---- Filtros ---- *@
         <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-            <input type="search" class="form-control" style="max-width: 280px;" placeholder="Buscar jogador ou número"
+            <input type="search" class="form-control" style="max-width: 280px;" placeholder="Buscar jogador, clube ou número"
                    value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
             <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="soFaltam" checked="@_soFaltam" @onchange="e => _soFaltam = e.Value is true" />
                 <label class="form-check-label" for="soFaltam">Só as que faltam</label>
             </div>
-            @if (_pagina is not null)
+            @if (_pagina is not null && string.IsNullOrWhiteSpace(_busca))
             {
-                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto"><Icone Nome="arrow-left" Tamanho="14" /> Índice</a>
+                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => IrParaAsync(null, -1)" @onclick:preventDefault="true">
+                    <Icone Nome="list" Tamanho="14" /> Sumário
+                </a>
             }
         </div>
 
@@ -175,99 +214,155 @@
                 }
             </div>
         }
-        else if (_pagina is { } pg)
+        else
         {
-            @* ---- Página do clube ---- *@
-            var indice = a.Paginas.ToList().FindIndex(x => x.TeamId == pg.TeamId);
-            var anterior = indice > 0 ? a.Paginas[indice - 1] : null;
-            var proxima = indice < a.Paginas.Count - 1 ? a.Paginas[indice + 1] : null;
+            <div class="livro-folhas">
+                @if (_pagina is { } pg)
+                {
+                    @* ---- Uma folha do álbum: clube ou página especial ---- *@
+                    var indice = IndiceDa(pg);
+                    var anterior = indice > 0 ? a.Paginas[indice - 1] : null;
+                    var proxima = indice < a.Paginas.Count - 1 ? a.Paginas[indice + 1] : null;
+                    var info = pg.Especial is { } especial ? AlbumFigurinhas.Especial(especial) : null;
+                    var vagas = Filtrar(pg.Vagas).ToList();
+                    var novaN = 0;
 
-            <div class="card pagina-clube">
-                <div class="card-header d-flex flex-wrap align-items-center gap-2">
-                    <img src="@Escudos.GetEscudo(pg.TimeNome)" alt="" width="36" height="36" style="object-fit: contain;" />
-                    <div class="me-auto">
-                        <div class="fw-bold">@pg.TimeNome</div>
-                        <div class="small text-muted">
-                            @pg.Coladas de @pg.Total · @pg.Percentual%
-                            @if (a.SeloDaPagina(pg.TeamId) is { } seloDaPagina)
+                    <article class="folha @(info is null ? "de-clube" : $"especial p-{info.Endereco}")" @key="@pg.Chave.NoEndereco">
+                        <header class="folha-cabeca">
+                            @if (info is not null)
                             {
-                                <span class="badge selo-badge ms-1" title="Completa em @BrazilTime.FormatDateTime(seloDaPagina.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="12" /> Página completa</span>
-                            }
-                            else if (pg.Completa)
-                            {
-                                <span class="etiqueta sucesso ms-1"><Icone Nome="check" Tamanho="12" /> Página completa</span>
-                            }
-                        </div>
-                    </div>
-                    @if (anterior is not null)
-                    {
-                        <a class="btn btn-sm btn-outline-secondary" href="/album?clube=@anterior.TeamId" title="@anterior.TimeNome">‹ Anterior</a>
-                    }
-                    @if (proxima is not null)
-                    {
-                        <a class="btn btn-sm btn-outline-secondary" href="/album?clube=@proxima.TeamId" title="@proxima.TimeNome">Próxima ›</a>
-                    }
-                </div>
-                <div class="card-body">
-                    @{ var vagas = Filtrar(pg.Vagas).ToList(); }
-                    @if (vagas.Count == 0)
-                    {
-                        <div class="text-muted">Não falta nenhuma.</div>
-                    }
-                    <div class="grade-cartas">
-                        @foreach (var v in vagas)
-                        {
-                            @if (v.Colada)
-                            {
-                                var colada = v.Figurinha;
-                                <button type="button" class="carta-botao" @key="v.Figurinha.FigurinhaId" title="Compartilhar" @onclick="() => _compartilhar = colada">
-                                    <CartaFigurinha Figurinha="@v.Figurinha" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo" />
-                                </button>
+                                <span class="folha-icone"><Icone Nome="@info.Icone" Tamanho="30" /></span>
                             }
                             else
                             {
-                                <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="true" />
+                                <img class="folha-escudo" src="@Escudos.GetEscudo(pg.Titulo)" alt="" width="52" height="52" />
                             }
-                        }
-                    </div>
-                    @if (pg.Coladas > 0)
-                    {
-                        <div class="small text-muted mt-2">Toque numa figurinha colada para compartilhar.</div>
-                    }
-                </div>
-            </div>
-        }
-        else
-        {
-            @* ---- Índice ---- *@
-            <div class="indice">
-                @foreach (var pagina in a.Paginas)
-                {
-                    var selo = a.SeloDaPagina(pagina.TeamId);
-                    <a class="indice-item card text-reset text-decoration-none @(pagina.Completa ? "completa" : "")" href="/album?clube=@pagina.TeamId">
-                        <div class="card-body d-flex align-items-center gap-2 p-2">
-                            <img src="@Escudos.GetEscudo(pagina.TimeNome)" alt="" width="40" height="40" style="object-fit: contain;" loading="lazy" />
                             <div class="flex-grow-1 min-w-0">
-                                <div class="fw-semibold text-truncate">@pagina.TimeNome</div>
-                                <div class="progress mt-1" style="height: .35rem;">
-                                    <div class="progress-bar" style="width: @(pagina.Percentual)%; background: @(pagina.Completa ? "var(--cbfv-acento)" : "var(--bs-tertiary-color)");"></div>
+                                <div class="folha-sobre">@(info?.Subtitulo ?? "Clube")</div>
+                                <h2 class="folha-titulo">@pg.Titulo</h2>
+                                <div class="folha-conta">
+                                    @pg.Coladas de @pg.Total · @pg.Percentual%
+                                    @if (a.SeloDaPagina(pg.Chave) is { } seloDaPagina)
+                                    {
+                                        <span class="badge selo-badge ms-1" title="Completa em @BrazilTime.FormatDateTime(seloDaPagina.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="12" /> Página completa</span>
+                                    }
+                                    else if (pg.Completa)
+                                    {
+                                        <span class="etiqueta sucesso ms-1"><Icone Nome="check" Tamanho="12" /> Página completa</span>
+                                    }
                                 </div>
-                                <div class="small text-muted mt-1">@pagina.Coladas/@pagina.Total</div>
                             </div>
-                            @if (selo is not null)
+                        </header>
+
+                        <div class="folha-miolo">
+                            @if (vagas.Count == 0)
                             {
-                                <span class="selo-pagina" title="Página completa em @BrazilTime.FormatDateTime(selo.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="14" /></span>
+                                <div class="text-muted">Não falta nenhuma.</div>
                             }
-                            else if (pagina.Completa)
+                            <div class="grade-cartas">
+                                @foreach (var v in vagas)
+                                {
+                                    @if (v.Colada)
+                                    {
+                                        var colada = v.Figurinha;
+                                        var colar = _colar.Contains(colada.FigurinhaId);
+                                        <button type="button" class="carta-botao" @key="v.Figurinha.FigurinhaId" title="Compartilhar" @onclick="() => _compartilhar = colada">
+                                            <CartaFigurinha Figurinha="@v.Figurinha" Quantidade="@v.Quantidade" Nova="@v.Nova" SeloLendaria="@Selo"
+                                                            Colar="@colar" AtrasoColar="@(colar ? 350 + 120 * novaN++ : 0)" />
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <CartaFigurinha @key="v.Figurinha.FigurinhaId" Figurinha="@v.Figurinha" Vazia="true" />
+                                    }
+                                }
+                            </div>
+                            @if (pg.Coladas > 0)
                             {
-                                <span class="selo-completa" title="Página completa"><Icone Nome="check" Tamanho="14" /></span>
+                                <div class="small text-muted mt-3">Toque numa figurinha colada para compartilhar.</div>
                             }
                         </div>
-                    </a>
+
+                        <footer class="folha-pe">
+                            <button type="button" class="folha-seta" title="@(anterior?.Titulo ?? "Sumário")" @onclick="() => IrParaAsync(anterior, -1)">
+                                <Icone Nome="chevron-left" Tamanho="18" /> <span class="folha-seta-nome">@(anterior?.Titulo ?? "Sumário")</span>
+                            </button>
+                            <span class="folha-numero">pág. @(indice + 1) de @a.Paginas.Count</span>
+                            <button type="button" class="folha-seta" title="@(proxima?.Titulo ?? "")" disabled="@(proxima is null)" @onclick="() => IrParaAsync(proxima, 1)">
+                                <span class="folha-seta-nome">@(proxima?.Titulo ?? "Fim do álbum")</span> <Icone Nome="chevron-right" Tamanho="18" />
+                            </button>
+                        </footer>
+                    </article>
+                }
+                else
+                {
+                    @* ---- Sumário: a primeira folha do álbum ---- *@
+                    <article class="folha sumario" @key="@("sumario")">
+                        <header class="folha-cabeca">
+                            <span class="folha-icone"><Icone Nome="list-ordered" Tamanho="30" /></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="folha-sobre">@a.Album.Nome</div>
+                                <h2 class="folha-titulo">Sumário</h2>
+                                <div class="folha-conta">@a.Paginas.Count páginas · deslize para o lado ou use as setas para folhear</div>
+                            </div>
+                        </header>
+
+                        <div class="folha-miolo">
+                            @foreach (var secao in Secoes(a))
+                            {
+                                <h3 class="sumario-secao">@secao.Titulo</h3>
+                                <div class="indice">
+                                    @foreach (var pagina in secao.Paginas)
+                                    {
+                                        var selo = a.SeloDaPagina(pagina.Chave);
+                                        var infoPagina = pagina.Especial is { } e ? AlbumFigurinhas.Especial(e) : null;
+                                        <a class="indice-item card text-reset text-decoration-none @(pagina.Completa ? "completa" : "") @(infoPagina is null ? "" : $"especial p-{infoPagina.Endereco}")"
+                                           href="@Endereco(pagina)" @onclick="() => IrParaAsync(pagina, 1)" @onclick:preventDefault="true">
+                                            <div class="card-body d-flex align-items-center gap-2 p-2">
+                                                @if (infoPagina is not null)
+                                                {
+                                                    <span class="indice-icone"><Icone Nome="@infoPagina.Icone" Tamanho="22" /></span>
+                                                }
+                                                else
+                                                {
+                                                    <img src="@Escudos.GetEscudo(pagina.Titulo)" alt="" width="40" height="40" style="object-fit: contain;" loading="lazy" />
+                                                }
+                                                <div class="flex-grow-1 min-w-0">
+                                                    <div class="fw-semibold text-truncate">@pagina.Titulo</div>
+                                                    <div class="progress mt-1" style="height: .35rem;">
+                                                        <div class="progress-bar" style="width: @(pagina.Percentual)%; background: @(pagina.Completa ? "var(--cbfv-acento)" : "var(--bs-tertiary-color)");"></div>
+                                                    </div>
+                                                    <div class="small text-muted mt-1 d-flex justify-content-between"><span>@pagina.Coladas/@pagina.Total</span><span>p. @(IndiceDa(pagina) + 1)</span></div>
+                                                </div>
+                                                @if (selo is not null)
+                                                {
+                                                    <span class="selo-pagina" title="Página completa em @BrazilTime.FormatDateTime(selo.Em, "dd/MM/yyyy")"><Icone Nome="award" Tamanho="14" /></span>
+                                                }
+                                                else if (pagina.Completa)
+                                                {
+                                                    <span class="selo-completa" title="Página completa"><Icone Nome="check" Tamanho="14" /></span>
+                                                }
+                                            </div>
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <footer class="folha-pe">
+                            <button type="button" class="folha-seta" title="Capa" @onclick="VerCapa">
+                                <Icone Nome="chevron-left" Tamanho="18" /> <span class="folha-seta-nome">Capa</span>
+                            </button>
+                            <span class="folha-numero">sumário</span>
+                            <button type="button" class="folha-seta" disabled="@(a.Paginas.Count == 0)" @onclick="() => IrParaAsync(a.Paginas.FirstOrDefault(), 1)">
+                                <span class="folha-seta-nome">@(a.Paginas.FirstOrDefault()?.Titulo)</span> <Icone Nome="chevron-right" Tamanho="18" />
+                            </button>
+                        </footer>
+                    </article>
                 }
             </div>
 
-            @if (a.ForaDoAlbum is { Count: > 0 } fora)
+            @if (_pagina is null && a.ForaDoAlbum is { Count: > 0 } fora)
             {
                 @* ---- Figurinhas de quem saiu dos clubes da liga ---- *@
                 <div class="card mt-4">
@@ -291,6 +386,7 @@
                 </div>
             }
         }
+        </div>
     }
 </div>
 
@@ -298,8 +394,13 @@
     // Enquanto a aba desta página está escondida, a query do endereço é a de outra aba (ver AbasService).
     [CascadingParameter] public AbaAberta? AbaAberta { get; set; }
 
+    /// <summary>Endereço antigo da página do clube (avisos e links de antes das páginas especiais).</summary>
     [SupplyParameterFromQuery(Name = "clube")]
     public Guid? Clube { get; set; }
+
+    /// <summary>A página aberta: o id do clube ou o nome da especial (<c>organizacao</c>, <c>lendarios</c>…).</summary>
+    [SupplyParameterFromQuery(Name = "pagina")]
+    public string? PaginaPedida { get; set; }
 
     private bool _carregando = true;
     private const int MaximoDeOrigens = 12;
@@ -321,6 +422,18 @@
     private string _busca = string.Empty;
     private bool _soFaltam;
 
+    // O livro: a capa (uma vez por sessão), a folha que vira e as novas que entram colando.
+    private bool _capaVerificada;
+    private bool _mostrarCapa;
+    private bool _abrindoCapa;
+    private bool _recemAberto;
+    private bool _rolarParaOLivro;
+    private bool _virando;
+    private HashSet<Guid> _colar = new();
+    private readonly HashSet<Guid> _jaColadas = new();
+    private string? _paginaDasNovas;
+    private DotNetObjectReference<Album>? _ponte;
+
     private string? Selo => _album is null ? null : $"Melhores de {_album.Album.Temporada - 1}";
 
     protected override async Task OnInitializedAsync()
@@ -335,7 +448,43 @@
         if (!_carregando) await AbrirPaginaAsync();
     }
 
-    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_album is not null && !_capaVerificada)
+        {
+            _capaVerificada = true;
+            try
+            {
+                _ponte ??= DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("cbfvAlbum.ligar", _ponte);
+                // Quem chega direto numa página (link de aviso, busca) não vê a capa.
+                var aberta = await JS.InvokeAsync<bool>("cbfvAlbum.capaJaAberta");
+                _mostrarCapa = !aberta && _pagina is null;
+            }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
+            StateHasChanged();
+            return;
+        }
+
+        if (_rolarParaOLivro)
+        {
+            _rolarParaOLivro = false;
+            try { await JS.InvokeVoidAsync("cbfvAlbum.topoDoLivro"); }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+        try { await JS.InvokeVoidAsync("cbfvAlbum.desligar"); }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
+        catch (InvalidOperationException) { }
+        _ponte?.Dispose();
+    }
 
     private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await CarregarAsync(); StateHasChanged(); });
 
@@ -366,10 +515,20 @@
         await AbrirPaginaAsync();
     }
 
-    /// <summary>A página do clube pedida no endereço. As novas que aparecem nela deixam de ser novas da próxima vez.</summary>
+    /// <summary>
+    /// A página pedida no endereço. As novas que aparecem nela entram colando (só desta vez) e deixam de ser
+    /// novas da próxima.
+    /// </summary>
     private async Task AbrirPaginaAsync()
     {
-        _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+        _pagina = PaginaDoEndereco();
+        var chave = _pagina?.Chave.NoEndereco;
+        if (chave != _paginaDasNovas)
+        {
+            _paginaDasNovas = chave;
+            // Voltar à página depois (as novas continuam marcadas na memória) não cola de novo.
+            _colar = _pagina?.Vagas.Where(v => v.Nova && _jaColadas.Add(v.Figurinha.FigurinhaId)).Select(v => v.Figurinha.FigurinhaId).ToHashSet() ?? new();
+        }
         if (_pagina is null || _eu is null) return;
 
         var novas = _pagina.Vagas.Where(v => v.Nova).Select(v => v.Figurinha.FigurinhaId).ToList();
@@ -378,6 +537,108 @@
         try { await AlbumSvc.MarcarVistasAsync(_eu.TreinadorId, novas, CancellationToken.None); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _umaPorVez.Release(); }
+    }
+
+    private PaginaDoAlbumDto? PaginaDoEndereco()
+    {
+        if (_album is null) return null;
+        if (!string.IsNullOrWhiteSpace(PaginaPedida))
+        {
+            if (AlbumFigurinhas.EspecialPeloEndereco(PaginaPedida) is { } especial)
+                return _album.Paginas.FirstOrDefault(p => p.Especial == especial);
+            return Guid.TryParse(PaginaPedida, out var id) ? _album.Paginas.FirstOrDefault(p => p.Especial is null && p.TeamId == id) : null;
+        }
+
+        return Clube is { } clube ? _album.Paginas.FirstOrDefault(p => p.Especial is null && p.TeamId == clube) : null;
+    }
+
+    private static string Endereco(PaginaDoAlbumDto? pagina) => pagina is null ? "/album" : $"/album?pagina={pagina.Chave.NoEndereco}";
+
+    private int IndiceDa(PaginaDoAlbumDto pagina) =>
+        _album is null ? -1 : _album.Paginas.ToList().FindIndex(p => p.Chave == pagina.Chave);
+
+    /// <summary>Vira a folha (para a frente ou para trás) e vai para a página; nulo = o sumário.</summary>
+    private async Task IrParaAsync(PaginaDoAlbumDto? destino, int direcao)
+    {
+        if (_virando || destino?.Chave == _pagina?.Chave) return;
+        _virando = true;
+        try
+        {
+            try { await JS.InvokeVoidAsync("cbfvAlbum.virar", direcao); }
+            catch (JSException) { }
+            catch (JSDisconnectedException) { }
+            _rolarParaOLivro = true;
+            Navigation.NavigateTo(Endereco(destino));
+        }
+        finally { _virando = false; }
+    }
+
+    /// <summary>Arrastar para o lado no celular ou as setas do teclado (cbfvAlbum no app.js).</summary>
+    [JSInvokable]
+    public async Task Virar(bool proxima)
+    {
+        if (_album is null || _mostrarCapa || !string.IsNullOrWhiteSpace(_busca) || _aberto is not null || _compartilhar is not null) return;
+        var paginas = _album.Paginas;
+        if (_pagina is null)
+        {
+            if (proxima && paginas.Count > 0) await IrParaAsync(paginas[0], 1);
+            return;
+        }
+
+        var i = IndiceDa(_pagina);
+        if (proxima && i < paginas.Count - 1) await IrParaAsync(paginas[i + 1], 1);
+        else if (!proxima) await IrParaAsync(i > 0 ? paginas[i - 1] : null, -1);
+    }
+
+    private async Task AbrirCapaAsync()
+    {
+        if (_abrindoCapa) return;
+        _abrindoCapa = true;
+        var reduzido = false;
+        try
+        {
+            await JS.InvokeVoidAsync("cbfvAlbum.marcarCapaAberta");
+            reduzido = await JS.InvokeAsync<bool>("cbfvAlbum.movimentoReduzido");
+        }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
+
+        if (!reduzido)
+        {
+            StateHasChanged();
+            await Task.Delay(950);
+        }
+        _mostrarCapa = false;
+        _abrindoCapa = false;
+        _recemAberto = !reduzido;
+    }
+
+    private void VerCapa()
+    {
+        _mostrarCapa = true;
+        _recemAberto = false;
+        if (_pagina is not null) Navigation.NavigateTo("/album");
+    }
+
+    /// <summary>As três da capa: as especiais com arte, depois as mais raras.</summary>
+    private static IEnumerable<FigurinhaDto> CartasDaCapa(MeuAlbumDto a) =>
+        a.Paginas.SelectMany(p => p.Vagas).Select(v => v.Figurinha)
+            .OrderByDescending(f => f.Especial && f.TemArte)
+            .ThenByDescending(f => f.Raridade)
+            .ThenByDescending(f => f.Tipo == TipoFigurinha.Jogador)
+            .ThenByDescending(f => f.Overall ?? 0)
+            .Take(3);
+
+    /// <summary>O sumário em partes: a abertura (Organização), os clubes e a história (Campeões e Lendários).</summary>
+    private static IEnumerable<(string Titulo, List<PaginaDoAlbumDto> Paginas)> Secoes(MeuAlbumDto a)
+    {
+        bool Antes(PaginaDoAlbumDto p) => p.Especial is { } e && AlbumFigurinhas.Especial(e).AntesDosClubes;
+        var abertura = a.Paginas.Where(Antes).ToList();
+        var clubes = a.Paginas.Where(p => p.Especial is null).ToList();
+        var historia = a.Paginas.Where(p => p.Especial is not null && !Antes(p)).ToList();
+        if (abertura.Count > 0) yield return ("Abertura", abertura);
+        if (clubes.Count > 0) yield return ("Clubes", clubes);
+        if (historia.Count > 0) yield return ("Hall da Fama e Lendas", historia);
     }
 
     private async Task PegarDoDiaAsync()
@@ -390,7 +651,7 @@
         {
             var ganhou = await AlbumSvc.PegarPacoteDoDiaAsync(_eu.TreinadorId, CancellationToken.None);
             _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
-            _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+            _pagina = PaginaDoEndereco();
             _ok = ganhou ? "Pacotes do dia na mão. É só abrir!" : "Você já pegou os pacotes de hoje. Amanhã tem mais.";
         }
         catch (Exception ex) { _erro = ex.Message; }
@@ -423,7 +684,7 @@
             _aberto = await AlbumSvc.AbrirPacoteAsync(_eu.TreinadorId, CancellationToken.None);
             _album = await AlbumSvc.MeuAlbumAsync(_eu.TreinadorId, null, CancellationToken.None);
             _raras = await AlbumSvc.UltimasRarasAsync(RarasNaCapa, CancellationToken.None);
-            _pagina = Clube is { } id ? _album?.Paginas.FirstOrDefault(p => p.TeamId == id) : null;
+            _pagina = PaginaDoEndereco();
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally
@@ -442,6 +703,8 @@
         if (termo.Length == 0) return true;
         if (int.TryParse(termo, out var numero)) return v.Figurinha.Numero == numero;
         var normal = TextoBusca.Normalizar(termo);
-        return TextoBusca.Normalizar(v.Figurinha.NomeImpresso).Contains(normal) || TextoBusca.Normalizar(v.Figurinha.TimeNome).Contains(normal);
+        return TextoBusca.Normalizar(v.Figurinha.NomeImpresso).Contains(normal)
+               || TextoBusca.Normalizar(v.Figurinha.TimeNome ?? "").Contains(normal)
+               || TextoBusca.Normalizar(v.Figurinha.Destaque ?? "").Contains(normal);
     }
 }

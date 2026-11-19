@@ -9,7 +9,29 @@ public enum TipoFigurinha
     Escudo = 2,
 
     /// <summary>Técnico ou auxiliar do clube no lançamento. Sorteada como brilhante, com visual próprio.</summary>
-    Treinador = 3
+    Treinador = 3,
+
+    /// <summary>
+    /// Figurinha de uma página especial (Organização, Campeões, Lendários): colocada pelo admin, quase sempre com
+    /// a arte inteira feita por ele (<see cref="FigurinhaArte"/>). A atualização do álbum nunca mexe nela.
+    /// </summary>
+    Especial = 4
+}
+
+/// <summary>As páginas do álbum que não são de clube. A ordem do enum não é a do álbum (ver <c>AlbumFigurinhas.PaginasEspeciais</c>).</summary>
+public enum PaginaEspecial
+{
+    /// <summary>Os administradores da liga que o admin escolhe.</summary>
+    Organizacao = 1,
+
+    /// <summary>Hall da Fama: um campeão de liga (Série A/B) por figurinha.</summary>
+    CampeoesLiga = 2,
+
+    /// <summary>Hall da Fama: um campeão da Copa por figurinha.</summary>
+    CampeoesCopa = 3,
+
+    /// <summary>Jogadores lendários: ainda na liga (com figurinha diferente) ou de outras edições.</summary>
+    Lendarios = 4
 }
 
 /// <summary>Raridade da figurinha. Cada uma tem só uma, a mais alta que se aplicar.</summary>
@@ -67,8 +89,14 @@ public class Figurinha
     public TipoFigurinha Tipo { get; set; }
     public RaridadeFigurinha Raridade { get; set; }
 
-    /// <summary>Clube da página.</summary>
-    public Guid TeamId { get; set; }
+    /// <summary>Clube da página. Na especial é opcional (o clube campeão, o clube do lendário) e só aparece na carta.</summary>
+    public Guid? TeamId { get; set; }
+
+    /// <summary>Página especial (só na <see cref="TipoFigurinha.Especial"/>); nulo = página do clube.</summary>
+    public PaginaEspecial? Pagina { get; set; }
+
+    /// <summary>A entrada do Hall da Fama da figurinha de campeão (para não criar a mesma duas vezes).</summary>
+    public Guid? HallOfFameId { get; set; }
 
     /// <summary>Nulo na figurinha do escudo e na de técnico.</summary>
     public int? PlayerId { get; set; }
@@ -114,9 +142,26 @@ public class Figurinha
     public DateTime? SaiuEm { get; set; }
 
     public Album Album { get; set; } = null!;
-    public Team Time { get; set; } = null!;
+    public Team? Time { get; set; }
     public Player? Jogador { get; set; }
     public Treinador? Treinador { get; set; }
+}
+
+/// <summary>
+/// A arte inteira de uma figurinha especial, feita e enviada pelo admin (5:7, a medida da carta). Guardada no
+/// banco como as fotos (no Render os arquivos somem a cada deploy).
+/// </summary>
+public class FigurinhaArte
+{
+    public Guid FigurinhaId { get; set; }
+    public byte[] Imagem { get; set; } = null!;
+
+    /// <summary>image/webp, image/png ou image/jpeg.</summary>
+    public string ContentType { get; set; } = null!;
+
+    public DateTime AtualizadaEm { get; set; }
+
+    public Figurinha Figurinha { get; set; } = null!;
 }
 
 /// <summary>As figurinhas que a pessoa já tirou. <c>Quantidade - 1</c> são as repetidas.</summary>
@@ -178,7 +223,7 @@ public class PacoteGanho
 
 public enum TipoConquistaAlbum
 {
-    /// <summary>Todas as figurinhas de um clube coladas.</summary>
+    /// <summary>Todas as figurinhas de uma página (de clube ou especial) coladas.</summary>
     PaginaCompleta = 1,
 
     /// <summary>O álbum inteiro colado: vai para o Hall da Fama (Colecionadores).</summary>
@@ -196,8 +241,11 @@ public class AlbumConquista
     public Guid AlbumId { get; set; }
     public TipoConquistaAlbum Tipo { get; set; }
 
-    /// <summary>O clube da página; nulo no álbum completo.</summary>
+    /// <summary>O clube da página; nulo no álbum completo e nas páginas especiais.</summary>
     public Guid? TeamId { get; set; }
+
+    /// <summary>A página especial completa (Organização, Campeões, Lendários); nulo nas de clube.</summary>
+    public PaginaEspecial? Pagina { get; set; }
 
     public DateTime Em { get; set; }
 

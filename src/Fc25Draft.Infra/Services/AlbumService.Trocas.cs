@@ -330,8 +330,8 @@ public partial class AlbumService
                 return await EncerrarAsync(troca, StatusTroca.NaoValeMais, motivo, agora, tx, ct);
 
             // Move tudo: cada item sai de um e entra no outro. Quem não tinha a figurinha cola na hora (NOVA).
-            var novasDe = new HashSet<Guid>();
-            var novasPara = new HashSet<Guid>();
+            var novasDe = new HashSet<ChaveDaPagina>();
+            var novasPara = new HashSet<ChaveDaPagina>();
             var recebidasPara = new List<FigurinhaDto>();
             foreach (var item in troca.Itens)
             {
@@ -354,7 +354,7 @@ public partial class AlbumService
                     };
                     _db.FigurinhasDosTreinadores.Add(nova);
                     posses[(entra, item.FigurinhaId)] = nova;
-                    novas.Add(porId[item.FigurinhaId].TeamId);
+                    novas.Add(porId[item.FigurinhaId].ChavePagina);
                 }
 
                 if (item.Oferecida) recebidasPara.Add(porId[item.FigurinhaId]);

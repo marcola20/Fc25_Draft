@@ -39,11 +39,24 @@ public class FigurinhaConfiguration : IEntityTypeConfiguration<Figurinha>
         b.HasIndex(x => new { x.AlbumId, x.Numero }).IsUnique();
         b.HasIndex(x => new { x.AlbumId, x.Raridade });
         b.HasIndex(x => new { x.AlbumId, x.SaiuEm });
+        b.HasIndex(x => new { x.AlbumId, x.Pagina });
 
-        b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Time).WithMany().HasForeignKey(x => x.TeamId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Jogador).WithMany().HasForeignKey(x => x.PlayerId).OnDelete(DeleteBehavior.Restrict);
         // Pessoa excluída: a figurinha fica com o nome do lançamento, sem o perfil.
         b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+public class FigurinhaArteConfiguration : IEntityTypeConfiguration<FigurinhaArte>
+{
+    public void Configure(EntityTypeBuilder<FigurinhaArte> b)
+    {
+        b.ToTable("FigurinhasArtes");
+        b.HasKey(x => x.FigurinhaId);
+        b.Property(x => x.Imagem).IsRequired();
+        b.Property(x => x.ContentType).HasMaxLength(40).IsRequired();
+        b.HasOne(x => x.Figurinha).WithOne().HasForeignKey<FigurinhaArte>(x => x.FigurinhaId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -89,8 +102,8 @@ public class AlbumConquistaConfiguration : IEntityTypeConfiguration<AlbumConquis
         b.ToTable("AlbumConquistas");
         b.HasKey(x => x.ConquistaId);
 
-        // Um selo de cada por pessoa: a página de cada clube e o álbum (TeamId nulo) uma vez só.
-        b.HasIndex(x => new { x.TreinadorId, x.AlbumId, x.Tipo, x.TeamId }).IsUnique().AreNullsDistinct(false);
+        // Um selo de cada por pessoa: a página de cada clube, cada página especial e o álbum (os dois nulos) uma vez só.
+        b.HasIndex(x => new { x.TreinadorId, x.AlbumId, x.Tipo, x.TeamId, x.Pagina }).IsUnique().AreNullsDistinct(false);
         b.HasIndex(x => new { x.AlbumId, x.Tipo, x.Em });
 
         b.HasOne(x => x.Treinador).WithMany().HasForeignKey(x => x.TreinadorId).OnDelete(DeleteBehavior.Cascade);

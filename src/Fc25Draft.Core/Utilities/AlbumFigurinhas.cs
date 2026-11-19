@@ -44,6 +44,40 @@ public static class AlbumFigurinhas
 
     public const int TamanhoDestaque = 80;
 
+    // ---- Páginas especiais ----
+
+    /// <summary>
+    /// Uma página especial do álbum. <paramref name="AntesDosClubes"/>: abre o álbum (Organização); as outras vêm
+    /// depois das páginas dos clubes, na ordem de <paramref name="Ordem"/>. <paramref name="Sigla"/> vai no canto
+    /// da carta que não tem arte própria.
+    /// </summary>
+    public sealed record InfoPaginaEspecial(
+        PaginaEspecial Pagina, string Titulo, string Subtitulo, string Endereco, string Icone, string Sigla,
+        RaridadeFigurinha RaridadePadrao, bool AntesDosClubes, int Ordem);
+
+    public static readonly IReadOnlyList<InfoPaginaEspecial> PaginasEspeciais = new[]
+    {
+        new InfoPaginaEspecial(PaginaEspecial.Organizacao, "A Organização", "Quem faz a CBFV acontecer", "organizacao", "landmark", "ADM",
+            RaridadeFigurinha.Brilhante, true, 0),
+        new InfoPaginaEspecial(PaginaEspecial.CampeoesLiga, "Campeões da Liga", "Hall da Fama · todos os campeões da liga", "campeoes-liga", "trophy", "LIGA",
+            RaridadeFigurinha.Brilhante, false, 1),
+        new InfoPaginaEspecial(PaginaEspecial.CampeoesCopa, "Campeões da Copa", "Hall da Fama · todos os campeões da Copa", "campeoes-copa", "medal", "COPA",
+            RaridadeFigurinha.Brilhante, false, 2),
+        new InfoPaginaEspecial(PaginaEspecial.Lendarios, "Lendários", "Craques que marcaram a história da CBFV", "lendarios", "crown", "LENDA",
+            RaridadeFigurinha.Lendaria, false, 3),
+    };
+
+    public static InfoPaginaEspecial Especial(PaginaEspecial pagina) => PaginasEspeciais.First(p => p.Pagina == pagina);
+
+    /// <summary>A página especial pelo nome no endereço (<c>/album?pagina=lendarios</c>); nulo se não for uma.</summary>
+    public static PaginaEspecial? EspecialPeloEndereco(string? endereco) =>
+        PaginasEspeciais.FirstOrDefault(p => string.Equals(p.Endereco, endereco, StringComparison.OrdinalIgnoreCase))?.Pagina;
+
+    /// <summary>Figurinhas por página especial (uma página de álbum de verdade não cabe mais que isso).</summary>
+    public const int MaximoPorPaginaEspecial = 30;
+
+    public const int TamanhoNomeEspecial = 60;
+
     /// <summary>Técnico ou auxiliar com passagem aberta no clube no lançamento.</summary>
     public sealed record TecnicoDoAlbum(Guid TreinadorId, string Nome, PapelTreinador Papel);
 
@@ -466,12 +500,13 @@ public static class AlbumFigurinhas
     /// Texto do aviso de selo: o álbum completo fala mais alto; páginas viram "Página do Santos completa!" ou,
     /// várias de uma vez, "3 páginas completas: Santos, Grêmio e Vasco."
     /// </summary>
-    public static string AvisoDeConquistas(string albumNome, bool albumCompleto, IReadOnlyList<string> paginas)
+    public static string AvisoDeConquistas(string albumNome, bool albumCompleto, IReadOnlyList<(string Nome, bool Especial)> paginas)
     {
         if (albumCompleto) return $"🏆 Você completou o {albumNome}! Seu nome está no Hall da Fama.";
         if (paginas.Count == 0) return string.Empty;
-        if (paginas.Count == 1) return $"🏅 Página do {paginas[0]} completa!";
-        var lista = string.Join(", ", paginas.Take(paginas.Count - 1)) + " e " + paginas[^1];
+        if (paginas.Count == 1) return paginas[0].Especial ? $"🏅 Página “{paginas[0].Nome}” completa!" : $"🏅 Página do {paginas[0].Nome} completa!";
+        var nomes = paginas.Select(p => p.Nome).ToList();
+        var lista = string.Join(", ", nomes.Take(nomes.Count - 1)) + " e " + nomes[^1];
         return $"🏅 {paginas.Count} páginas completas: {lista}.";
     }
 
@@ -482,6 +517,10 @@ public static class AlbumFigurinhas
     {
         (TipoFigurinha.Escudo, _) => $"Colei o escudo brilhante do {f.TimeNome} no {albumNome}!",
         (TipoFigurinha.Treinador, _) => $"Tirei o {(f.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "técnico")} {f.Perfil?.NomeCurto ?? f.NomeImpresso} do {f.TimeNome} no {albumNome}!",
+        (TipoFigurinha.Especial, _) when f.Pagina == PaginaEspecial.Organizacao => $"Tirei a figurinha do ADM {f.NomeImpresso} no {albumNome}!",
+        (TipoFigurinha.Especial, _) when f.Pagina is PaginaEspecial.CampeoesLiga or PaginaEspecial.CampeoesCopa =>
+            $"Colei o {f.NomeImpresso}{(f.Destaque is null ? "" : $", {char.ToLower(f.Destaque[0])}{f.Destaque[1..]}")}, no {albumNome}!",
+        (TipoFigurinha.Especial, _) => $"Tirei o lendário {f.NomeImpresso} no {albumNome}!",
         _ when f.Lenda => $"Tirei a lenda {f.NomeImpresso} no {albumNome}!",
         (_, RaridadeFigurinha.Lendaria) => $"Tirei o {f.NomeImpresso} lendário no {albumNome}!",
         (_, RaridadeFigurinha.Brilhante) => $"Tirei o {f.NomeImpresso} brilhante no {albumNome}!",

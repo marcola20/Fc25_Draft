@@ -1343,3 +1343,58 @@ a.text-primary:hover {
 .texto-site-exemplo p:last-child {
     margin-bottom: 0;
 }
+
+/* Álbum: a folha que vira (cbfvAlbum.virar no app.js). Uma cópia da folha atual gira pela lombada por cima
+   da página nova; fica aqui (e não no CSS da página) porque é criada fora do componente. */
+.folha-virando {
+    position: fixed;
+    z-index: 1050;
+    pointer-events: none;
+    perspective: 2400px;
+}
+
+.folha-virando .lamina {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transform-origin: left center;
+}
+
+.folha-virando.para-tras .lamina { transform-origin: right center; }
+
+.folha-virando .lamina-frente,
+.folha-virando .lamina-verso {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    margin: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.folha-virando .lamina-frente { min-height: 100%; }
+
+.folha-virando .lamina-verso {
+    bottom: 0;
+    transform: rotateY(180deg);
+    border-radius: 16px 4px 4px 16px;
+    background:
+        linear-gradient(270deg, rgba(0, 0, 0, .18) 0, rgba(0, 0, 0, 0) 2.5rem),
+        #f3eee2;
+    box-shadow: 0 1rem 2rem rgba(0, 0, 0, .2);
+}
+
+[data-bs-theme="dark"] .folha-virando .lamina-verso {
+    background: linear-gradient(270deg, rgba(0, 0, 0, .35) 0, rgba(0, 0, 0, 0) 2.5rem), #1f2124;
+}
+
+.folha-virando .lamina-sombra {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .35) 100%);
+}
+
+.folha-virando.para-tras .lamina-sombra { background: linear-gradient(270deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, .35) 100%); }

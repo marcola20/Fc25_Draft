@@ -3,7 +3,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace Fc25Draft.Web.Extensions.Endpoints;
 
-/// <summary>Fotos dos jogadores (a imagem pública e a importação do PES pelo script) e dos treinadores.</summary>
+/// <summary>Fotos dos jogadores (a imagem pública e a importação do PES pelo script), dos treinadores e as artes das figurinhas especiais.</summary>
 public static class FotosEndpoints
 {
     private static byte[]? _semFoto;
@@ -48,6 +48,21 @@ public static class FotosEndpoints
             return Results.File(foto.Imagem, foto.ContentType,
                 lastModified: DateTime.SpecifyKind(foto.AtualizadaEm, DateTimeKind.Utc),
                 entityTag: new EntityTagHeaderValue($"\"{foto.AtualizadaEm.Ticks:x}\""));
+        }).AllowAnonymous();
+
+        // Arte inteira da figurinha especial do álbum (Organização, Campeões, Lendários), feita pelo admin.
+        app.MapGet("/fotos/figurinhas/{figurinhaId:guid}", async (
+            Guid figurinhaId, HttpContext ctx, IAlbumService album, CancellationToken ct) =>
+        {
+            var arte = await album.ObterArteAsync(figurinhaId, ct);
+            if (arte is null) return Results.NotFound();
+
+            ctx.Response.Headers.CacheControl = ctx.Request.Query.ContainsKey("v")
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=60";
+            return Results.File(arte.Imagem, arte.ContentType,
+                lastModified: DateTime.SpecifyKind(arte.AtualizadaEm, DateTimeKind.Utc),
+                entityTag: new EntityTagHeaderValue($"\"{arte.AtualizadaEm.Ticks:x}\""));
         }).AllowAnonymous();
 
         // Usado pelo scripts/pes/enviar_fotos_pes.py, com o token de admin.

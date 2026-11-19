@@ -119,7 +119,8 @@ public class LayoutNavigationService
         {
             new("Lançar o Álbum", "/admin/album", "images"),
             new("Dar Pacotes", "/admin/album/pacotes", "package"),
-            new("Figurinhas sem Foto", "/admin/album/sem-foto", "camera")
+            new("Figurinhas sem Foto", "/admin/album/sem-foto", "camera"),
+            new("Páginas Especiais", "/admin/album/especiais", "crown")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Sistema", new List<MenuItem>
         {
@@ -796,6 +797,12 @@ public class LayoutNavigationService
             Route = "/admin/album/sem-foto",
             Title = "Figurinhas sem Foto",
             Subtitle = "Jogadores do álbum que ainda saem com a silhueta — Admin"
+        },
+        ["/admin/album/especiais"] = new PageDefinition
+        {
+            Route = "/admin/album/especiais",
+            Title = "Páginas Especiais",
+            Subtitle = "Organização, Campeões da Liga e da Copa e Lendários, com a arte de cada figurinha — Admin"
         },
         ["/admin/hall-of-fame"] = new PageDefinition
         {

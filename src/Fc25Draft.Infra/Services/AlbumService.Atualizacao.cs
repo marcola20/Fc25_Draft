@@ -48,8 +48,8 @@ public partial class AlbumService
                 .Concat(plano.Saem.Select(s => s.FigurinhaId))
                 .ToList();
             var porId = await _db.Figurinhas.Where(f => tocadas.Contains(f.FigurinhaId)).ToDictionaryAsync(f => f.FigurinhaId, ct);
-            var proximaOrdem = (await _db.Figurinhas.Where(f => f.AlbumId == albumId)
-                    .GroupBy(f => f.TeamId)
+            var proximaOrdem = (await _db.Figurinhas.Where(f => f.AlbumId == albumId && f.Pagina == null && f.TeamId != null)
+                    .GroupBy(f => f.TeamId!.Value)
                     .Select(g => new { g.Key, Ordem = g.Max(f => f.Ordem) })
                     .ToListAsync(ct))
                 .ToDictionary(x => x.Key, x => x.Ordem);
@@ -151,7 +151,7 @@ public partial class AlbumService
             // (ou o álbum) completa ganha o selo agora. Página que ganhou figurinha nova volta a ter vaga, e o selo
             // de quem já tinha fica, como sempre.
             var figurinhas = await FigurinhasAsync(albumId, ct);
-            var clubes = figurinhas.Select(f => f.TeamId).ToHashSet();
+            var clubes = figurinhas.Select(f => f.ChavePagina).ToHashSet();
             var colecionadores = await _db.FigurinhasDosTreinadores.AsNoTracking()
                 .Where(f => f.Figurinha.AlbumId == albumId)
                 .Select(f => f.TreinadorId)
@@ -178,22 +178,22 @@ public partial class AlbumService
             .Where(f => f.AlbumId == albumId)
             .Select(f => new
             {
-                f.FigurinhaId, f.Tipo, f.TeamId, TimeNome = f.Time.TeamName, f.PlayerId, f.TreinadorId, f.NomeImpresso,
+                f.FigurinhaId, f.Tipo, f.TeamId, TimeNome = f.Time != null ? f.Time.TeamName : "", f.PlayerId, f.TreinadorId, f.NomeImpresso,
                 f.Overall, f.Lenda, f.SaiuEm, f.Numero, f.Raridade, f.PosicaoSigla
             })
             .ToListAsync(ct);
         if (lidas.Count == 0)
             throw new InvalidOperationException("Álbum não encontrado.");
 
-        // As páginas são os clubes que têm escudo no álbum.
-        var clubes = lidas.Where(f => f.Tipo == TipoFigurinha.Escudo)
-            .GroupBy(f => f.TeamId)
+        // As páginas são os clubes que têm escudo no álbum. As figurinhas das páginas especiais não mudam nunca.
+        var clubes = lidas.Where(f => f.Tipo == TipoFigurinha.Escudo && f.TeamId != null)
+            .GroupBy(f => f.TeamId!.Value)
             .ToDictionary(g => g.Key, g => g.First().TimeNome);
         var daTemporada = clubes.Select(c => new ClubeDaTemporada(c.Key, c.Value, null)).ToList();
 
         var plano = AlbumFigurinhas.PlanejarAtualizacao(
-            lidas.Select(f => new AlbumFigurinhas.FigurinhaExistente(
-                f.FigurinhaId, f.Tipo, f.TeamId, f.PlayerId, f.TreinadorId, f.NomeImpresso, f.Overall, f.Lenda, f.SaiuEm is not null)).ToList(),
+            lidas.Where(f => f.Tipo != TipoFigurinha.Especial && f.TeamId != null).Select(f => new AlbumFigurinhas.FigurinhaExistente(
+                f.FigurinhaId, f.Tipo, f.TeamId!.Value, f.PlayerId, f.TreinadorId, f.NomeImpresso, f.Overall, f.Lenda, f.SaiuEm is not null)).ToList(),
             clubes.Keys.ToHashSet(),
             await ElencosAsync(daTemporada, ct),
             await TecnicosAsync(daTemporada, ct));

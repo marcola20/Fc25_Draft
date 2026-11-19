@@ -293,7 +293,7 @@ public class PushService : IPushService
         var conquistas = await _db.AlbumConquistas.AsNoTracking()
             .Where(c => c.Em >= desde && pessoas.Contains(c.TreinadorId))
             .OrderBy(c => c.Em)
-            .Select(c => new { c.ConquistaId, c.TreinadorId, c.Tipo, Time = c.Time != null ? c.Time.TeamName : null, AlbumNome = c.Album.Nome })
+            .Select(c => new { c.ConquistaId, c.TreinadorId, c.Tipo, c.Pagina, Time = c.Time != null ? c.Time.TeamName : null, AlbumNome = c.Album.Nome })
             .ToListAsync(ct);
         if (conquistas.Count == 0) return 0;
 
@@ -307,16 +307,16 @@ public class PushService : IPushService
         var pessoasAvisadas = 0;
         foreach (var daPessoa in conquistas.Where(c => !avisadas.Contains(ChaveDaConquista(c.ConquistaId))).GroupBy(c => c.TreinadorId))
         {
-            var novas = new List<(TipoConquistaAlbum Tipo, string? Time, string AlbumNome)>();
+            var novas = new List<(TipoConquistaAlbum Tipo, string? Pagina, bool Especial, string AlbumNome)>();
             foreach (var c in daPessoa)
                 if (await MarcarAsync(ChaveDaConquista(c.ConquistaId), ct))
-                    novas.Add((c.Tipo, c.Time, c.AlbumNome));
+                    novas.Add((c.Tipo, c.Pagina is { } p ? AlbumFigurinhas.Especial(p).Titulo : c.Time, c.Pagina is not null, c.AlbumNome));
             if (novas.Count == 0) continue;
 
             var texto = AlbumFigurinhas.AvisoDeConquistas(
                 novas[0].AlbumNome,
                 novas.Any(n => n.Tipo == TipoConquistaAlbum.AlbumCompleto),
-                novas.Where(n => n.Tipo == TipoConquistaAlbum.PaginaCompleta && n.Time is not null).Select(n => n.Time!).ToList());
+                novas.Where(n => n.Tipo == TipoConquistaAlbum.PaginaCompleta && n.Pagina is not null).Select(n => (n.Pagina!, n.Especial)).ToList());
             var inscricoes = await _db.InscricoesPush.Where(i => i.TreinadorId == daPessoa.Key).ToListAsync(ct);
             await EnviarAsync(inscricoes, new Notificacao("🎴 Álbum de figurinhas", texto, "/album", "album-conquistas"), ct);
             await _db.SaveChangesAsync(ct);
