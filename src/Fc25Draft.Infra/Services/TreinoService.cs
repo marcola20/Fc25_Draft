@@ -43,9 +43,12 @@ public class TreinoService : ITreinoService
             .GroupBy(t => t.PlayerId)
             .ToDictionary(g => g.Key, g => g.Sum(t => TreinoCriterios.GanhoPorSemana + (t.ComPadrinho ? PadrinhoCriterios.ExtraNoTreino : 0)));
 
+        // Quem foi escolhido mas deixou de poder treinar no meio da semana (passou de 85, foi emprestado...) não conta:
+        // some da tabela, não ocupa vaga e sai do treino no próximo salvar.
         var jogadores = elenco
             .Select(j => new TreinoJogadorDto(j.PlayerId, j.Nome, j.Posicao, j.Overall, j.Idade, j.Goleiro, j.PorQueNaoTreina,
-                daSemana.TryGetValue(j.PlayerId, out var foco) ? foco : null, ganhos.GetValueOrDefault(j.PlayerId), j.Grupo))
+                j.PorQueNaoTreina is null && daSemana.TryGetValue(j.PlayerId, out var foco) ? foco : null,
+                ganhos.GetValueOrDefault(j.PlayerId), j.Grupo))
             // Quem pode treinar primeiro, os mais novos antes.
             .OrderBy(j => j.PorQueNaoTreina is not null).ThenBy(j => j.Idade ?? 99).ThenByDescending(j => j.Overall)
             .ToList();
@@ -150,6 +153,11 @@ public class TreinoService : ITreinoService
                 t.SemEfeito = "sem atributos do jogo no site";
                 continue;
             }
+            if (jogador.Overall > TreinoCriterios.OverallMaximo)
+            {
+                t.SemEfeito = $"passou de {TreinoCriterios.OverallMaximo} antes do treino: já se formou";
+                continue;
+            }
 
             var dto = AtributosPes.ParaDto(jogador.Atributos);
             var antes = OverallPes.Valores(dto);
@@ -243,8 +251,9 @@ public class TreinoService : ITreinoService
 
             var limites = await LimitesAsync(timeId, ct);
             var elenco = await ElencoAsync(timeId, limites, ct);
-            var podem = elenco.Count(j => j.PorQueNaoTreina is null);
-            var escolhidos = await _db.TreinosSemanais.CountAsync(t => t.TeamId == timeId && t.Semana == semana, ct);
+            var podemIds = elenco.Where(j => j.PorQueNaoTreina is null).Select(j => j.PlayerId).ToList();
+            var podem = podemIds.Count;
+            var escolhidos = await _db.TreinosSemanais.CountAsync(t => t.TeamId == timeId && t.Semana == semana && podemIds.Contains(t.PlayerId), ct);
             var faltam = Math.Min(limites.Vagas, podem) - escolhidos;
             if (faltam <= 0) continue;
 
