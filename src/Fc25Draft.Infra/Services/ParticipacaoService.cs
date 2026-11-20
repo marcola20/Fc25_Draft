@@ -209,7 +209,8 @@ public class ParticipacaoService : IParticipacaoService
                         jogosInsatisfeito,
                         j.PromessaEm,
                         j.PromessaEm is DateTime prometeu ? PedidoDeSaida.JogosDepois(jogos, prometeu) : 0,
-                        j.PromessaQuebrada)
+                        j.PromessaQuebrada,
+                        j.PromessaEm is DateTime prometido && PedidoDeSaida.CumpriuAPromessa(jogos, prometido))
                 };
             }
             entradas[j.PlayerId] = new Entrada(j.TeamId, jogos, goleiro, temNivel, herdada, papel);
