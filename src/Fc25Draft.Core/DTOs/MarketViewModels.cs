@@ -36,6 +36,9 @@ public class MarketItemVm
 
     public int Overall { get; set; }
 
+    /// <summary>Idade do jogador (0 quando não cadastrada).</summary>
+    public int Age { get; set; }
+
     public decimal BasePrice { get; set; }
 
     public Guid? CurrentLeaderTeamId { get; set; }

@@ -185,6 +185,7 @@ namespace Fc25Draft.Web.Extensions
             PlayerName = dto.PlayerName,
             PositionId = dto.Position.ToPositionId(),
             Overall = dto.Ovr,
+            Age = dto.Age,
             BasePrice = dto.BasePrice,
             CurrentLeaderTeamId = dto.CurrentLeaderTeamId,
             CurrentLeaderTeamName = dto.CurrentLeaderTeamName,

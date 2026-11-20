@@ -21,7 +21,10 @@
         <FotoJogador PlayerId="@Item.PlayerId" Tamanho="48" />
         <div class="leilao-jogador">
             <a href="/players/details/@Item.PlayerId" class="leilao-nome">@Item.PlayerName</a>
-            <span class="leilao-posicao">@Item.PositionId.ToPositionName() · OVR <span class="numero">@Item.Overall</span></span>
+            <span class="leilao-posicao">
+                @Item.PositionId.ToPositionName() · OVR <span class="numero">@Item.Overall</span>@if (Item.Age > 0)
+                {<text> · <span class="numero">@Item.Age</span> anos</text>}
+            </span>
         </div>
         @if (!IsExpired && !TreatAsSoldVisual)
         {
