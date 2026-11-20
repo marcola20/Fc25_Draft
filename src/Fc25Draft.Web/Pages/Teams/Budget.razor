@@ -6,11 +6,21 @@
 @inject IPricingService PricingService
 @inject ILogger<Fc25Draft.Web.Pages.Teams.Budget> Logger
 @inject EscudoService Escudos
+@inject AdminAuthService AdminAuth
+@implements IDisposable
 
 <PageTitle>Valor de Elenco</PageTitle>
 
 <PageHeader Title="Valor de Elenco"
             Subtitle="Valor de elenco de cada time." />
+
+@if (_veCaixa && !_isLoading && _errorMessage is null)
+{
+    <div class="painel p-2 px-3 mb-2 small text-body-secondary d-flex align-items-center gap-2">
+        <Icone Nome="lock" Tamanho="14" />
+        A coluna Caixa só aparece para você (administrador principal). Os outros veem só o valor de elenco.
+    </div>
+}
 
 @if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
@@ -36,11 +46,26 @@ else
                     <th scope="col" class="d-none d-md-table-cell">Responsável</th>
                     <th scope="col" class="d-none d-sm-table-cell" style="width: 30%;"></th>
                     <th scope="col" class="text-end">
-                        <button type="button" class="ordenar ativo" @onclick="ToggleSort">
+                        <button type="button" class="ordenar @(_sortBy == Coluna.Elenco ? "ativo" : "")" @onclick="() => ToggleSort(Coluna.Elenco)">
                             Valor de elenco
-                            <Icone Nome="@(_sortDesc ? "arrow-down" : "arrow-up")" Tamanho="12" />
+                            @if (_sortBy == Coluna.Elenco)
+                            {
+                                <Icone Nome="@(_sortDesc ? "arrow-down" : "arrow-up")" Tamanho="12" />
+                            }
                         </button>
                     </th>
+                    @if (_veCaixa)
+                    {
+                        <th scope="col" class="text-end">
+                            <button type="button" class="ordenar @(_sortBy == Coluna.Caixa ? "ativo" : "")" @onclick="() => ToggleSort(Coluna.Caixa)">
+                                Caixa
+                                @if (_sortBy == Coluna.Caixa)
+                                {
+                                    <Icone Nome="@(_sortDesc ? "arrow-down" : "arrow-up")" Tamanho="12" />
+                                }
+                            </button>
+                        </th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -61,6 +86,10 @@ else
                             <div class="elenco-barra"><span class="@(maisCaro ? "topo" : "")" style="width: @Largura(row.SquadValue, maior)%;"></span></div>
                         </td>
                         <td class="text-end text-nowrap numero fw-medium text-body-emphasis">@FormatCurrency(row.SquadValue)</td>
+                        @if (_veCaixa)
+                        {
+                            <td class="text-end text-nowrap numero fw-medium @(row.Caixa < 0 ? "text-danger" : "text-body-emphasis")">@FormatCurrency(row.Caixa)</td>
+                        }
                     </tr>
                 }
             </tbody>
@@ -75,11 +104,46 @@ else
     private bool _isLoading = true;
     private string? _errorMessage;
     private bool _sortDesc = true;
+    private Coluna _sortBy = Coluna.Elenco;
 
-    protected override async Task OnInitializedAsync()
+    // Só o administrador principal vê o caixa dos times (o endpoint também só manda para ele).
+    private bool _veCaixa;
+
+    private enum Coluna { Elenco, Caixa }
+
+    protected override void OnInitialized()
     {
-        await LoadDataAsync();
+        AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        // Espera ler o token do navegador para saber se é o principal antes de buscar.
+        await AdminAuth.EnsureInitializedAsync();
+        _veCaixa = AdminAuth.IsPrincipal;
+        await LoadDataAsync();
+        StateHasChanged();
+    }
+
+    private void OnAuthenticationChanged()
+    {
+        if (!AdminAuth.IsInitialized || AdminAuth.IsPrincipal == _veCaixa)
+            return;
+
+        _ = InvokeAsync(async () =>
+        {
+            _veCaixa = AdminAuth.IsPrincipal;
+            if (!_veCaixa && _sortBy == Coluna.Caixa)
+                _sortBy = Coluna.Elenco;
+            await LoadDataAsync();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= OnAuthenticationChanged;
 
     private async Task LoadDataAsync()
     {
@@ -119,7 +183,7 @@ else
                     }
                 }
 
-                _rows.Add(new SquadValueRow(team.TeamId, team.TeamName, team.OwnerName, squadValue));
+                _rows.Add(new SquadValueRow(team.TeamId, team.TeamName, team.OwnerName, squadValue, team.Budget));
             }
 
             ApplySort();
@@ -135,17 +199,27 @@ else
         }
     }
 
-    private void ToggleSort()
+    private void ToggleSort(Coluna coluna)
     {
-        _sortDesc = !_sortDesc;
+        if (_sortBy == coluna)
+        {
+            _sortDesc = !_sortDesc;
+        }
+        else
+        {
+            _sortBy = coluna;
+            _sortDesc = true;
+        }
+
         ApplySort();
     }
 
     private void ApplySort()
     {
+        Func<SquadValueRow, decimal> chave = _sortBy == Coluna.Caixa ? r => r.Caixa : r => r.SquadValue;
         _sortedRows = (_sortDesc
-                ? _rows.OrderByDescending(r => r.SquadValue).ThenBy(r => r.TeamName)
-                : _rows.OrderBy(r => r.SquadValue).ThenBy(r => r.TeamName))
+                ? _rows.OrderByDescending(chave).ThenBy(r => r.TeamName)
+                : _rows.OrderBy(chave).ThenBy(r => r.TeamName))
             .ToList();
     }
 
@@ -155,5 +229,5 @@ else
     private static string Largura(decimal valor, decimal maior) =>
         (maior <= 0 ? 0 : valor / maior * 100).ToString("0.#", CultureInfo.InvariantCulture);
 
-    private sealed record SquadValueRow(Guid TeamId, string TeamName, string? OwnerName, decimal SquadValue);
+    private sealed record SquadValueRow(Guid TeamId, string TeamName, string? OwnerName, decimal SquadValue, decimal Caixa);
 }

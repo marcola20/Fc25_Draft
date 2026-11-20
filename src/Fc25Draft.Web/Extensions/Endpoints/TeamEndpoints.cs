@@ -58,17 +58,19 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 return Results.Ok(new PagedResult<TeamListItemDto>(items, total, currentPage, currentPageSize));
             });
 
-            teamsApi.MapGet("/budgets", async (DraftDbContext db, CancellationToken ct = default) =>
+            // O caixa dos times é segredo: só o administrador principal recebe o valor;
+            // para os outros vai zerado (a lista de times continua servindo).
+            teamsApi.MapGet("/budgets", async (DraftDbContext db, HttpContext httpContext, CancellationToken ct = default) =>
             {
+                var veCaixa = httpContext.User.IsInRole("AdminPrincipal");
                 var items = await db.Teams
                     .AsNoTracking()
-                    .OrderByDescending(t => t.Budget)
-                    .ThenBy(t => t.TeamName)
+                    .OrderBy(t => t.TeamName)
                     .Select(t => new TeamBudgetDto(
                         t.TeamId,
                         t.TeamName,
                         t.OwnerName,
-                        t.Budget))
+                        veCaixa ? t.Budget : 0m))
                     .ToListAsync(ct);
 
                 return Results.Ok(items);

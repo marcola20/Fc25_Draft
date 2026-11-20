@@ -18,11 +18,15 @@ else if (_dados is null)
 else
 {
     <div class="row g-2 mb-3">
-        <div class="col-12 col-md">
-            <div class="card text-center h-100"><div class="card-body py-2">
-                <div class="small text-muted">Caixa hoje</div><h4 class="mb-0">@Dinheiro.Curto(_dados.Saldo)</h4>
-            </div></div>
-        </div>
+        @* O caixa é segredo: só o próprio time e a organização veem o saldo. *@
+        @if (MostrarSaldo)
+        {
+            <div class="col-12 col-md">
+                <div class="card text-center h-100"><div class="card-body py-2">
+                    <div class="small text-muted">Caixa hoje</div><h4 class="mb-0">@Dinheiro.Curto(_dados.Saldo)</h4>
+                </div></div>
+            </div>
+        }
         <div class="col-6 col-md">
             <div class="card text-center h-100"><div class="card-body py-2">
                 <div class="small text-muted">Entradas</div><h4 class="mb-0 text-success">@Dinheiro.Curto(_dados.Entradas)</h4>
@@ -51,7 +55,10 @@ else
                     <th style="width:8.5rem;">Data</th>
                     <th>Movimento</th>
                     <th class="text-end" style="width:8rem;">Valor</th>
-                    <th class="text-end d-none d-md-table-cell" style="width:8rem;">Saldo</th>
+                    @if (MostrarSaldo)
+                    {
+                        <th class="text-end d-none d-md-table-cell" style="width:8rem;">Saldo</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -66,10 +73,13 @@ else
                         <td class="text-end fw-semibold text-nowrap @(l.Valor >= 0 ? "text-success" : "text-danger")">
                             @(l.Valor >= 0 ? "+" : "−")@Dinheiro.Curto(Math.Abs(l.Valor))
                         </td>
-                        <td class="text-end text-muted text-nowrap d-none d-md-table-cell">@Dinheiro.Curto(l.SaldoDepois)</td>
+                        @if (MostrarSaldo)
+                        {
+                            <td class="text-end text-muted text-nowrap d-none d-md-table-cell">@Dinheiro.Curto(l.SaldoDepois)</td>
+                        }
                     </tr>
                 }
-                @if (_filtro == "todos")
+                @if (_filtro == "todos" && MostrarSaldo)
                 {
                     <tr class="table-light">
                         <td></td>
@@ -90,6 +100,9 @@ else
 
 @code {
     [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    /// <summary>Mostra o caixa (Caixa hoje e a coluna Saldo). Os outros times só veem os movimentos.</summary>
+    [Parameter] public bool MostrarSaldo { get; set; }
 
     private ExtratoTimeDto? _dados;
     private bool _loading = true;

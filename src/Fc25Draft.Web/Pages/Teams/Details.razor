@@ -249,7 +249,7 @@ else
     }
     else if (_activeMainTab == MainTab.Extrato)
     {
-        <TimeExtratoTab @key="@($"extrato-{Id}")" TeamId="@Id" />
+        <TimeExtratoTab @key="@($"extrato-{Id}")" TeamId="@Id" MostrarSaldo="@(_canQuickSell || AdminAuth.IsAdmin)" />
     }
     else
     {

@@ -65,7 +65,8 @@ public class TeamsApiClient
 
     public async Task<IReadOnlyList<TeamBudgetDto>> GetBudgetsAsync(CancellationToken ct = default)
     {
-        var client = await _clientFactory.CreateAsync();
+        // Vai com o token: o caixa só vem preenchido para o administrador principal.
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true);
         var response = await client.GetAsync("api/teams/budgets", ct);
         await EnsureSuccessAsync(response);
 
