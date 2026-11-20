@@ -58,6 +58,9 @@ public class PedidoDeSaidaService : IPedidoDeSaidaService
             if (saida.PromessaEm is not null && !p.Insatisfeito)
             {
                 vinculo.PromessaEm = null;
+                // A contagem para pedir para sair recomeça daqui: uma venda no elenco que mude a conta do humor não
+                // pode devolver ele à lista pelos jogos de antes da promessa.
+                vinculo.PazesEm = agora;
                 AvisosDoTime.Criar(_db, p.TimeId, AvisosDoTime.Promessa,
                     $"🤝 Promessa cumprida: {nome} voltou a ser titular e ficou no clube.", link, agora);
             }

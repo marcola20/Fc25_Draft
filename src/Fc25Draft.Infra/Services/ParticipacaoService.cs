@@ -84,7 +84,7 @@ public class ParticipacaoService : IParticipacaoService
             .Select(r => new
             {
                 r.TeamId, r.PlayerId, r.Player.Name, r.Player.Overall, r.Player.PositionId,
-                r.SaidaPedidaEm, r.VariacaoCongelada, r.PromessaEm, r.PromessaQuebrada, r.Papel, r.ConversaEm, r.Player.Age
+                r.SaidaPedidaEm, r.VariacaoCongelada, r.PromessaEm, r.PromessaQuebrada, r.PazesEm, r.Papel, r.ConversaEm, r.Player.Age
             })
             .ToListAsync(ct);
         var times = await _db.Teams.AsNoTracking().ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
@@ -196,9 +196,11 @@ public class ParticipacaoService : IParticipacaoService
             {
                 var travada = j.SaidaPedidaEm is not null ? j.VariacaoCongelada : null;
                 var p = Participacao.Calcular(j.TeamId, jogos, goleiro, temNivel, herdada, travada, papel);
-                int? jogosInsatisfeito = p.InsatisfeitoDesde is { } h && pedidoDesde is DateTime contaDesde
+                // Depois de uma promessa cumprida, só os jogos daí em diante contam.
+                var contaDesde = pedidoDesde is DateTime regra && j.PazesEm is DateTime pazes && pazes > regra ? pazes : pedidoDesde;
+                int? jogosInsatisfeito = p.InsatisfeitoDesde is { } h && contaDesde is DateTime desdeQuando
                                          && !goleiro && !emprestados.Contains(j.PlayerId)
-                    ? PedidoDeSaida.JogosInsatisfeito(jogos, h, contaDesde)
+                    ? PedidoDeSaida.JogosInsatisfeito(jogos, h, desdeQuando)
                     : null;
                 jogadores[j.PlayerId] = p with
                 {

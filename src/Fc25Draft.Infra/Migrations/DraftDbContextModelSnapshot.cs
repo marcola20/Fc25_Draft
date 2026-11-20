@@ -3722,6 +3722,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<short?>("Papel")
                         .HasColumnType("smallint");
 
+                    b.Property<DateTime?>("PazesEm")
+                        .HasColumnType("timestamp without time zone");
+
                     b.Property<DateTime?>("PromessaEm")
                         .HasColumnType("timestamp without time zone");
 

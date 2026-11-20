@@ -30,6 +30,12 @@ namespace Fc25Draft.Core.Entities
         public bool PromessaQuebrada { get; set; }
 
         /// <summary>
+        /// Quando a última promessa foi cumprida: os jogos de antes não contam mais para ele pedir para sair de novo
+        /// (precisa seguir insatisfeito por mais <see cref="Utilities.PedidoDeSaidaCriterios.JogosAtePedir"/> jogos depois disso).
+        /// </summary>
+        public DateTime? PazesEm { get; set; }
+
+        /// <summary>
         /// Papel no elenco: o que ele espera do clube. Gravado logo que chega (pela chegada), na virada (pelo que jogou)
         /// e na conversa. Nulo = ainda não gravado (a conta deduz pela chegada).
         /// </summary>
