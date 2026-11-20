@@ -110,7 +110,12 @@ namespace Fc25Draft.Web.Extensions.Endpoints
                 // Até dois auxiliares: os tokens vêm juntos, separados por vírgula.
                 var auxTokens = noComando.Where(p => p.Papel == PapelTreinador.Auxiliar).Select(p => p.Token).ToList();
                 var auxToken = auxTokens.Count == 0 ? null : string.Join(", ", auxTokens);
-                var budgetFormatado = string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget);
+                // O caixa é segredo: só o próprio time (pelo token) e o administrador principal recebem.
+                var veCaixa = httpContext.User.IsInRole("AdminPrincipal")
+                    || httpContext.User.FindFirst("TeamId")?.Value == id.ToString();
+                var budgetFormatado = veCaixa
+                    ? string.Format(new System.Globalization.CultureInfo("pt-BR"), "{0:C}", team.Budget)
+                    : string.Empty;
 
                 var dto = new TeamDetailsDto(team.TeamId, team.TeamName, team.OwnerName, teamToken, team.Jogadores, budgetFormatado, team.QuickSellCount, team.TransferCount, team.AuxiliarName, auxToken, team.LoanCount);
                 return Results.Ok(dto);

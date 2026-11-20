@@ -91,8 +91,8 @@ else
                 <dt>Valor do elenco</dt>
                 <dd class="numero">@FormatCurrency(teamAmount ?? 0m)</dd>
             </div>
-            @* O caixa é só do próprio time (e da organização): os outros não veem. *@
-            @if (_canQuickSell || AdminAuth.IsAdmin)
+            @* O caixa é só do próprio time (e do administrador principal): os outros não veem. *@
+            @if ((_canQuickSell || AdminAuth.IsPrincipal) && !string.IsNullOrEmpty(team.Caixa))
             {
                 <div>
                     <dt>Caixa</dt>
@@ -249,7 +249,7 @@ else
     }
     else if (_activeMainTab == MainTab.Extrato)
     {
-        <TimeExtratoTab @key="@($"extrato-{Id}")" TeamId="@Id" MostrarSaldo="@(_canQuickSell || AdminAuth.IsAdmin)" />
+        <TimeExtratoTab @key="@($"extrato-{Id}")" TeamId="@Id" MostrarSaldo="@(_canQuickSell || AdminAuth.IsPrincipal)" />
     }
     else
     {
