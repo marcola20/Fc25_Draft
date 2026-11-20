@@ -69,6 +69,11 @@
                                     <div class="form-text">Base × isto = comprar agora.</div>
                                 </div>
                                 <div class="col-6 col-md-4">
+                                    <label class="form-label">Comprar-agora do ciclo especial</label>
+                                    <input type="number" step="any" class="form-control" @bind="_buyNowEspecial" />
+                                    <div class="form-text">Base × isto nos ciclos especiais (Trio de Ouro).</div>
+                                </div>
+                                <div class="col-6 col-md-4">
                                     <label class="form-label">Taxa incremento mín.</label>
                                     <input type="number" step="any" class="form-control" @bind="_minRate" />
                                     <div class="form-text">Ex.: 0.03 = 3% do lance.</div>
@@ -101,6 +106,17 @@
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary" @onclick="Salvar" disabled="@_saving">@(_saving ? "Salvando..." : "Salvar")</button>
                         <button class="btn btn-outline-secondary" @onclick="RestaurarPadroes" disabled="@_saving">Restaurar padrões</button>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <div class="fw-medium mb-1">Itens já gerados do ciclo especial</div>
+                            <p class="text-muted small mb-2">
+                                O fator vale para os próximos itens gerados num ciclo especial. Para recalcular o comprar-agora dos itens em aberto
+                                (rascunho ou ativo), clique abaixo: ele salva a precificação e recalcula. Item com lance acima do novo valor fica como está.
+                            </p>
+                            <button class="btn btn-outline-warning btn-sm" @onclick="ReaplicarEspecial" disabled="@_saving">Reaplicar no ciclo especial</button>
+                        </div>
                     </div>
                 </div>
 
@@ -426,7 +442,7 @@
     private bool _saving;
     private string? _erro, _ok;
 
-    private decimal _baseScale, _overallBase, _buyNow, _minRate, _minStep;
+    private decimal _baseScale, _overallBase, _buyNow, _minRate, _minStep, _buyNowEspecial;
     private int _overallPivot;
     private decimal _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35;
 
@@ -696,13 +712,14 @@
     {
         _baseScale = c.BaseScale; _overallBase = c.OverallBase; _overallPivot = c.OverallPivot;
         _buyNow = c.BuyNowFactor; _minRate = c.MinIncrementRate; _minStep = c.MinIncrementStep;
+        _buyNowEspecial = c.BuyNowFactorEspecial;
         _f22 = c.AgeFactorUpTo22; _f24 = c.AgeFactor23To24; _f26 = c.AgeFactor25To26; _f28 = c.AgeFactor27To28;
         _f30 = c.AgeFactor29To30; _f32 = c.AgeFactor31To32; _f34 = c.AgeFactor33To34; _f35 = c.AgeFactor35Plus;
     }
 
     private PricingConfigDto Montar() => new(
         _baseScale, _overallBase, _overallPivot, _buyNow, _minRate, _minStep,
-        _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35);
+        _f22, _f24, _f26, _f28, _f30, _f32, _f34, _f35, _buyNowEspecial);
 
     private async Task Salvar()
     {
@@ -717,11 +734,29 @@
         finally { _saving = false; }
     }
 
+    private async Task ReaplicarEspecial()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            // Salva antes: o recálculo usa o fator gravado, não o digitado.
+            Aplicar(await PricingCfg.UpdateAsync(Montar(), CancellationToken.None));
+            var (atualizados, pulados) = await PricingCfg.ReaplicarComprarJaEspecialAsync(CancellationToken.None);
+            _ok = atualizados == 0 && pulados == 0
+                ? "Nenhum item em aberto mudou (sem ciclo especial aberto ou já estavam com esse valor)."
+                : $"Comprar-agora recalculado em {atualizados} item(ns) do ciclo especial."
+                  + (pulados > 0 ? $" {pulados} ficou(aram) como estava(m): o lance atual já passa do novo valor." : "");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
     private void RestaurarPadroes()
     {
         var d = PricingConfig.Default();
         _baseScale = d.BaseScale; _overallBase = d.OverallBase; _overallPivot = d.OverallPivot;
         _buyNow = d.BuyNowFactor; _minRate = d.MinIncrementRate; _minStep = d.MinIncrementStep;
+        _buyNowEspecial = d.BuyNowFactorEspecial;
         _f22 = d.AgeFactorUpTo22; _f24 = d.AgeFactor23To24; _f26 = d.AgeFactor25To26; _f28 = d.AgeFactor27To28;
         _f30 = d.AgeFactor29To30; _f32 = d.AgeFactor31To32; _f34 = d.AgeFactor33To34; _f35 = d.AgeFactor35Plus;
         _ok = "Valores padrão carregados no formulário. Clique em Salvar para aplicar.";

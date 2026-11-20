@@ -12,6 +12,8 @@ public class PricingConfig
     public decimal OverallBase { get; set; }
     public int OverallPivot { get; set; }
     public decimal BuyNowFactor { get; set; }
+    /// <summary>Comprar-agora dos ciclos especiais (Trio de Ouro etc.): base × isto.</summary>
+    public decimal BuyNowFactorEspecial { get; set; }
     public decimal MinIncrementRate { get; set; }
     public decimal MinIncrementStep { get; set; }
 
@@ -35,6 +37,7 @@ public class PricingConfig
         OverallBase = 1.08m,
         OverallPivot = 75,
         BuyNowFactor = 1.80m,
+        BuyNowFactorEspecial = 3.00m,
         MinIncrementRate = 0.03m,
         MinIncrementStep = 500m,
         AgeFactorUpTo22 = 1.18m,

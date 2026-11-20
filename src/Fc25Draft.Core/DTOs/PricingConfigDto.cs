@@ -14,4 +14,5 @@ public record PricingConfigDto(
     decimal AgeFactor29To30,
     decimal AgeFactor31To32,
     decimal AgeFactor33To34,
-    decimal AgeFactor35Plus);
+    decimal AgeFactor35Plus,
+    decimal BuyNowFactorEspecial = 3.00m);

@@ -3262,6 +3262,11 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<decimal>("BuyNowFactor")
                         .HasColumnType("numeric");
 
+                    b.Property<decimal>("BuyNowFactorEspecial")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(3.00m);
+
                     b.Property<decimal>("MinIncrementRate")
                         .HasColumnType("numeric");
 
