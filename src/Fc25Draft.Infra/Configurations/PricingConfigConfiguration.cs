@@ -14,7 +14,6 @@ public class PricingConfigConfiguration : IEntityTypeConfiguration<PricingConfig
         e.Property(x => x.BaseScale).HasColumnType("numeric");
         e.Property(x => x.OverallBase).HasColumnType("numeric");
         e.Property(x => x.BuyNowFactor).HasColumnType("numeric");
-        e.Property(x => x.BuyNowFactorEspecial).HasColumnType("numeric").HasDefaultValue(3.00m);
         e.Property(x => x.MinIncrementRate).HasColumnType("numeric");
         e.Property(x => x.MinIncrementStep).HasColumnType("numeric");
 

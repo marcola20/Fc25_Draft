@@ -76,7 +76,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                         continue;
                     }
 
-                    var (pricing, age) = await CalculatePricingAsync(selected, context, ct).ConfigureAwait(false);
+                    var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
 
                     var entity = new MarketItem
                     {
@@ -268,18 +268,13 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                 multipliers.TryGetValue(candidate.PlayerId, out var multiplier) ? multiplier : 1m))
             .ToList();
 
-        var configEspecial = string.IsNullOrWhiteSpace(cycle.Theme)
-            ? null
-            : await _dbContext.PricingConfigs.AsNoTracking().FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? PricingConfig.Default();
-
         return new GenerationContext(
             cycle.CycleId,
             seed,
             eligiblePlayers.Count,
             selected,
             selected.Count == 0 ? null : selected.Min(s => s.ExpiresAtUtc),
-            selected.Count == 0 ? null : selected.Max(s => s.ExpiresAtUtc),
-            configEspecial);
+            selected.Count == 0 ? null : selected.Max(s => s.ExpiresAtUtc));
     }
 
     private async Task<HashSet<int>> LoadExcludedPlayersAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
@@ -673,7 +668,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var items = new List<MarketItemGenerationItem>(context.SelectedPlayers.Count);
         foreach (var selected in context.SelectedPlayers)
         {
-            var (pricing, age) = await CalculatePricingAsync(selected, context, ct).ConfigureAwait(false);
+            var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
             items.Add(new MarketItemGenerationItem(
                 selected.Candidate.PlayerId,
                 selected.Candidate.PlayerName,
@@ -692,7 +687,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         return items;
     }
 
-    private async Task<(PricingResult Pricing, int Age)> CalculatePricingAsync(SelectedCandidate selected, GenerationContext context, CancellationToken ct)
+    private async Task<(PricingResult Pricing, int Age)> CalculatePricingAsync(SelectedCandidate selected, CancellationToken ct)
     {
         var age = selected.Candidate.Age;
         if (!age.HasValue)
@@ -711,13 +706,6 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var weight = MarketWeightResolver.GetByPositionId(selected.Candidate.PositionId);
         var multiplier = selected.PriceMultiplier <= 0 ? 1m : selected.PriceMultiplier;
         var pricing = _pricingService.Calculate(weight * multiplier, selected.Candidate.Overall, age.Value);
-
-        // Ciclo especial (Trio de Ouro etc.): comprar-agora com o fator próprio, configurável no admin.
-        if (context.ConfigEspecial is { } especial)
-        {
-            pricing = pricing with { BuyNowPrice = PricingConfigService.ComprarJaEspecial(pricing.BasePrice, especial) };
-        }
-
         return (pricing, age.Value);
     }
 
@@ -784,6 +772,5 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         int EligibleCount,
         IReadOnlyList<SelectedCandidate> SelectedPlayers,
         DateTime? FirstExpirationUtc,
-        DateTime? LastExpirationUtc,
-        PricingConfig? ConfigEspecial = null);
+        DateTime? LastExpirationUtc);
 }
