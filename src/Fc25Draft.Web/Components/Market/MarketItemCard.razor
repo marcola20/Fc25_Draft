@@ -91,6 +91,13 @@
                        placeholder="Valor do lance, ex.: 30.000.000"
                        @onfocus="BeginEditing"
                        @onblur="EndEditing" />
+            <button type="button"
+                    class="btn btn-outline-secondary btn-sm"
+                    disabled="@IsMinBidDisabled"
+                    title="Preencher com o lance mínimo (@FormatCurrency(Item.RequiredMinBid))"
+                    @onclick="FillMinimumBid">
+                Mínimo
+            </button>
             <button type="submit"
                     class="btn btn-primary btn-sm"
                     disabled="@IsBidDisabled"
@@ -232,6 +239,19 @@
 
     private bool IsBidDisabled => _isSubmitting || IsExpired || !Item.IsActive || !_model.ParsedAmount.HasValue || IsCurrentTeamLeader;
     private bool IsBuyNowDisabled => _isSubmitting || IsExpired || !Item.IsActive;
+    private bool IsMinBidDisabled => _isSubmitting || IsExpired || !Item.IsActive || IsCurrentTeamLeader;
+
+    // Coloca o lance mínimo no campo; o lance só sai no "Dar lance".
+    private void FillMinimumBid()
+    {
+        if (IsMinBidDisabled)
+            return;
+
+        _errorMessage = null;
+        _infoMessage = null;
+        _model.AmountText = FormatCurrency(Item.RequiredMinBid);
+        NotifyAmountChanged();
+    }
 
     private bool CanBuyNow => Item.IsActive && Item.BuyNowPrice.HasValue;
 
