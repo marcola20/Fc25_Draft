@@ -29,6 +29,9 @@ public class MarketCycleConfiguration : IEntityTypeConfiguration<MarketCycle>
         builder.Property(x => x.Notes)
             .HasMaxLength(500);
 
+        builder.Property(x => x.Theme)
+            .HasMaxLength(40);
+
         builder.Property(x => x.CreatedAtUtc)
             .HasColumnType("timestamp with time zone")
             .IsRequired();

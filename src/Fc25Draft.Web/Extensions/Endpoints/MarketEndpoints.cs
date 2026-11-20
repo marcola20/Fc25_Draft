@@ -17,6 +17,18 @@ namespace Fc25Draft.Web.Extensions.Endpoints
             marketApi.MapMarketItemPublicationEndpoints();
             marketApi.MapMarketItemsEndpoints();
 
+            // GET /api/market/especial — tema do ciclo ativo (Trio de Ouro etc.); 204 se for ciclo normal
+            marketApi.MapGet("/especial", async (Guid? cycleId, IMarketCycleService cycleService, CancellationToken ct) =>
+            {
+                var cycle = await cycleService.ResolveAsync(cycleId, ct).ConfigureAwait(false);
+                if (cycle is null || cycle.Status != MarketCycleStatus.Active || string.IsNullOrWhiteSpace(cycle.Theme))
+                {
+                    return Results.NoContent();
+                }
+
+                return Results.Ok(new MarketCycleThemeDto(cycle.CycleId, cycle.Name, cycle.Theme!, cycle.EndsAtUtc));
+            });
+
             // POST /api/market/history  (Admin)
             marketApi.MapPost("/history", async (RegisterTransferHistoryRequestDto request, ITransferHistoryService transferHistoryService) =>
             {

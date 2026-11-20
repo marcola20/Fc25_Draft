@@ -126,7 +126,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                 c.EndsAtUtc,
                 c.CreatedAtUtc,
                 c.UpdatedAtUtc,
-                c.Notes))
+                c.Notes,
+            c.Theme))
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -146,7 +147,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
                 c.EndsAtUtc,
                 c.CreatedAtUtc,
                 c.UpdatedAtUtc,
-                c.Notes))
+                c.Notes,
+            c.Theme))
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
 
@@ -252,6 +254,28 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         return new MarketCycleSettlementSummary(sold, expired, canceled);
     }
 
+    public async Task<MarketCycleDto?> SetThemeAsync(Guid cycleId, string? theme, CancellationToken ct)
+    {
+        var normalized = string.IsNullOrWhiteSpace(theme) ? null : theme.Trim().ToLowerInvariant();
+        if (!MarketCycleThemes.IsValid(normalized))
+        {
+            throw new MarketValidationException("Tema especial desconhecido.");
+        }
+
+        var cycle = await _dbContext.MarketCycles
+            .FirstOrDefaultAsync(c => c.CycleId == cycleId, ct)
+            .ConfigureAwait(false);
+        if (cycle is null)
+        {
+            return null;
+        }
+
+        cycle.Theme = normalized;
+        cycle.UpdatedAtUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
+        return ToDto(cycle);
+    }
+
     private static MarketCycleDto ToDto(MarketCycle cycle) => new(
         cycle.CycleId,
         cycle.Name,
@@ -260,7 +284,8 @@ public class MarketCycleAdminService : IMarketCycleAdminService
         cycle.EndsAtUtc,
         cycle.CreatedAtUtc,
         cycle.UpdatedAtUtc,
-        cycle.Notes);
+        cycle.Notes,
+            cycle.Theme);
 
     private static DateTime EnsureUtc(DateTime value) =>
     value.Kind switch

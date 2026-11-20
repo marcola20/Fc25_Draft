@@ -137,6 +137,22 @@ public class MarketCycleClient
         return result;
     }
 
+    public async Task<MarketCycleDto> SetThemeAsync(Guid cycleId, string? theme, CancellationToken ct = default)
+    {
+        var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);
+
+        using var response = await client.PutAsJsonAsync(
+            $"api/admin/market/cycles/{cycleId}/theme", new { theme }, ct).ConfigureAwait(false);
+
+        await EnsureSuccessAsync(response, ct).ConfigureAwait(false);
+
+        var result = await response.Content
+            .ReadFromJsonAsync<MarketCycleDto>(SerializerOptions, ct)
+            .ConfigureAwait(false);
+
+        return result ?? throw new InvalidOperationException("Resposta inválida do servidor ao marcar o ciclo especial.");
+    }
+
     public async Task<MarketCycleStatusUpdateResult> ConcludeAsync(Guid cycleId, CancellationToken ct = default)
     {
         var client = await _clientFactory.CreateAsync(includeAdminToken: true).ConfigureAwait(false);

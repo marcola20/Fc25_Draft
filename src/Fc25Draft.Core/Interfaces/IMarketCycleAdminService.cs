@@ -13,6 +13,9 @@ public interface IMarketCycleAdminService
 
     Task<MarketCycleDto> UpdateStatusAsync(Guid cycleId, MarketCycleStatus status, bool forceClose, CancellationToken ct);
 
+    /// <summary>Marca (ou desmarca, com null) o ciclo como especial. Ver MarketCycleThemes.</summary>
+    Task<MarketCycleDto?> SetThemeAsync(Guid cycleId, string? theme, CancellationToken ct);
+
     Task<MarketCycleStatusUpdateResult> ConcludeAsync(Guid cycleId, CancellationToken ct);
 }
 

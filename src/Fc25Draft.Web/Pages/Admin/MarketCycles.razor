@@ -127,11 +127,28 @@ else
                     {
                         <tr>
                             <td>
-                                <div class="fw-semibold">@item.Name</div>
+                                <div class="fw-semibold">
+                                    @item.Name
+                                    @if (MarketCycleThemes.LabelOf(item.Theme) is { } themeLabel)
+                                    {
+                                        <span class="badge ciclo-especial-badge ms-1">★ @themeLabel</span>
+                                    }
+                                </div>
                                 @if (!string.IsNullOrWhiteSpace(item.Notes))
                                 {
                                     <div class="text-muted small">@item.Notes</div>
                                 }
+                                <select class="form-select form-select-sm mt-1 w-auto"
+                                        title="Ciclo especial: muda o visual da tela do mercado"
+                                        value="@(item.Theme ?? string.Empty)"
+                                        disabled="@IsUpdating(item.CycleId)"
+                                        @onchange="async e => await SetThemeAsync(item, e.Value?.ToString())">
+                                    <option value="">Ciclo normal</option>
+                                    @foreach (var theme in MarketCycleThemes.All)
+                                    {
+                                        <option value="@theme.Key">Especial: @theme.Label</option>
+                                    }
+                                </select>
                             </td>
                             <td>
                                 <span class="badge @GetStatusBadgeClass(item.Status)">@GetStatusLabel(item.Status)</span>
@@ -627,6 +644,33 @@ else
             1 => $"1 {singular}",
             _ => $"{value} {plural}"
         };
+
+    private async Task SetThemeAsync(MarketCycleDto cycle, string? theme)
+    {
+        if (!_updatingStatus.Add(cycle.CycleId))
+        {
+            return;
+        }
+
+        try
+        {
+            var updated = await MarketCycleClient.SetThemeAsync(cycle.CycleId, string.IsNullOrWhiteSpace(theme) ? null : theme);
+            Toasts.ShowSuccess(MarketCycleThemes.LabelOf(updated.Theme) is { } label
+                ? $"{cycle.Name} agora é um ciclo especial: {label}."
+                : $"{cycle.Name} voltou a ser um ciclo normal.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Falha ao marcar ciclo especial {CycleId}", cycle.CycleId);
+            Toasts.ShowError(ex is InvalidOperationException ? ex.Message : "Não foi possível marcar o ciclo especial.");
+        }
+        finally
+        {
+            _updatingStatus.Remove(cycle.CycleId);
+        }
+
+        await LoadAsync(_currentPage);
+    }
 
     private async Task BeginEditAsync(MarketCycleDto cycle)
     {

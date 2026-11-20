@@ -88,6 +88,7 @@ public class MarketCycleService : IMarketCycleService
             cycle.EndsAtUtc,
             cycle.CreatedAtUtc,
             cycle.UpdatedAtUtc,
-            cycle.Notes);
+            cycle.Notes,
+            cycle.Theme);
     }
 }

@@ -1,0 +1,121 @@
+/* Ciclo especial "Trio de Ouro": preto e dourado art déco.
+   O banner é sempre escuro (é a arte do ciclo), nos dois temas do site. */
+.trio-banner {
+    --ouro-claro: #f6e3a1;
+    --ouro: #d4af37;
+    --ouro-escuro: #8a6a12;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 15rem;
+    margin-bottom: 1.25rem;
+    padding: 1.5rem 1.75rem;
+    overflow: hidden;
+    border: 1px solid var(--ouro);
+    border-radius: 0.75rem;
+    background:
+        radial-gradient(120% 140% at 85% 50%, rgba(212, 175, 55, 0.22), transparent 60%),
+        #0b0a08;
+    color: var(--ouro-claro);
+    box-shadow: 0 0 0 4px #0b0a08, 0 0 0 5px rgba(212, 175, 55, 0.45), var(--cbfv-sombra);
+}
+
+.trio-banner-arte {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: auto;
+    max-width: 60%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 22%);
+    mask-image: linear-gradient(to right, transparent, #000 22%);
+    pointer-events: none;
+}
+
+.trio-banner-texto,
+.trio-fim {
+    position: relative;
+    max-width: 30rem;
+}
+
+.trio-selo {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ouro);
+}
+
+.trio-titulo {
+    margin: 0.125rem 0 0.25rem;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, var(--ouro-claro) 0%, var(--ouro) 55%, var(--ouro-escuro) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.trio-nomes {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff8e1;
+}
+
+.trio-sub {
+    margin: 0;
+    font-size: 0.875rem;
+    color: rgba(246, 227, 161, 0.8);
+}
+
+.trio-fim {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: rgba(246, 227, 161, 0.8);
+}
+
+.trio-fim .numero {
+    font-weight: 600;
+    color: var(--ouro-claro);
+}
+
+@media (max-width: 575.98px) {
+    .trio-banner {
+        min-height: 15rem;
+        padding: 1.25rem;
+        justify-content: flex-end;
+    }
+
+    .trio-banner-arte {
+        width: 100%;
+        opacity: 0.55;
+        -webkit-mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+        mask-image: linear-gradient(to bottom, #000 30%, transparent 95%);
+    }
+}
+
+/* Cartões dourados durante o Trio de Ouro */
+.mercado-trio-de-ouro ::deep .leilao {
+    border-color: #d4af37;
+    background:
+        linear-gradient(180deg, rgba(212, 175, 55, 0.14), transparent 45%),
+        var(--bs-body-bg);
+    box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.35), var(--cbfv-sombra);
+}
+
+/* tom de ouro que dá leitura no claro e no escuro */
+.mercado-trio-de-ouro ::deep .leilao-figura {
+    color: #a8820f;
+}
+
+.mercado-trio-de-ouro .nav-tabs .nav-link.active {
+    border-top: 2px solid #d4af37;
+}

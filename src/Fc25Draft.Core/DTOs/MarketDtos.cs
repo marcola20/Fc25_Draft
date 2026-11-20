@@ -2,6 +2,9 @@ using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.DTOs;
 
+/// <summary>Ciclo especial ativo, para a tela do mercado se vestir com o tema.</summary>
+public record MarketCycleThemeDto(Guid CycleId, string Name, string Theme, DateTime EndsAtUtc);
+
 public record MarketCycleDto
 {
     public MarketCycleDto(
@@ -12,7 +15,8 @@ public record MarketCycleDto
         DateTime endsAtUtc,
         DateTime createdAtUtc,
         DateTime updatedAtUtc,
-        string? notes)
+        string? notes,
+        string? theme = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("O nome do ciclo é obrigatório.", nameof(name));
@@ -33,6 +37,7 @@ public record MarketCycleDto
         CreatedAtUtc = normalizedCreated;
         UpdatedAtUtc = normalizedUpdated;
         Notes = notes;
+        Theme = theme;
     }
 
     public Guid CycleId { get; init; }
@@ -50,6 +55,9 @@ public record MarketCycleDto
     public DateTime UpdatedAtUtc { get; init; }
 
     public string? Notes { get; init; }
+
+    /// <summary>Ciclo especial (ex.: "trio-de-ouro"); null = ciclo normal.</summary>
+    public string? Theme { get; init; }
 
     private static DateTime EnsureUtc(DateTime value)
     {

@@ -25,6 +25,7 @@ public static class MarketCycleEndpoints
         cycles.MapGet("", HandleQueryAsync);
         cycles.MapGet("/{cycleId:guid}", HandleGetAsync);
         cycles.MapPatch("/{cycleId:guid}/status", HandleStatusUpdateAsync);
+        cycles.MapPut("/{cycleId:guid}/theme", HandleSetThemeAsync);
         cycles.MapPost("/{cycleId:guid}:conclude", HandleConcludeAsync);
         cycles.MapPost("/{cycleId:guid}/items/preview", HandlePreviewAsync);
         cycles.MapPost("/{cycleId:guid}/items/generate", HandleGenerateAsync);
@@ -95,6 +96,27 @@ public static class MarketCycleEndpoints
 
         var result = await service.QueryAsync(command, ct).ConfigureAwait(false);
         return Results.Ok(result);
+    }
+
+    public sealed record MarketCycleThemeRequest(string? Theme);
+
+    private static async Task<IResult> HandleSetThemeAsync(
+        Guid cycleId,
+        MarketCycleThemeRequest request,
+        IMarketCycleAdminService service,
+        CancellationToken ct)
+    {
+        try
+        {
+            var updated = await service.SetThemeAsync(cycleId, request?.Theme, ct).ConfigureAwait(false);
+            return updated is null
+                ? Results.NotFound(new { message = "Ciclo não encontrado." })
+                : Results.Ok(updated);
+        }
+        catch (MarketValidationException ex)
+        {
+            return Results.BadRequest(new { message = ex.Message });
+        }
     }
 
     private static async Task<IResult> HandleGetAsync(

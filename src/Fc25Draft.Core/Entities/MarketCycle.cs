@@ -8,6 +8,8 @@ public class MarketCycle
     public DateTime StartsAtUtc { get; set; }
     public DateTime EndsAtUtc { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Ciclo especial (ex.: "trio-de-ouro"); null = ciclo normal. Ver MarketCycleThemes.</summary>
+    public string? Theme { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public ICollection<MarketItem> Items { get; set; } = new List<MarketItem>();

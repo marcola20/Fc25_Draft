@@ -153,7 +153,8 @@ public class MarketCycleGenerator : IMarketCycleGenerator
             cycle.EndsAtUtc,
             cycle.CreatedAtUtc,
             cycle.UpdatedAtUtc,
-            cycle.Notes);
+            cycle.Notes,
+            cycle.Theme);
     }
 
     private async Task<HashSet<int>> LoadExcludedPlayersAsync(CancellationToken ct)

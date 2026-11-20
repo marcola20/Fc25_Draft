@@ -8,6 +8,7 @@
 @using System.Threading.Tasks
 @using Microsoft.Extensions.Logging
 @using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
 @using Fc25Draft.Core.Enums
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Web.Components.Market
@@ -33,6 +34,22 @@
 <PageHeader Title="Mercado de Transferências"
             Subtitle="Leilões abertos e lances em tempo real"
             Actions="@HeaderActions" />
+
+<div class="mercado @(_especial is null ? null : $"mercado-{_especial.Theme}")">
+
+@if (_especial?.Theme == MarketCycleThemes.TrioDeOuro)
+{
+    <section class="trio-banner" aria-label="Ciclo especial Trio de Ouro">
+        <img class="trio-banner-arte" src="/images/especiais/trio-de-ouro-banner.png" alt="" loading="eager" />
+        <div class="trio-banner-texto">
+            <span class="trio-selo">★ Ciclo especial ★</span>
+            <h2 class="trio-titulo">Trio de Ouro</h2>
+            <p class="trio-nomes">Cristiano Ronaldo · Messi · Kaká</p>
+            <p class="trio-sub">Três lendas, três leilões. Um ciclo inteiro só para eles.</p>
+        </div>
+        <div class="trio-fim">Encerra <span class="numero">@BrazilTime.FormatDateTime(_especial.EndsAtUtc)</span></div>
+    </section>
+}
 
 <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item" role="presentation">
@@ -186,6 +203,8 @@ else
     </section>
 }
 
+</div>
+
 @if (_teamTokenModalOpen)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
@@ -272,6 +291,7 @@ else
     private bool _initialized;
     private string? _errorMessage;
     private string? _cycleNotice;
+    private MarketCycleThemeDto? _especial;
     private MarketTab _activeTab = MarketTab.Items;
     private bool _teamTokenConfigured;
     private bool _teamTokenModalOpen;
@@ -380,6 +400,7 @@ else
                 await EnsureHubConnectedAsync();
                 await JoinCycleAsync();
                 var ct = PrepareNewLoadCts();
+                await LoadEspecialAsync();
                 await LoadPageAsync(1, ct);
             });
         }
@@ -398,7 +419,9 @@ else
         }
 
         var ct = PrepareNewLoadCts();
+        var especialTask = LoadEspecialAsync();
         await LoadPageAsync(1, ct);
+        await especialTask;
 
         try
         {
@@ -445,6 +468,21 @@ else
         await LoadTeamTokenStatusAsync();
 
         _initialized = true;
+    }
+
+    // Ciclo especial (Trio de Ouro etc.): troca o visual da página. Falha aqui nunca derruba o mercado.
+    private async Task LoadEspecialAsync()
+    {
+        var cycleFilter = CycleId is { } id && id != Guid.Empty ? id : (Guid?)null;
+        try
+        {
+            _especial = await Client.GetEspecialAsync(cycleFilter, _lifetimeCts?.Token ?? CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        StateHasChangedSafe();
     }
 
     private async Task LoadPositionsAsync()

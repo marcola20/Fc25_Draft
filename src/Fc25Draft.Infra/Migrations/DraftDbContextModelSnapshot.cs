@@ -2121,6 +2121,10 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Theme")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 

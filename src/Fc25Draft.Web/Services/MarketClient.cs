@@ -29,6 +29,29 @@ namespace Fc25Draft.Web.Services
             _logger = logger;
         }
 
+        /// <summary>Tema especial do ciclo ativo (ou null se for ciclo normal). Nunca lança.</summary>
+        public async Task<MarketCycleThemeDto?> GetEspecialAsync(Guid? cycleId, CancellationToken ct)
+        {
+            try
+            {
+                var url = "/api/market/especial";
+                if (cycleId.HasValue && cycleId.Value != Guid.Empty) url += $"?cycleId={cycleId.Value:D}";
+                var http = await _clientFactory.CreateAsync();
+                using var resp = await http.GetAsync(url, ct);
+                if (resp.StatusCode != System.Net.HttpStatusCode.OK) return null;
+                return await resp.Content.ReadFromJsonAsync<MarketCycleThemeDto>(cancellationToken: ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Falha ao ler o tema especial do ciclo.");
+                return null;
+            }
+        }
+
         public async Task<PagedResult<CoreItemVm>> GetItemsAsync(Guid? cycleId, CoreQueryVm query, CancellationToken ct)
         {
             var qs = new List<string>();

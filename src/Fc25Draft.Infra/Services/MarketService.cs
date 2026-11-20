@@ -570,7 +570,8 @@ public class MarketService : IMarketService
             cycle.EndsAtUtc,
             cycle.CreatedAtUtc,
             cycle.UpdatedAtUtc,
-            cycle.Notes);
+            cycle.Notes,
+            cycle.Theme);
     }
 
     internal static MarketItemVm ToVm(MarketItemDto dto) => new MarketItemVm
