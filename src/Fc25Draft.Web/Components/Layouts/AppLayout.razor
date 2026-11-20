@@ -32,6 +32,7 @@
                    ToggleSidebar="@ToggleSidebar"
                    SignIn="@OpenAdminModal"
                    SignOut="@SignOutAsync"
+                   Atualizar="@AtualizarTelaAsync"
                    AvisosTeamId="@quemEntrou?.TeamId" />
         <AbasFaixa />
         </div>
@@ -372,6 +373,22 @@
             // Sem clube o /me devolve 403; o rótulo já cobre esse caso.
             Logger.LogDebug(ex, "LayoutNavV2:Não foi possível identificar quem entrou");
         }
+    }
+
+    // Botão de atualizar do topo: a página da aba aberta é montada de novo e busca tudo outra vez. O cabeçalho
+    // volta ao da rota antes, para a página nova pôr o dela (subtítulo, caminho, botões) do zero.
+    private async Task AtualizarTelaAsync()
+    {
+        if (!Abas.RotaAtualTemAba(Navigation.Uri))
+        {
+            // Tela sem aba ("não encontrado" e afins): aí é o F5 mesmo.
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+            return;
+        }
+
+        await UpdatePageDefinitionAsync(Navigation.Uri);
+        Abas.RecarregarAtiva();
+        StateHasChanged();
     }
 
     private void ToggleSidebar()

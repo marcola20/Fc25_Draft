@@ -176,3 +176,18 @@
         max-width: 45vw;
     }
 }
+
+/* Botão de atualizar: uma volta no ícone a cada clique. */
+.botao-atualizar.girando ::deep .icone {
+    animation: botao-atualizar-gira 0.6s var(--cbfv-curva, ease) 1;
+}
+
+@keyframes botao-atualizar-gira {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .botao-atualizar.girando ::deep .icone {
+        animation: none;
+    }
+}

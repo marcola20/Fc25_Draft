@@ -32,6 +32,10 @@
             }
 
             <BuscaGeral />
+            <button type="button" class="btn-moldura btn-moldura-icone botao-atualizar @(_girando ? "girando" : null)"
+                    @onclick="AtualizarAsync" title="Atualizar esta tela" aria-label="Atualizar esta tela">
+                <Icone Nome="refresh-cw" />
+            </button>
             <BotaoTema />
             <AvisosSino TeamId="@AvisosTeamId" />
 
@@ -69,6 +73,21 @@
     [Parameter] public EventCallback ToggleSidebar { get; set; }
     [Parameter] public EventCallback SignIn { get; set; }
     [Parameter] public EventCallback SignOut { get; set; }
+
+    /// <summary>Busca de novo os dados da tela aberta (sem F5 e sem perder as outras abas).</summary>
+    [Parameter] public EventCallback Atualizar { get; set; }
+
+    private bool _girando;
+
+    // O ícone dá uma volta para mostrar que o clique pegou; a página nova mostra o próprio carregando.
+    private async Task AtualizarAsync()
+    {
+        if (_girando) return;
+        _girando = true;
+        await Atualizar.InvokeAsync();
+        await Task.Delay(600);
+        _girando = false;
+    }
 
     /// <summary>Time de quem entrou, para o sino de avisos (nulo esconde o sino).</summary>
     [Parameter] public Guid? AvisosTeamId { get; set; }

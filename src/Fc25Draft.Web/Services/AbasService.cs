@@ -160,6 +160,20 @@ public sealed class AbasService
         Mudou?.Invoke();
     }
 
+    /// <summary>
+    /// Botão de atualizar do topo: a página da aba da frente é montada de novo e busca tudo outra vez, como um
+    /// F5 só dela (as outras abas ficam como estão). Falso quando a tela atual não está numa aba.
+    /// </summary>
+    public bool RecarregarAtiva()
+    {
+        if (Ativa is not { Instancia: { } atual } aba || !RotaAtualTemAba(_nav.Uri)) return false;
+
+        // Instância nova = @key novo no AppLayout: a página antiga sai e a nova roda o OnInitialized de novo.
+        aba.Instancia = new InstanciaDaAba(new RouteData(atual.Tipo, atual.Valores!), ++_relogio);
+        Mudou?.Invoke();
+        return true;
+    }
+
     /// <summary>A faixa vai navegar para esta aba (clique nela, no menu "…" ou a vizinha da que fechou).</summary>
     public void Escolher(Aba aba) => _escolhida = aba;
 
