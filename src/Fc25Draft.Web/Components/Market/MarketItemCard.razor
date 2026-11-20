@@ -99,15 +99,32 @@
             </button>
         </EditForm>
 
-        @if (CanMinBid)
+        @* Atalhos lado a lado: lance mínimo na esquerda, comprar já na direita (no celular estreito um embaixo do outro). *@
+        @if (CanMinBid || (CanBuyNow && !_showBuyConfirm))
         {
-            <button type="button"
-                    class="btn btn-outline-primary btn-sm w-100"
-                    disabled="@IsMinBidDisabled"
-                    title="@LeaderTooltip"
-                    @onclick="PlaceMinimumBidAsync">
-                Dar lance mínimo · @FormatCurrency(Item.RequiredMinBid)
-            </button>
+            <div class="leilao-atalhos">
+                @if (CanMinBid)
+                {
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            disabled="@IsMinBidDisabled"
+                            title="@(LeaderTooltip ?? $"Dar lance mínimo de {FormatCurrency(Item.RequiredMinBid)}")"
+                            @onclick="PlaceMinimumBidAsync">
+                        Lance mínimo · @FormatCurrency(Item.RequiredMinBid)
+                    </button>
+                }
+
+                @if (CanBuyNow && !_showBuyConfirm)
+                {
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            disabled="@IsBuyNowDisabled"
+                            title="@($"Comprar agora por {FormatCurrency(Item.BuyNowPrice!.Value)}")"
+                            @onclick="ShowBuyNowConfirm">
+                        Comprar já · @FormatCurrency(Item.BuyNowPrice!.Value)
+                    </button>
+                }
+            </div>
         }
 
         @if (CanBuyNow)
@@ -129,15 +146,6 @@
                         Cancelar
                     </button>
                 </div>
-            }
-            else
-            {
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm w-100"
-                        disabled="@IsBuyNowDisabled"
-                        @onclick="ShowBuyNowConfirm">
-                    Comprar agora por @FormatCurrency(Item.BuyNowPrice!.Value)
-                </button>
             }
         }
     }
