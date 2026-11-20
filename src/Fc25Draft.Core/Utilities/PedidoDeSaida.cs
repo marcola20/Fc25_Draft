@@ -32,12 +32,17 @@ public static class PedidoDeSaidaCriterios
 /// <param name="PromessaEm">Promessa de colocar para jogar em andamento desde.</param>
 /// <param name="JogosDaPromessa">Jogos do clube desde a promessa.</param>
 /// <param name="PromessaQuebrada">Já quebraram uma promessa com ele: está na lista pela metade e não aceita outra.</param>
+/// <param name="PromessaCumprida">
+/// Foi titular <see cref="ParticipacaoCriterios.TitularSeguidoParaResolver"/> jogos seguidos depois da promessa (dentro
+/// dos jogos dela). Só jogando: mudança no elenco que mexa na conta do humor não cumpre a promessa.
+/// </param>
 public sealed record SituacaoDeSaida(
     DateTime? SaidaPedidaEm,
     int? JogosInsatisfeito,
     DateTime? PromessaEm,
     int JogosDaPromessa,
-    bool PromessaQuebrada)
+    bool PromessaQuebrada,
+    bool PromessaCumprida = false)
 {
     public bool NaLista => SaidaPedidaEm is not null;
 
@@ -67,6 +72,22 @@ public static class PedidoDeSaida
     /// <summary>Jogos do clube encerrados depois de <paramref name="desde"/>.</summary>
     public static int JogosDepois(IReadOnlyList<JogoDoJogador> jogos, DateTime desde) =>
         jogos.Count(j => j.Data > desde);
+
+    /// <summary>
+    /// A promessa foi cumprida? Titular <see cref="ParticipacaoCriterios.TitularSeguidoParaResolver"/> jogos seguidos
+    /// entre os <see cref="PedidoDeSaidaCriterios.JogosDaPromessa"/> primeiros jogos do clube depois de
+    /// <paramref name="prometeu"/>.
+    /// </summary>
+    public static bool CumpriuAPromessa(IReadOnlyList<JogoDoJogador> jogos, DateTime prometeu)
+    {
+        var seguidos = 0;
+        foreach (var jogo in jogos.Where(j => j.Data > prometeu).Take(PedidoDeSaidaCriterios.JogosDaPromessa))
+        {
+            seguidos = jogo.Titular ? seguidos + 1 : 0;
+            if (seguidos >= ParticipacaoCriterios.TitularSeguidoParaResolver) return true;
+        }
+        return false;
+    }
 
     /// <summary>Variação com a promessa quebrada: o valor (e a venda rápida) cai pela metade.</summary>
     public static decimal VariacaoDaPromessaQuebrada(decimal variacao) =>

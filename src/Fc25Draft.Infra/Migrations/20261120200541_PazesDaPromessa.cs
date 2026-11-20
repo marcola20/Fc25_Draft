@@ -33,32 +33,55 @@ namespace Fc25Draft.Infra.Migrations
 
             // Quem voltou à lista depois da promessa cumprida sem ter passado 3 jogos do clube desde então (uma venda no
             // elenco mudou a conta do humor e os jogos de antes da promessa contaram): sai da lista e o time é avisado.
+            // Se a promessa foi dada como cumprida sem nenhum jogo do clube desde o pedido para sair (foi a conta do
+            // humor que virou, não ele que jogou), ela volta a estar em andamento, como na regra nova: titular 2 jogos
+            // seguidos nos 5 jogos dela. Senão, as pazes valem e ele só pede de novo com mais 3 jogos insatisfeito.
             migrationBuilder.Sql("""
-                WITH indevidos AS (
-                    SELECT r."TeamId", r."PlayerId"
+                WITH jogos AS (
+                    SELECT DISTINCT e."TimeId", e."PartidaId", COALESCE(p."EncerradaEm", rd."DataHora") AS data
+                    FROM "LigaEscalacoesPartida" e
+                    JOIN "LigaPartidas" p ON p."PartidaId" = e."PartidaId"
+                    JOIN "LigaRodadas" rd ON rd."RodadaId" = p."RodadaId"
+                    WHERE e."Titular" AND p."Status" = 2
+                ),
+                indevidos AS (
+                    SELECT r."TeamId", r."PlayerId", r."PazesEm",
+                           NOT EXISTS (
+                               SELECT 1 FROM jogos j
+                               WHERE j."TimeId" = r."TeamId"
+                                 AND j.data <= r."PazesEm"
+                                 AND j.data > COALESCE((
+                                     SELECT MAX(a."CriadoEm") FROM "AvisosTimes" a
+                                     WHERE a."TeamId" = r."TeamId" AND a."Tipo" = 'PEDIU_PARA_SAIR'
+                                       AND a."Link" = '/players/details/' || r."PlayerId"
+                                       AND a."CriadoEm" < r."PazesEm"), r."PazesEm")
+                           ) AND EXISTS (
+                               SELECT 1 FROM "AvisosTimes" a
+                               WHERE a."TeamId" = r."TeamId" AND a."Tipo" = 'PEDIU_PARA_SAIR'
+                                 AND a."Link" = '/players/details/' || r."PlayerId"
+                                 AND a."CriadoEm" < r."PazesEm"
+                           ) AS sem_jogo
                     FROM "TeamRosters" r
                     WHERE r."SaidaPedidaEm" IS NOT NULL
                       AND r."PazesEm" IS NOT NULL
                       AND r."SaidaPedidaEm" > r."PazesEm"
                       AND NOT r."PromessaQuebrada"
                       AND (
-                          SELECT COUNT(DISTINCT e."PartidaId")
-                          FROM "LigaEscalacoesPartida" e
-                          JOIN "LigaPartidas" p ON p."PartidaId" = e."PartidaId"
-                          JOIN "LigaRodadas" rd ON rd."RodadaId" = p."RodadaId"
-                          WHERE e."TimeId" = r."TeamId"
-                            AND e."Titular"
-                            AND p."Status" = 2
-                            AND COALESCE(p."EncerradaEm", rd."DataHora") > r."PazesEm"
-                            AND COALESCE(p."EncerradaEm", rd."DataHora") <= r."SaidaPedidaEm"
+                          SELECT COUNT(*) FROM jogos j
+                          WHERE j."TimeId" = r."TeamId" AND j.data > r."PazesEm" AND j.data <= r."SaidaPedidaEm"
                       ) < 3
                 ),
                 avisos AS (
                     INSERT INTO "AvisosTimes" ("AvisoId", "TeamId", "Tipo", "Texto", "Link", "CriadoEm")
                     SELECT gen_random_uuid(), i."TeamId", 'PROMESSA',
-                           '🤝 Correção: ' || pl."Name" || ' saiu da lista de transferências. Ele tinha feito as pazes com a promessa '
-                           || 'cumprida e voltou à lista por engano, pelos jogos de antes dela. Só pede para sair de novo se ficar '
-                           || 'insatisfeito por mais 3 jogos.',
+                           CASE WHEN i.sem_jogo
+                               THEN '🤝 Correção: ' || pl."Name" || ' saiu da lista de transferências e a promessa de colocar '
+                                    || 'para jogar voltou a valer: a promessa tinha sido dada como cumprida sem ele jogar. '
+                                    || 'Ele precisa ser titular 2 jogos seguidos nos próximos 5 jogos do clube.'
+                               ELSE '🤝 Correção: ' || pl."Name" || ' saiu da lista de transferências. Ele tinha feito as pazes com a promessa '
+                                    || 'cumprida e voltou à lista por engano, pelos jogos de antes dela. Só pede para sair de novo se ficar '
+                                    || 'insatisfeito por mais 3 jogos.'
+                           END,
                            '/players/details/' || i."PlayerId", NOW() AT TIME ZONE 'UTC'
                     FROM indevidos i
                     JOIN "Players" pl ON pl."PlayerId" = i."PlayerId"
@@ -67,7 +90,9 @@ namespace Fc25Draft.Infra.Migrations
                 SET "SaidaPedidaEm" = NULL,
                     "VariacaoCongelada" = NULL,
                     "AskingPrice" = NULL,
-                    "ListedAtUtc" = NULL
+                    "ListedAtUtc" = NULL,
+                    "PromessaEm" = CASE WHEN i.sem_jogo THEN i."PazesEm" ELSE NULL END,
+                    "PazesEm" = CASE WHEN i.sem_jogo THEN NULL ELSE i."PazesEm" END
                 FROM indevidos i
                 WHERE r."TeamId" = i."TeamId" AND r."PlayerId" = i."PlayerId";
                 """);

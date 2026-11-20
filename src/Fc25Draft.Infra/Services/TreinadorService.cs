@@ -14,6 +14,9 @@ namespace Fc25Draft.Infra.Services;
 /// </summary>
 public class TreinadorService : ITreinadorService
 {
+    /// <summary>Rodada do playoff de acesso dentro da Série A (ver LigaTemporadaService).</summary>
+    private const int NumeroPlayoffAcesso = -2;
+
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
 
@@ -382,12 +385,56 @@ public class TreinadorService : ITreinadorService
                 .Select(c => new { c.TimeId, Temporada = l.Temporada!.Value, Divisao = l.Divisao!.Value }))
             .ToLookup(x => (x.TimeId, x.Temporada), x => x.Divisao);
 
-        string? DesfechoDaTemporada(Guid timeId, int temporada, Divisao? divisao)
+        // Enquanto a temporada seguinte não foi montada, quem responde é a tabela: a zona em que o
+        // clube terminou e, para quem caiu no playoff, o resultado dele. Mesma regra da virada.
+        var playoffSerieA = ligas
+            .Where(l => l.Tipo == TipoCompetition.Liga && l.Divisao == Divisao.SerieA)
+            .Select(l => l.LigaId)
+            .ToList();
+
+        var playoffs = (await _db.LigaPartidas.AsNoTracking()
+                .Where(p => playoffSerieA.Contains(p.Rodada.LigaId) && p.Rodada.Numero == NumeroPlayoffAcesso
+                            && p.Status == PartidaStatus.Encerrada)
+                .Select(p => new { p.Rodada.LigaId, p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId })
+                .ToListAsync(ct))
+            .Select(p => new
+            {
+                Temporada = ligas.First(l => l.LigaId == p.LigaId).Temporada!.Value,
+                p.TimeCasaId,
+                p.TimeForaId,
+                Vencedor = LigaDesempate.VencedorDoJogoDecisivo(p.TimeCasaId, p.TimeForaId, p.GolsCasa, p.GolsFora, p.TemPenaltis, p.PenaltisVencedorId)
+            })
+            .Where(p => p.Vencedor != null)
+            .ToList();
+
+        string? PelaTabela(Guid ligaId, Guid timeId, int temporada, Divisao divisao, int? vagasDiretas, int? vagasPlayoff)
+        {
+            var tabela = classificacoes.Where(c => c.LigaId == ligaId && c.Posicao > 0).ToList();
+            var doTime = tabela.FirstOrDefault(c => c.TimeId == timeId);
+            if (doTime is null) return null;
+
+            var regra = LigaRegraZonas.De(TipoCompetition.Liga, divisao, vagasDiretas, vagasPlayoff);
+            switch (LigaZonas.Zona(regra, doTime.Posicao, tabela.Count))
+            {
+                case ZonaClassificacao.Rebaixamento: return "Rebaixado";
+                case ZonaClassificacao.AcessoDireto or ZonaClassificacao.CampeaoComAcesso: return "Acesso";
+                case ZonaClassificacao.PlayoffRebaixamento or ZonaClassificacao.PlayoffAcesso:
+                    var jogo = playoffs.FirstOrDefault(p => p.Temporada == temporada && (p.TimeCasaId == timeId || p.TimeForaId == timeId));
+                    if (jogo is null) return null;
+                    var venceu = jogo.Vencedor == timeId;
+                    return divisao == Divisao.SerieA
+                        ? (venceu ? null : "Rebaixado")
+                        : (venceu ? "Acesso" : null);
+                default: return null;
+            }
+        }
+
+        string? DesfechoDaTemporada(Guid ligaId, Guid timeId, int temporada, Divisao? divisao, int? vagasDiretas, int? vagasPlayoff)
         {
             if (divisao is null) return null;
 
             var seguinte = divisoesPorTemporada[(timeId, temporada + 1)].ToList();
-            if (seguinte.Count == 0) return null;
+            if (seguinte.Count == 0) return PelaTabela(ligaId, timeId, temporada, divisao.Value, vagasDiretas, vagasPlayoff);
 
             if (divisao == Divisao.SerieA && seguinte.All(d => d == Divisao.SerieB)) return "Rebaixado";
             if (divisao == Divisao.SerieB && seguinte.Any(d => d == Divisao.SerieA)) return "Acesso";
@@ -432,7 +479,7 @@ public class TreinadorService : ITreinadorService
                     Movimento(passagem, comecou, acabou, encerrada),
                     campanha,
                     naTabela ? null : FaseDoTime(liga.LigaId, passagem.TimeId, campeao),
-                    naTabela && encerrada ? DesfechoDaTemporada(passagem.TimeId, liga.Temporada!.Value, liga.Divisao) : null)));
+                    naTabela && encerrada ? DesfechoDaTemporada(liga.LigaId, passagem.TimeId, liga.Temporada!.Value, liga.Divisao, liga.VagasDiretas, liga.VagasPlayoff) : null)));
             }
         }
 

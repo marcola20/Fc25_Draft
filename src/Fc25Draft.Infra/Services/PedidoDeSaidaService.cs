@@ -43,8 +43,9 @@ public class PedidoDeSaidaService : IPedidoDeSaidaService
             if (p.Saida is not { } saida) continue;
 
             var pedir = saida.FaltamParaPedir == 0;
+            // A promessa acaba jogando (titular seguido) ou quando os jogos dela passam sem isso.
             var promessaAcabou = saida.PromessaEm is not null
-                                 && (!p.Insatisfeito || saida.JogosDaPromessa >= PedidoDeSaidaCriterios.JogosDaPromessa);
+                                 && (saida.PromessaCumprida || saida.JogosDaPromessa >= PedidoDeSaidaCriterios.JogosDaPromessa);
             if (!pedir && !promessaAcabou) continue;
 
             // A conta fica guardada por um minuto: confere no banco se nada mudou desde então.
@@ -55,7 +56,7 @@ public class PedidoDeSaidaService : IPedidoDeSaidaService
             var nome = vinculo.Player.Name;
             var link = $"/players/details/{playerId}";
 
-            if (saida.PromessaEm is not null && !p.Insatisfeito)
+            if (saida.PromessaCumprida)
             {
                 vinculo.PromessaEm = null;
                 // A contagem para pedir para sair recomeça daqui: uma venda no elenco que mude a conta do humor não
