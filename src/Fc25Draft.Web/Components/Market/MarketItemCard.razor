@@ -91,13 +91,6 @@
                        placeholder="Valor do lance, ex.: 30.000.000"
                        @onfocus="BeginEditing"
                        @onblur="EndEditing" />
-            <button type="button"
-                    class="btn btn-outline-secondary btn-sm"
-                    disabled="@IsMinBidDisabled"
-                    title="Preencher com o lance mínimo (@FormatCurrency(Item.RequiredMinBid))"
-                    @onclick="FillMinimumBid">
-                Mínimo
-            </button>
             <button type="submit"
                     class="btn btn-primary btn-sm"
                     disabled="@IsBidDisabled"
@@ -105,6 +98,17 @@
                 Dar lance
             </button>
         </EditForm>
+
+        @if (CanMinBid)
+        {
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm w-100"
+                    disabled="@IsMinBidDisabled"
+                    title="@LeaderTooltip"
+                    @onclick="PlaceMinimumBidAsync">
+                Dar lance mínimo · @FormatCurrency(Item.RequiredMinBid)
+            </button>
+        }
 
         @if (CanBuyNow)
         {
@@ -241,16 +245,18 @@
     private bool IsBuyNowDisabled => _isSubmitting || IsExpired || !Item.IsActive;
     private bool IsMinBidDisabled => _isSubmitting || IsExpired || !Item.IsActive || IsCurrentTeamLeader;
 
-    // Coloca o lance mínimo no campo; o lance só sai no "Dar lance".
-    private void FillMinimumBid()
+    // Quando o mínimo já bate no "comprar agora", o servidor recusa o lance: aí só sobra a compra.
+    private bool CanMinBid => Item.IsActive
+        && !(Item.BuyNowPrice.HasValue && Item.RequiredMinBid >= Item.BuyNowPrice.Value);
+
+    // Lance direto no mínimo que está na tela; o servidor confere tudo de novo
+    // (versão do item, líder, mínimo, elenco, saldo) e recusa se algo mudou.
+    private async Task PlaceMinimumBidAsync()
     {
-        if (IsMinBidDisabled)
+        if (IsMinBidDisabled || !CanMinBid)
             return;
 
-        _errorMessage = null;
-        _infoMessage = null;
-        _model.AmountText = FormatCurrency(Item.RequiredMinBid);
-        NotifyAmountChanged();
+        await PlaceBidAsync(Item.RequiredMinBid);
     }
 
     private bool CanBuyNow => Item.IsActive && Item.BuyNowPrice.HasValue;
@@ -676,6 +682,16 @@
         if (!_model.ParsedAmount.HasValue)
             return;
 
+        await PlaceBidAsync(_model.ParsedAmount.Value);
+    }
+
+    private async Task PlaceBidAsync(decimal amount)
+    {
+        if (_editContext is null || _isSubmitting)
+            return;
+
+        _infoMessage = null;
+        _errorMessage = null;
         _isSubmitting = true;
         _submitCts?.Cancel();
         _submitCts?.Dispose();
@@ -686,7 +702,7 @@
             var request = new BidRequest
             {
                 ItemId = Item.ItemId,
-                Amount = _model.ParsedAmount.Value,
+                Amount = amount,
                 RowVersion = Item.RowVersion
             };
 
