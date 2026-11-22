@@ -76,7 +76,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
                         continue;
                     }
 
-                    var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
+                    var (pricing, age) = await CalculatePricingAsync(selected, context, ct).ConfigureAwait(false);
 
                     var entity = new MarketItem
                     {
@@ -274,7 +274,8 @@ public class MarketItemGenerationService : IMarketItemGenerationService
             eligiblePlayers.Count,
             selected,
             selected.Count == 0 ? null : selected.Min(s => s.ExpiresAtUtc),
-            selected.Count == 0 ? null : selected.Max(s => s.ExpiresAtUtc));
+            selected.Count == 0 ? null : selected.Max(s => s.ExpiresAtUtc),
+            options.PriceOverrides);
     }
 
     private async Task<HashSet<int>> LoadExcludedPlayersAsync(Guid cycleId, MarketItemGenerationOptions options, CancellationToken ct)
@@ -668,7 +669,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var items = new List<MarketItemGenerationItem>(context.SelectedPlayers.Count);
         foreach (var selected in context.SelectedPlayers)
         {
-            var (pricing, age) = await CalculatePricingAsync(selected, ct).ConfigureAwait(false);
+            var (pricing, age) = await CalculatePricingAsync(selected, context, ct).ConfigureAwait(false);
             items.Add(new MarketItemGenerationItem(
                 selected.Candidate.PlayerId,
                 selected.Candidate.PlayerName,
@@ -687,7 +688,7 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         return items;
     }
 
-    private async Task<(PricingResult Pricing, int Age)> CalculatePricingAsync(SelectedCandidate selected, CancellationToken ct)
+    private async Task<(PricingResult Pricing, int Age)> CalculatePricingAsync(SelectedCandidate selected, GenerationContext context, CancellationToken ct)
     {
         var age = selected.Candidate.Age;
         if (!age.HasValue)
@@ -706,6 +707,28 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         var weight = MarketWeightResolver.GetByPositionId(selected.Candidate.PositionId);
         var multiplier = selected.PriceMultiplier <= 0 ? 1m : selected.PriceMultiplier;
         var pricing = _pricingService.Calculate(weight * multiplier, selected.Candidate.Overall, age.Value);
+
+        // Preço digitado na prévia. Valor inicial novo: incremento e comprar já seguem a fórmula
+        // (fator normal); comprar já digitado vale como está.
+        if (context.PriceOverrides is not null
+            && context.PriceOverrides.TryGetValue(selected.Candidate.PlayerId, out var manual))
+        {
+            if (manual.BasePrice is { } novoBase && novoBase != pricing.BasePrice)
+            {
+                pricing = _pricingService.ComVariacao(pricing, novoBase / pricing.BasePrice - 1m);
+            }
+
+            if (manual.BuyNowPrice is { } novoComprarJa)
+            {
+                pricing = pricing with { BuyNowPrice = novoComprarJa };
+            }
+
+            if (pricing.BuyNowPrice <= pricing.BasePrice)
+            {
+                throw new MarketValidationException(
+                    $"O comprar já de {selected.Candidate.PlayerName} precisa ser maior que o valor inicial.");
+            }
+        }
         return (pricing, age.Value);
     }
 
@@ -772,5 +795,6 @@ public class MarketItemGenerationService : IMarketItemGenerationService
         int EligibleCount,
         IReadOnlyList<SelectedCandidate> SelectedPlayers,
         DateTime? FirstExpirationUtc,
-        DateTime? LastExpirationUtc);
+        DateTime? LastExpirationUtc,
+        IReadOnlyDictionary<int, MarketItemPriceOverride>? PriceOverrides = null);
 }

@@ -286,8 +286,34 @@ else
                                         <td>@item.PositionName</td>
                                         <td>@(item.Age?.ToString() ?? "-")</td>
                                         <td>@item.Overall</td>
-                                        <td>@FormatCurrency(item.BasePrice)</td>
-                                        <td>@FormatCurrency(item.BuyNowPrice)</td>
+                                        <td>
+                                            <input type="number" min="1" step="500"
+                                                   class="form-control form-control-sm preco-manual @(TemPrecoManual(item.PlayerId, base_: true) ? "border-warning" : null)"
+                                                   aria-label="Valor inicial de @item.PlayerName"
+                                                   title="Valor inicial (@FormatCurrency(item.BasePrice))"
+                                                   value="@item.BasePrice.ToString("0", System.Globalization.CultureInfo.InvariantCulture)"
+                                                   disabled="@(!CanModifyPreview)"
+                                                   @onchange="async e => await AlterarPrecoAsync(item, e.Value?.ToString(), base_: true)" />
+                                            <div class="form-text mt-0">@FormatCurrency(item.BasePrice)</div>
+                                        </td>
+                                        <td>
+                                            <input type="number" min="1" step="500"
+                                                   class="form-control form-control-sm preco-manual @(TemPrecoManual(item.PlayerId, base_: false) ? "border-warning" : null)"
+                                                   aria-label="Comprar já de @item.PlayerName"
+                                                   title="Comprar já (@FormatCurrency(item.BuyNowPrice))"
+                                                   value="@(item.BuyNowPrice?.ToString("0", System.Globalization.CultureInfo.InvariantCulture))"
+                                                   disabled="@(!CanModifyPreview)"
+                                                   @onchange="async e => await AlterarPrecoAsync(item, e.Value?.ToString(), base_: false)" />
+                                            <div class="form-text mt-0">@FormatCurrency(item.BuyNowPrice)</div>
+                                            @if (_precosManuais.ContainsKey(item.PlayerId))
+                                            {
+                                                <button type="button" class="btn btn-link btn-sm p-0 small"
+                                                        disabled="@(!CanModifyPreview)"
+                                                        @onclick="async () => await DesfazerPrecoAsync(item.PlayerId)">
+                                                    voltar ao calculado
+                                                </button>
+                                            }
+                                        </td>
                                         <td>@BrazilTime.FormatDateTime(item.ExpiresAtUtc)</td>
                                         <td class="text-end">
                                             <button type="button"
@@ -456,6 +482,8 @@ else
     private readonly List<PlayerListItemDto> _playerSearchResults = new();
     private HashSet<int> _manualOverrideIds = new();
     private HashSet<int> _excludedPlayerIds = new();
+    // Valor inicial / comprar já digitados na prévia, por jogador.
+    private Dictionary<int, (decimal? Base, decimal? ComprarJa)> _precosManuais = new();
     private string? _positionsError;
     private string _playerSearchTerm = string.Empty;
     private string? _playerSearchError;
@@ -510,6 +538,7 @@ else
     {
         _manualOverrideIds.Clear();
         _excludedPlayerIds.Clear();
+        _precosManuais.Clear();
         _playerSearchResults.Clear();
         _playerSearchTerm = string.Empty;
         _playerSearchError = null;
@@ -682,6 +711,7 @@ else
             var request = CloneRequest(_lastPreviewRequest);
             request.ManualPlayerIds = _manualOverrideIds.Count > 0 ? _manualOverrideIds.ToList() : null;
             request.ExcludedPlayerIds = _excludedPlayerIds.Count > 0 ? _excludedPlayerIds.ToList() : null;
+            request.PriceOverrides = PrecosManuaisDoPedido();
 
             if (preferPreviewSeed && _preview is not null)
             {
@@ -751,6 +781,7 @@ else
         var request = CloneRequest(_lastPreviewRequest);
         request.ManualPlayerIds = _manualOverrideIds.Count > 0 ? _manualOverrideIds.ToList() : null;
         request.ExcludedPlayerIds = _excludedPlayerIds.Count > 0 ? _excludedPlayerIds.ToList() : null;
+        request.PriceOverrides = PrecosManuaisDoPedido();
         request.Seed = _preview?.Seed ?? request.Seed;
 
         _isPreviewUpdating = true;
@@ -771,6 +802,77 @@ else
         {
             _isPreviewUpdating = false;
             await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool TemPrecoManual(int playerId, bool base_) =>
+        _precosManuais.TryGetValue(playerId, out var p) && (base_ ? p.Base.HasValue : p.ComprarJa.HasValue);
+
+    private List<MarketItemPriceOverrideDto>? PrecosManuaisDoPedido() =>
+        _precosManuais.Count == 0
+            ? null
+            : _precosManuais.Select(kv => new MarketItemPriceOverrideDto
+            {
+                PlayerId = kv.Key,
+                BasePrice = kv.Value.Base,
+                BuyNowPrice = kv.Value.ComprarJa
+            }).ToList();
+
+    private async Task AlterarPrecoAsync(MarketItemGenerationItemDto item, string? texto, bool base_)
+    {
+        if (!CanModifyPreview || _preview is null)
+            return;
+
+        if (!decimal.TryParse(texto, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var valor)
+            || valor <= 0)
+        {
+            Toasts.ShowError("Digite um valor maior que zero.");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        var anterior = _precosManuais.TryGetValue(item.PlayerId, out var atual) ? atual : ((decimal?)null, (decimal?)null);
+        // Mudou o valor inicial e não tinha comprar já próprio: o comprar já acompanha pela fórmula.
+        _precosManuais[item.PlayerId] = base_ ? (valor, anterior.Item2) : (anterior.Item1, valor);
+
+        await AtualizarPreviaComPrecosAsync(() =>
+        {
+            if (anterior.Item1 is null && anterior.Item2 is null)
+                _precosManuais.Remove(item.PlayerId);
+            else
+                _precosManuais[item.PlayerId] = anterior;
+        });
+    }
+
+    private async Task DesfazerPrecoAsync(int playerId)
+    {
+        if (!_precosManuais.TryGetValue(playerId, out var anterior))
+            return;
+
+        _precosManuais.Remove(playerId);
+        await AtualizarPreviaComPrecosAsync(() => _precosManuais[playerId] = anterior);
+    }
+
+    private async Task AtualizarPreviaComPrecosAsync(Action desfazer)
+    {
+        var previousPreview = _preview;
+        try
+        {
+            await RefreshPreviewWithOverridesAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            desfazer();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            desfazer();
+            _preview = previousPreview;
+            await InvokeAsync(StateHasChanged);
+            Toasts.ShowError(ex is HttpRequestException ? ex.Message : "Não foi possível atualizar o preço na pré-visualização.");
+            Logger.LogError(ex, "LayoutNav:Error ao alterar preço na pré-visualização");
         }
     }
 

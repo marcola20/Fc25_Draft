@@ -306,7 +306,26 @@ public static class MarketCycleEndpoints
             request.MaxItemLifespan,
             request.AutoSpreadExpirationsAcrossCycle,
             manualPlayers is { Length: > 0 } ? manualPlayers : null,
-            excludedPlayers is { Length: > 0 } ? excludedPlayers : null);
+            excludedPlayers is { Length: > 0 } ? excludedPlayers : null,
+            ToPriceOverrides(request.PriceOverrides));
+    }
+
+    private static IReadOnlyDictionary<int, MarketItemPriceOverride>? ToPriceOverrides(List<MarketItemPriceOverrideDto>? overrides)
+    {
+        if (overrides is not { Count: > 0 })
+            return null;
+
+        var result = new Dictionary<int, MarketItemPriceOverride>();
+        foreach (var o in overrides)
+        {
+            if (o.BasePrice is <= 0 || o.BuyNowPrice is <= 0)
+                throw new MarketValidationException("Valor inicial e comprar já precisam ser maiores que zero.");
+            if (o.BasePrice is null && o.BuyNowPrice is null)
+                continue;
+            result[o.PlayerId] = new MarketItemPriceOverride(o.BasePrice, o.BuyNowPrice);
+        }
+
+        return result.Count > 0 ? result : null;
     }
 
     private static MarketItemGenerationPreviewDto ToDto(MarketItemGenerationPreview preview)

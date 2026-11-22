@@ -19,7 +19,11 @@ public record MarketItemGenerationOptions(
     TimeSpan? MaxItemLifespan,
     bool AutoSpreadExpirationsAcrossCycle,
     IReadOnlyCollection<int>? ManualPlayerIds,
-    IReadOnlyCollection<int>? ExcludedPlayerIds);
+    IReadOnlyCollection<int>? ExcludedPlayerIds,
+    IReadOnlyDictionary<int, MarketItemPriceOverride>? PriceOverrides = null);
+
+/// <summary>Preço digitado pelo admin na prévia para um jogador (null = usa o calculado).</summary>
+public record MarketItemPriceOverride(decimal? BasePrice, decimal? BuyNowPrice);
 
 public record MarketItemGenerationCandidate(
     int PlayerId,

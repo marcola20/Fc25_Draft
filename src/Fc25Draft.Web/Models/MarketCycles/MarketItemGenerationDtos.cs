@@ -44,6 +44,18 @@ public class MarketItemGenerationRequestDto
     public List<int>? ManualPlayerIds { get; set; }
 
     public List<int>? ExcludedPlayerIds { get; set; }
+
+    /// <summary>Valor inicial / comprar já digitados na prévia, por jogador.</summary>
+    public List<MarketItemPriceOverrideDto>? PriceOverrides { get; set; }
+}
+
+public class MarketItemPriceOverrideDto
+{
+    public int PlayerId { get; set; }
+
+    public decimal? BasePrice { get; set; }
+
+    public decimal? BuyNowPrice { get; set; }
 }
 
 public record MarketItemGenerationPreviewDto(
