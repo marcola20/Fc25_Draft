@@ -37,17 +37,17 @@
 
 <div class="mercado @(_especial is null ? null : $"mercado-{_especial.Theme}")">
 
-@if (_especial?.Theme == MarketCycleThemes.TrioDeOuro)
+@if (_especial is not null && Especiais.TryGetValue(_especial.Theme, out var visual))
 {
-    <section class="trio-banner" aria-label="Ciclo especial Trio de Ouro">
-        <img class="trio-banner-arte" src="/images/especiais/trio-de-ouro-banner.png" alt="" loading="eager" />
-        <div class="trio-banner-texto">
-            <span class="trio-selo">★ Ciclo especial ★</span>
-            <h2 class="trio-titulo">Trio de Ouro</h2>
-            <p class="trio-nomes">Cristiano Ronaldo · Messi · Kaká</p>
-            <p class="trio-sub">Três lendas, três leilões. Um ciclo inteiro só para eles.</p>
+    <section class="especial-banner" aria-label="Ciclo especial @visual.Titulo">
+        <img class="especial-banner-arte" src="@visual.Imagem" alt="" loading="eager" />
+        <div class="especial-banner-texto">
+            <span class="especial-selo">@visual.Selo</span>
+            <h2 class="especial-titulo">@visual.Titulo</h2>
+            <p class="especial-nomes">@visual.Nomes</p>
+            <p class="especial-sub">@visual.Frase</p>
         </div>
-        <div class="trio-fim">Encerra <span class="numero">@BrazilTime.FormatDateTime(_especial.EndsAtUtc)</span></div>
+        <div class="especial-fim">Encerra <span class="numero">@BrazilTime.FormatDateTime(_especial.EndsAtUtc)</span></div>
     </section>
 }
 
@@ -292,6 +292,23 @@ else
     private string? _errorMessage;
     private string? _cycleNotice;
     private MarketCycleThemeDto? _especial;
+
+    // Visual de cada ciclo especial (cores no Index.razor.css, classe mercado-<tema>).
+    private sealed record EspecialVisual(string Titulo, string Selo, string Nomes, string Frase, string Imagem);
+
+    private static readonly IReadOnlyDictionary<string, EspecialVisual> Especiais = new Dictionary<string, EspecialVisual>
+    {
+        [MarketCycleThemes.TrioDeOuro] = new(
+            "Trio de Ouro", "★ Ciclo especial ★",
+            "Cristiano Ronaldo · Messi · Kaká",
+            "Três lendas, três leilões. Um ciclo inteiro só para eles.",
+            "/images/especiais/trio-de-ouro-banner.png"),
+        [MarketCycleThemes.RealezaEuropeia] = new(
+            "Realeza Europeia", "♛ Ciclo especial ♛",
+            "David Beckham · Fernando Torres · Xavi",
+            "A nobreza do futebol europeu em três leilões.",
+            "/images/especiais/realeza-europeia-banner.png"),
+    };
     private MarketTab _activeTab = MarketTab.Items;
     private bool _teamTokenConfigured;
     private bool _teamTokenModalOpen;

@@ -7,10 +7,12 @@ namespace Fc25Draft.Core.Entities;
 public static class MarketCycleThemes
 {
     public const string TrioDeOuro = "trio-de-ouro";
+    public const string RealezaEuropeia = "realeza-europeia";
 
     public static IReadOnlyList<(string Key, string Label)> All { get; } = new[]
     {
         (TrioDeOuro, "Trio de Ouro"),
+        (RealezaEuropeia, "Realeza Europeia"),
     };
 
     public static bool IsValid(string? key) =>
