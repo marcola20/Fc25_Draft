@@ -1,0 +1,310 @@
+@page "/admin/venda-rapida"
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IEvolucaoVendaRapidaService EvolucaoSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Evolução na Venda Rápida — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_linhas is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-12 col-xl-7">
+                <div class="card">
+                    <div class="card-header fw-medium d-flex align-items-center gap-2 flex-wrap">
+                        Quanto sobe cada overall
+                        @if (_fabrica)
+                        {
+                            <span class="badge bg-secondary" title="Nada salvo ainda: vale a tabela de fábrica">padrão de fábrica</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success">tabela salva</span>
+                        }
+                        @if (_mudou)
+                        {
+                            <span class="badge bg-warning text-dark">alterações não salvas</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Na venda rápida, o site sorteia uma subida entre o <strong>mínimo</strong> e o <strong>máximo</strong>
+                            da linha do overall que o jogador tinha (nunca passa de 99). Mínimo e máximo iguais = subida fixa;
+                            os dois em 0 = não evolui. Abaixo de @EvolucaoNaVendaRapida.PrimeiroOverall ninguém evolui.
+                            Vale para a próxima venda rápida assim que salvar.
+                        </p>
+
+                        <div class="d-flex align-items-end gap-2 flex-wrap mb-3 p-2 rounded border bg-light">
+                            <div>
+                                <label class="form-label small mb-0">Do overall</label>
+                                <input type="number" class="form-control form-control-sm" style="width: 5.5rem" @bind="_lote.De" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">até</label>
+                                <input type="number" class="form-control form-control-sm" style="width: 5.5rem" @bind="_lote.Ate" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">sobe de</label>
+                                <input type="number" min="0" class="form-control form-control-sm" style="width: 5.5rem" @bind="_lote.Min" />
+                            </div>
+                            <div>
+                                <label class="form-label small mb-0">a</label>
+                                <input type="number" min="0" class="form-control form-control-sm" style="width: 5.5rem" @bind="_lote.Max" />
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="AplicarLote">Preencher</button>
+                            <span class="small text-muted">preenche várias linhas de uma vez (ainda precisa salvar)</span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-3">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Overall</th>
+                                        <th style="width: 7rem">Mínimo</th>
+                                        <th style="width: 7rem">Máximo</th>
+                                        <th>Fica com</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var l in _linhas)
+                                    {
+                                        var invalida = l.Min < 0 || l.Max < 0 || l.Min > l.Max || l.Max > EvolucaoNaVendaRapida.SubidaMaxima;
+                                        <tr class="@(invalida ? "table-danger" : l.Max > 0 ? "" : "text-muted")">
+                                            <td class="fw-semibold">@l.Overall</td>
+                                            <td>
+                                                <input type="number" min="0" max="@EvolucaoNaVendaRapida.SubidaMaxima" class="form-control form-control-sm"
+                                                       value="@l.Min" @onchange="e => Mudar(l, e, minimo: true)" />
+                                            </td>
+                                            <td>
+                                                <input type="number" min="0" max="@EvolucaoNaVendaRapida.SubidaMaxima" class="form-control form-control-sm"
+                                                       value="@l.Max" @onchange="e => Mudar(l, e, minimo: false)" />
+                                            </td>
+                                            <td class="small">
+                                                @if (invalida)
+                                                {
+                                                    <span class="text-danger">mínimo maior que o máximo, negativo ou acima de +@EvolucaoNaVendaRapida.SubidaMaxima</span>
+                                                }
+                                                else if (l.Max <= 0)
+                                                {
+                                                    <span>não evolui</span>
+                                                }
+                                                else
+                                                {
+                                                    var de = Math.Min(99, l.Overall + l.Min);
+                                                    var ate = Math.Min(99, l.Overall + l.Max);
+                                                    <span>@EvolucaoNaVendaRapida.Descrever(l.Min, l.Max) → <strong>@(de == ate ? $"{de}" : $"{de} a {ate}")</strong></span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-primary" @onclick="Salvar" disabled="@_salvando">@(_salvando ? "Salvando..." : "Salvar")</button>
+                            <button class="btn btn-outline-secondary" @onclick="Desfazer" disabled="@(_salvando || !_mudou)">Desfazer alterações</button>
+                            @if (!_fabrica)
+                            {
+                                <button class="btn btn-outline-danger ms-auto" @onclick="VoltarParaFabrica" disabled="@_salvando">Voltar ao padrão de fábrica</button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-5">
+                <div class="card">
+                    <div class="card-header fw-medium">Como aparece em /overall</div>
+                    <div class="card-body">
+                        <p class="text-muted small">Overalls seguidos com a mesma subida viram uma linha só. Mostra o que está na tela (salvo ou não).</p>
+                        <table class="table table-sm w-auto mb-0">
+                            <thead><tr><th>Overall</th><th>Sobe</th></tr></thead>
+                            <tbody>
+                                @foreach (var (overall, sobe) in EvolucaoNaVendaRapida.Faixas(ParaDtos()))
+                                {
+                                    <tr><td>@overall</td><td>@sobe</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private sealed class Linha
+    {
+        public int Overall { get; init; }
+        public int Min { get; set; }
+        public int Max { get; set; }
+    }
+
+    private sealed class Lote
+    {
+        public int? De { get; set; }
+        public int? Ate { get; set; }
+        public int? Min { get; set; }
+        public int? Max { get; set; }
+    }
+
+    private List<Linha>? _linhas;
+    private IReadOnlyList<EvolucaoVendaRapidaDto> _carregadas = Array.Empty<EvolucaoVendaRapidaDto>();
+    private readonly Lote _lote = new();
+    private bool _fabrica, _mudou, _salvando;
+    private string? _erro, _ok;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/venda-rapida"));
+    }
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            var tabela = await EvolucaoSvc.ObterAsync(CancellationToken.None);
+            _fabrica = tabela.Fabrica;
+            _carregadas = tabela.Linhas;
+            MontarLinhas();
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+
+    /// <summary>Uma linha por overall da faixa da tabela; o que não estiver salvo entra como "não evolui".</summary>
+    private void MontarLinhas()
+    {
+        _linhas = Enumerable.Range(EvolucaoNaVendaRapida.PrimeiroOverall,
+                EvolucaoNaVendaRapida.UltimoOverall - EvolucaoNaVendaRapida.PrimeiroOverall + 1)
+            .Select(o =>
+            {
+                var (min, max) = EvolucaoNaVendaRapida.Subida(o, _carregadas);
+                return new Linha { Overall = o, Min = min, Max = max };
+            })
+            .ToList();
+        _mudou = false;
+    }
+
+    private IReadOnlyList<EvolucaoVendaRapidaDto> ParaDtos() =>
+        (_linhas ?? new List<Linha>()).Select(l => new EvolucaoVendaRapidaDto(l.Overall, l.Min, l.Max)).ToList();
+
+    private void Mudar(Linha linha, ChangeEventArgs e, bool minimo)
+    {
+        var valor = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        if (minimo)
+        {
+            linha.Min = valor;
+            if (linha.Max < valor) linha.Max = valor; // subir o mínimo puxa o máximo junto
+        }
+        else
+        {
+            linha.Max = valor;
+        }
+        _mudou = true;
+        _ok = null;
+    }
+
+    private void AplicarLote()
+    {
+        _erro = null; _ok = null;
+        if (_linhas is null) return;
+        if (_lote.De is not { } de || _lote.Ate is not { } ate || _lote.Min is not { } min || _lote.Max is not { } max)
+        {
+            _erro = "Preencha o intervalo de overall e a subida (de/a).";
+            return;
+        }
+        if (de > ate) (de, ate) = (ate, de);
+        if (min < 0 || max < 0 || min > max || max > EvolucaoNaVendaRapida.SubidaMaxima)
+        {
+            _erro = $"A subida precisa ficar entre 0 e +{EvolucaoNaVendaRapida.SubidaMaxima}, com o mínimo até o máximo.";
+            return;
+        }
+
+        foreach (var l in _linhas.Where(l => l.Overall >= de && l.Overall <= ate))
+        {
+            l.Min = min;
+            l.Max = max;
+        }
+        _mudou = true;
+    }
+
+    private async Task Salvar()
+    {
+        _erro = null; _ok = null;
+        var linhas = ParaDtos();
+        if (EvolucaoNaVendaRapida.Validar(linhas) is { } erro)
+        {
+            _erro = erro;
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            await EvolucaoSvc.SalvarAsync(linhas, CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Tabela salva. Vale para a próxima venda rápida.";
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Desfazer()
+    {
+        _erro = null; _ok = null;
+        MontarLinhas();
+    }
+
+    private async Task VoltarParaFabrica()
+    {
+        _erro = null; _ok = null;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Apagar a tabela salva e voltar a valer o padrão de fábrica?"))
+            return;
+
+        _salvando = true;
+        try
+        {
+            await EvolucaoSvc.VoltarParaFabricaAsync(CancellationToken.None);
+            await CarregarAsync();
+            _ok = "Voltou a valer o padrão de fábrica.";
+        }
+        catch (Exception ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

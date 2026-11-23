@@ -7,6 +7,7 @@
 @inject LayoutNavigationService NavigationService
 @inject AdminAuthService AdminAuth
 @inject ISincronizacaoPesService SincronizacaoPes
+@inject IEvolucaoVendaRapidaService EvolucaoVendaRapidaSvc
 
 @implements IDisposable
 
@@ -117,15 +118,10 @@
             <table class="table table-sm w-auto overall-evolucao">
                 <thead><tr><th>Overall</th><th>Sobe</th></tr></thead>
                 <tbody>
-                    <tr><td>até 74</td><td>não evolui</td></tr>
-                    <tr><td>75 e 76</td><td>+7</td></tr>
-                    <tr><td>77 e 78</td><td>+5 ou +6</td></tr>
-                    <tr><td>79</td><td>+4 ou +5</td></tr>
-                    <tr><td>80</td><td>+4</td></tr>
-                    <tr><td>81 e 82</td><td>+3</td></tr>
-                    <tr><td>83 e 84</td><td>+2 ou +3</td></tr>
-                    <tr><td>85 e 86</td><td>+1 ou +2</td></tr>
-                    <tr><td>87 ou mais</td><td>não evolui</td></tr>
+                    @foreach (var (overall, sobe) in EvolucaoNaVendaRapida.Faixas(_evolucaoVendaRapida))
+                    {
+                        <tr><td>@overall</td><td>@sobe</td></tr>
+                    }
                 </tbody>
             </table>
             <p>
@@ -271,10 +267,18 @@
         string.Join(", ", mudancas.Select((d, i) => (d, i)).Where(x => x.d != 0)
             .Select(x => $"{AtributosPes.Todos[x.i].Nome} {x.d:+#;-#}"));
 
+    private IReadOnlyList<EvolucaoVendaRapidaDto> _evolucaoVendaRapida = EvolucaoNaVendaRapida.Fabrica;
+
     protected override void OnInitialized()
     {
         LayoutState.SetPage(NavigationService.GetPageDefinition("/overall"));
         AdminAuth.AuthenticationChanged += OnAuthenticationChanged;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _evolucaoVendaRapida = (await EvolucaoVendaRapidaSvc.ObterAsync(CancellationToken.None)).Linhas; }
+        catch { /* sem o banco, mostra a tabela de fábrica */ }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

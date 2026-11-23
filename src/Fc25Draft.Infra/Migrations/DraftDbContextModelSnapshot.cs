@@ -1185,6 +1185,22 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("EvolucoesPes", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EvolucaoVendaRapida", b =>
+                {
+                    b.Property<int>("Overall")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Maximo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Minimo")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Overall");
+
+                    b.ToTable("EvolucoesVendaRapida", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Figurinha", b =>
                 {
                     b.Property<Guid>("FigurinhaId")

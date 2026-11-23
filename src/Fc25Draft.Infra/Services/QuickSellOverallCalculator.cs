@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using Fc25Draft.Core.DTOs;
+using Fc25Draft.Core.Utilities;
 
 namespace Fc25Draft.Infra.Services;
 
@@ -10,45 +13,23 @@ internal static class QuickSellOverallCalculator
     public static decimal Pagamento(decimal precoBase) =>
         decimal.Round(precoBase * FatorDoPagamento, 2, MidpointRounding.AwayFromZero);
 
-    public static int CalculateNewOverall(int currentOverall)
-        => CalculateNewOverall(currentOverall, RandomInclusive);
+    /// <summary>O novo overall pela tabela de evolução (editada em /admin/venda-rapida), no máximo 99.</summary>
+    public static int CalculateNewOverall(int currentOverall, IReadOnlyList<EvolucaoVendaRapidaDto> tabela)
+        => CalculateNewOverall(currentOverall, tabela, RandomInclusive);
 
-    public static int CalculateNewOverall(int currentOverall, Func<int, int, int> randomInclusive)
+    public static int CalculateNewOverall(int currentOverall, IReadOnlyList<EvolucaoVendaRapidaDto> tabela, Func<int, int, int> randomInclusive)
     {
-        var delta = CalculateDelta(currentOverall, randomInclusive);
+        var delta = CalculateDelta(currentOverall, tabela, randomInclusive);
         return Math.Min(99, currentOverall + delta);
     }
 
-    public static int CalculateDelta(int currentOverall, Func<int, int, int> randomInclusive)
+    public static int CalculateDelta(int currentOverall, IReadOnlyList<EvolucaoVendaRapidaDto> tabela, Func<int, int, int> randomInclusive)
     {
         if (randomInclusive is null)
             throw new ArgumentNullException(nameof(randomInclusive));
 
-        if (currentOverall >= 87)
-            return 0;
-
-        if (currentOverall is >= 85 and <= 86)
-            return randomInclusive(1, 2);
-
-        if (currentOverall is >= 83 and <= 84)
-            return randomInclusive(2, 3);
-
-        if (currentOverall is >= 81 and <= 82)
-            return randomInclusive(3, 3);
-
-        if (currentOverall is 80)
-            return randomInclusive(4, 4);
-
-        if (currentOverall is 79)
-            return randomInclusive(4, 5);
-
-        if (currentOverall is >= 77 and < 79)
-            return randomInclusive(5, 6);
-
-        if (currentOverall is >= 75 and <= 76)
-            return randomInclusive(7, 7);
-
-        return 0;
+        var (min, max) = EvolucaoNaVendaRapida.Subida(currentOverall, tabela);
+        return max <= 0 ? 0 : randomInclusive(min, max);
     }
 
     public static int RandomInclusive(int min, int max)

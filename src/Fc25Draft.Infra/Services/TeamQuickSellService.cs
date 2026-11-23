@@ -124,6 +124,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                     throw new QuickSellException("Preço base inválido para o jogador.", StatusCodes.Status400BadRequest);
 
                 var payout = QuickSellOverallCalculator.Pagamento(basePrice);
+                var tabela = (await EvolucaoVendaRapidaService.CarregarAsync(_dbContext, ct).ConfigureAwait(false)).Linhas;
                 int oldOverall, newOverall;
                 string? evolucao = null;
                 if (player.Atributos is not null
@@ -132,7 +133,7 @@ public class TeamQuickSellService : ITeamQuickSellService
                     // Com atributos do PES, a evolução é nos atributos; o overall sai da fórmula.
                     OverallPes.Recalcular(player);
                     oldOverall = player.Overall;
-                    evolucao = EvoluirAtributos(player, QuickSellOverallCalculator.CalculateNewOverall(oldOverall), now);
+                    evolucao = EvoluirAtributos(player, QuickSellOverallCalculator.CalculateNewOverall(oldOverall, tabela), now);
                     newOverall = player.Overall;
                 }
                 else
@@ -148,7 +149,7 @@ public class TeamQuickSellService : ITeamQuickSellService
 
                     newOverall = hasPendingBump
                         ? player.QuickSellNewOverall!.Value
-                        : QuickSellOverallCalculator.CalculateNewOverall(oldOverall);
+                        : QuickSellOverallCalculator.CalculateNewOverall(oldOverall, tabela);
 
                     if (!hasPendingBump)
                     {

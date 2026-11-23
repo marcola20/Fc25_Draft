@@ -55,6 +55,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddTambemComConexaoPropria<IPricingService, PricingService>();
             services.AddComConexaoPropria<IPricingConfigService, PricingConfigService>();
             services.AddComConexaoPropria<ITransferConfigService, TransferConfigService>();
+            services.AddComConexaoPropria<IEvolucaoVendaRapidaService, EvolucaoVendaRapidaService>();
             services.AddScoped<IMarketCycleGenerator, MarketCycleGenerator>();
             services.AddScoped<IMarketCycleAdminService, MarketCycleAdminService>();
             services.AddScoped<IMarketCycleService, MarketCycleService>();

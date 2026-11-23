@@ -162,6 +162,7 @@ public class DraftDbContext : DbContext
     public DbSet<AlbumConquista> AlbumConquistas => Set<AlbumConquista>();
     public DbSet<TrocaFigurinhas> TrocasFigurinhas => Set<TrocaFigurinhas>();
     public DbSet<TrocaFigurinhaItem> TrocasFigurinhasItens => Set<TrocaFigurinhaItem>();
+    public DbSet<EvolucaoVendaRapida> EvolucoesVendaRapida => Set<EvolucaoVendaRapida>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {

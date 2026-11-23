@@ -107,6 +107,7 @@ public class LayoutNavigationService
         {
             new("Negociações", "/admin/negociacoes", "repeat"),
             new("Ciclos do Leilão", "/admin/ciclos", "settings"),
+            new("Evolução na Venda Rápida", "/admin/venda-rapida", "trending-up"),
             new("Log de Ações", "/admin/log-acoes", "list")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Draft", new List<MenuItem>
@@ -485,6 +486,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Abas do Site")
+            }
+        },
+        ["/admin/venda-rapida"] = new PageDefinition
+        {
+            Route = "/admin/venda-rapida",
+            Title = "Evolução na Venda Rápida",
+            Subtitle = "Quanto sobe o overall de cada jogador vendido na venda rápida — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Evolução na Venda Rápida")
             }
         },
         ["/admin/configuracoes"] = new PageDefinition
