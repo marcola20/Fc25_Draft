@@ -18,11 +18,11 @@ public record DataDaTemporada(
     DateTime? Abre = null);
 
 /// <summary>
-/// Calendário real da temporada, montado a partir do domingo de abertura (Supercopa).
-/// O ritmo é semanal e fixo: <b>terça</b> Série B, <b>quarta</b> Série A e <b>sexta</b> Copa.
-/// Como a Série A tem mais rodadas que a B, no meio da temporada entra uma semana em que a B
-/// folga e a A joga duas vezes (logo depois da janela de transferências) — assim as duas séries
-/// terminam na mesma semana, a B um dia antes da A. A última data é o playoff de acesso.
+/// Calendário real da temporada, montado a partir da data da Supercopa (a abertura).
+/// A janela de transferências fecha na véspera da Supercopa e a Série A estreia sozinha no sábado
+/// seguinte. Da semana depois em diante o ritmo é fixo: <b>terça</b> Série B, <b>quinta</b> Série A e
+/// <b>sábado</b> Copa. A Série A tem mais rodadas que a B, então termina depois; a última data é o
+/// playoff de acesso, no sábado seguinte ao último jogo.
 /// </summary>
 public static class CalendarioTemporada
 {
@@ -31,6 +31,9 @@ public static class CalendarioTemporada
 
     /// <summary>Horário em que a janela de transferências abre, depois dos jogos.</summary>
     public static readonly TimeSpan HorarioDaJanela = new(20, 0, 0);
+
+    /// <summary>Dias da semana de cada competição no ritmo fixo.</summary>
+    public const DayOfWeek DiaDaSerieB = DayOfWeek.Tuesday, DiaDaSerieA = DayOfWeek.Thursday, DiaDaCopa = DayOfWeek.Saturday;
 
     /// <summary>Detalhe das datas do mata-mata da Copa (que não têm número de rodada).</summary>
     public const string QuartasDaCopa = "Quartas de final", SemifinaisDaCopa = "Semifinais", FinalDaCopa = "Final";
@@ -46,80 +49,45 @@ public static class CalendarioTemporada
                  bool ehJogo = true, DateTime? abre = null) =>
             datas.Add(new DataDaTemporada(datas.Count + 1, dia.Date + Horario, tipo, divisao, rodada, titulo, detalhe, ehJogo, abre));
 
-        // A temporada abre na data da Supercopa, seja ela qual for; a primeira rodada é na terça
-        // seguinte e a janela fecha na véspera.
+        // A janela fecha na véspera da Supercopa, que abre a temporada; a Série A estreia no sábado
+        // seguinte, antes de o ritmo da semana começar.
         var diaDaAbertura = abertura.Date;
-        var primeiraTerca = ProximoDia(diaDaAbertura, DayOfWeek.Tuesday);
+        var estreiaDaSerieA = ProximoDia(diaDaAbertura, DiaDaCopa);
 
+        Add(diaDaAbertura.AddDays(-1), null, null, null, "Mercado", "fecha a janela", ehJogo: false);
         Add(diaDaAbertura, TipoCompetition.Supercopa, null, null, "Supercopa", "abre a temporada");
-        Add(primeiraTerca.AddDays(-1), null, null, null, "Mercado", "fecha a janela", ehJogo: false);
 
-        var extrasDaSerieA = Math.Max(0, rodadasSerieA - rodadasSerieB);
-        var semanas = rodadasSerieB + (extrasDaSerieA > 0 ? 1 : 0);
-        var semanaDoMercado = extrasDaSerieA > 0 ? (semanas + 1) / 2 : 0;
+        int serieA = 1, serieB = 1;
+        if (rodadasSerieA > 0)
+            Add(estreiaDaSerieA, TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
 
-        // Datas da Copa na ordem em que acontecem, uma por sexta.
+        // Datas da Copa na ordem em que acontecem, uma por sábado.
         var daCopa = new Queue<(string Titulo, string Detalhe, int? Rodada)>();
         for (int g = 1; g <= rodadasGrupoCopa; g++) daCopa.Enqueue(("Copa", $"Rodada {g} · grupos", g));
         daCopa.Enqueue(("Copa", QuartasDaCopa, null));
         daCopa.Enqueue(("Copa", SemifinaisDaCopa, null));
         daCopa.Enqueue(("Copa", FinalDaCopa, null));
 
-        int serieA = 1, serieB = 1;
-
-        for (int semana = 1; semana <= semanas; semana++)
-        {
-            var terca = primeiraTerca.AddDays((semana - 1) * 7);
-            var quarta = terca.AddDays(1);
-            var sexta = terca.AddDays(3);
-
-            if (semana == semanaDoMercado)
-            {
-                // Janela do meio: abre depois dos jogos da sexta anterior e fecha na segunda.
-                // A Série B folga a semana e a Série A joga as rodadas que sobram.
-                Add(terca.AddDays(-1), null, null, null, "Mercado", "", ehJogo: false,
-                    abre: terca.AddDays(-4) + HorarioDaJanela);
-
-                for (int i = 0; i < extrasDaSerieA && serieA <= rodadasSerieA; i++)
-                    Add(terca.AddDays(i), TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
-            }
-            else
-            {
-                if (serieB <= rodadasSerieB)
-                    Add(terca, TipoCompetition.Liga, Divisao.SerieB, serieB, "Série B", $"Rodada {serieB++}");
-                if (serieA <= rodadasSerieA)
-                    Add(quarta, TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
-            }
-
-            if (daCopa.Count > 0)
-            {
-                var (titulo, detalhe, rodada) = daCopa.Dequeue();
-                Add(sexta, TipoCompetition.Copa, null, rodada, titulo, detalhe);
-            }
-        }
-
-        // O que sobrar (rodadas de liga ou da Copa) segue nas semanas seguintes, no mesmo ritmo.
-        var extra = semanas;
+        // Semana a semana, de terça a sábado, até acabar tudo.
+        var terca = ProximoDia(estreiaDaSerieA, DiaDaSerieB);
         while (serieB <= rodadasSerieB || serieA <= rodadasSerieA || daCopa.Count > 0)
         {
-            extra++;
-            var terca = primeiraTerca.AddDays((extra - 1) * 7);
-
             if (serieB <= rodadasSerieB)
                 Add(terca, TipoCompetition.Liga, Divisao.SerieB, serieB, "Série B", $"Rodada {serieB++}");
             if (serieA <= rodadasSerieA)
-                Add(terca.AddDays(1), TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
+                Add(ProximoDia(terca, DiaDaSerieA), TipoCompetition.Liga, Divisao.SerieA, serieA, "Série A", $"Rodada {serieA++}");
             if (daCopa.Count > 0)
             {
                 var (titulo, detalhe, rodada) = daCopa.Dequeue();
-                Add(terca.AddDays(3), TipoCompetition.Copa, null, rodada, titulo, detalhe);
+                Add(ProximoDia(terca, DiaDaCopa), TipoCompetition.Copa, null, rodada, titulo, detalhe);
             }
+
+            terca = terca.AddDays(7);
         }
 
-        // Fecha a temporada com o playoff, na sexta seguinte à última rodada de liga.
+        // Fecha a temporada com o playoff, no sábado seguinte ao último jogo.
         var ultimoJogo = datas.Where(d => d.EhJogo).Max(d => d.Quando);
-        var sextaFinal = ProximaSexta(ultimoJogo.Date);
-        Add(sextaFinal, TipoCompetition.Liga, null, null, "Playoff de acesso", "");
+        Add(ProximoDia(ultimoJogo.Date, DiaDaCopa), TipoCompetition.Liga, null, null, "Playoff de acesso", "");
 
         return datas;
     }
@@ -173,5 +141,4 @@ public static class CalendarioTemporada
         return depoisDe.AddDays(dias == 0 ? 7 : dias);
     }
 
-    private static DateTime ProximaSexta(DateTime depoisDe) => ProximoDia(depoisDe, DayOfWeek.Friday);
 }
