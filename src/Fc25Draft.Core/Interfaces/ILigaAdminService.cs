@@ -109,6 +109,18 @@ public interface ILigaAdminService
     /// <summary>Sorteia os grupos: cada pote distribui seus times igualmente entre os grupos.</summary>
     Task<IReadOnlyList<LigaGrupoTimeDto>> SortearCopaAsync(Guid ligaId, CancellationToken ct);
 
+    /// <summary>Muda o formato da Copa (grupos ou fase de liga) enquanto ela não foi sorteada.</summary>
+    Task<LigaDto> DefinirFormatoCopaAsync(Guid ligaId, Enums.FormatoCopa formato, CancellationToken ct);
+
+    /// <summary>Ranking, potes e, depois do sorteio, os jogos da fase de liga da Copa.</summary>
+    Task<CopaFaseDeLigaSorteioDto?> GetSorteioFaseDeLigaAsync(Guid ligaId, CancellationToken ct);
+
+    /// <summary>
+    /// Sorteia os jogos da fase de liga (2 potes pelo ranking, jogos equilibrados) e já grava as
+    /// 4 rodadas com as datas do calendário. Pode sortear de novo enquanto nenhum jogo começou.
+    /// </summary>
+    Task<CopaFaseDeLigaSorteioDto> SortearFaseDeLigaAsync(Guid ligaId, CancellationToken ct);
+
     Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
 
     // Times inscritos (Liga de pontos corridos)

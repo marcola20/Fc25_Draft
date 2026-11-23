@@ -87,7 +87,7 @@ public class LigaPublicService : ILigaPublicService
             .GroupBy(k => k.LigaId)
             .ToDictionary(
                 g => g.Key,
-                g => (IReadOnlyList<FaseKnockout>)g.Select(x => x.Fase).OrderBy(f => f).ToArray());
+                g => (IReadOnlyList<FaseKnockout>)g.Select(x => x.Fase).OrderBy(FasesKnockout.Ordem).ToArray());
 
         // Edições antigas foram encerradas sem gravar o campeão: nesses casos ele vem
         // do vencedor da final e, se a edição não teve mata-mata, do 1º da tabela.
@@ -554,7 +554,7 @@ public class LigaPublicService : ILigaPublicService
 
     /// <summary>"3ª rodada", a fase do mata-mata ou "Jogo extra" (mini liga, decisivo, playoff).</summary>
     private static string RotuloDoJogo(int numeroDaRodada, FaseKnockout? fase) =>
-        fase is FaseKnockout f ? FaseLabelMap.GetValueOrDefault(f, f.ToString())
+        fase is FaseKnockout f ? FasesKnockout.Nome(f)
             : numeroDaRodada > 0 ? $"{numeroDaRodada}ª rodada" : "Jogo extra";
 
     /// <summary>Gols (sem os contra) e os jogos deles, de uma competição ou de todas.</summary>
@@ -645,10 +645,10 @@ public class LigaPublicService : ILigaPublicService
             .Include(x => x.TimeFora)
             .Include(x => x.Vencedor)
             .Include(x => x.Partida)
-            .OrderBy(x => x.Fase)
+            .Include(x => x.Liga)
             .ToListAsync(ct);
 
-        return jogos.Select(ToKnockoutJogoDto).ToArray();
+        return jogos.OrderBy(x => FasesKnockout.Ordem(x.Fase)).Select(ToKnockoutJogoDto).ToArray();
     }
 
     public async Task<IReadOnlyList<LigaGrupoTimeDto>> GetGruposAsync(Guid ligaId, CancellationToken ct)
@@ -867,7 +867,7 @@ public class LigaPublicService : ILigaPublicService
 
         var supercopaComSemifinal = liga.Tipo == TipoCompetition.Supercopa
                                     && await _db.LigaTimes.CountAsync(t => t.LigaId == liga.LigaId, ct) > 2;
-        var rotulo = fase is not null ? FaseLabelMap.GetValueOrDefault(fase.Value, fase.Value.ToString())
+        var rotulo = fase is not null ? FasesKnockout.Rotulo(fase.Value, liga.FormatoCopa == FormatoCopa.FaseDeLiga && liga.Tipo == TipoCompetition.Copa)
             : supercopaComSemifinal ? (p.Rodada.Numero == 1 ? "Semifinal" : "Final")
             : liga.Tipo == TipoCompetition.Supercopa ? "Jogo único"
             : p.Rodada.Desempate ? "Jogo decisivo"
@@ -1435,16 +1435,12 @@ public class LigaPublicService : ILigaPublicService
                 // Empatados em Pts/V/SG dividem a mesma posição (jogo decisivo).
                 var decisivos = decisivosPorLiga.GetValueOrDefault(liga.LigaId, JogosDecisivos.Nenhum);
 
-                var doGrupo = LigaDesempate.Ordenar(
+                var faseDeLiga = liga.FormatoCopa == FormatoCopa.FaseDeLiga;
+                var doGrupo = CopaTabela.Ordenar(
                     classifs.Where(x => x.LigaId == liga.LigaId && x.Grupo == c.Grupo),
-                    TipoCompetition.Copa,
-                    x => x.TimeId,
-                    ClassifFlat.Stats,
-                    Array.Empty<ConfrontoDireto>(),
-                    decisivos);
+                    faseDeLiga, x => x.TimeId, ClassifFlat.Stats, decisivos);
 
-                var posicoesGrupo = LigaDesempate.PosicoesCopa(
-                    doGrupo, x => x.TimeId, ClassifFlat.Stats, decisivos);
+                var posicoesGrupo = CopaTabela.Posicoes(doGrupo, faseDeLiga, x => x.TimeId, ClassifFlat.Stats, decisivos);
 
                 posicao = posicoesGrupo[doGrupo.FindIndex(x => x.TimeId == timeId)];
             }
@@ -1456,7 +1452,8 @@ public class LigaPublicService : ILigaPublicService
                 c.GolsPro, c.GolsContra, c.GolsPro - c.GolsContra,
                 FaseAlcancadaLabel(knockouts
                     .Where(k => k.LigaId == liga.LigaId)
-                    .Select(k => (k.Fase, k.VencedorId)), timeId)));
+                    .Select(k => (k.Fase, k.VencedorId)), timeId),
+                liga.Tipo == TipoCompetition.Copa && liga.FormatoCopa == FormatoCopa.FaseDeLiga));
         }
 
         // Clean sheet é apurado por partida encerrada do time nas competições da temporada.
@@ -1563,13 +1560,13 @@ public class LigaPublicService : ILigaPublicService
     private static string? FaseAlcancadaLabel(IEnumerable<(FaseKnockout Fase, Guid? VencedorId)> jogos, Guid timeId)
     {
         var maisAvancado = jogos
-            .OrderByDescending(j => j.Fase)
+            .OrderByDescending(j => FasesKnockout.Ordem(j.Fase))
             .Select(j => (Fase: j.Fase, VencedorId: j.VencedorId))
             .FirstOrDefault();
 
         if (maisAvancado.Fase == FaseKnockout.None) return null;
 
-        var label = FaseLabelMap.GetValueOrDefault(maisAvancado.Fase, maisAvancado.Fase.ToString());
+        var label = FasesKnockout.Nome(maisAvancado.Fase);
 
         if (maisAvancado.VencedorId is null)
             return $"Disputando: {label}";
@@ -1901,6 +1898,7 @@ public class LigaPublicService : ILigaPublicService
     private static string EtapaLabel(TipoCompetition tipo, int rodada, bool desempate, FaseKnockout? fase, bool semifinalDaSupercopa = false) => fase switch
     {
         FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C => "Play-In",
+        FaseKnockout.PO1 or FaseKnockout.PO2 or FaseKnockout.PO3 or FaseKnockout.PO4 => "Playoff",
         FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas de final",
         FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
         FaseKnockout.Final => "Final",
@@ -2142,10 +2140,10 @@ public class LigaPublicService : ILigaPublicService
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
             l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff,
-            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId);
+            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId, l.FormatoCopa);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
-        new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase],
+        new(j.KnockoutJogoId, j.Fase, FasesKnockout.Rotulo(j.Fase, j.Liga?.FormatoCopa == FormatoCopa.FaseDeLiga),
             j.TimeCasaId, j.TimeCasa?.TeamName,
             j.TimeForaId, j.TimeFora?.TeamName,
             j.VencedorId, j.Vencedor?.TeamName,
@@ -2156,18 +2154,4 @@ public class LigaPublicService : ILigaPublicService
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
             j.Partida?.TemPenaltis ?? false,
             j.Partida?.YoutubeVideoId);
-
-    private static readonly Dictionary<FaseKnockout, string> FaseLabelMap = new()
-    {
-        [FaseKnockout.PlayIn_A] = "Play-In Jogo 1 (9º vs 10º)",
-        [FaseKnockout.PlayIn_B] = "Play-In Jogo 2 (7º vs 8º)",
-        [FaseKnockout.PlayIn_C] = "Play-In Jogo 3 (Decisivo)",
-        [FaseKnockout.QF1] = "Quartas 1 — 1º Grupo A x 2º Grupo B",
-        [FaseKnockout.QF2] = "Quartas 2 — 1º Grupo B x 2º Grupo A",
-        [FaseKnockout.QF3] = "Quartas 3 — 1º Grupo C x 2º Grupo D",
-        [FaseKnockout.QF4] = "Quartas 4 — 1º Grupo D x 2º Grupo C",
-        [FaseKnockout.Semi1] = "Semifinal 1",
-        [FaseKnockout.Semi2] = "Semifinal 2",
-        [FaseKnockout.Final] = "Final"
-    };
 }

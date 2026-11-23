@@ -8,6 +8,95 @@
 {
     <div class="alert alert-info mb-0">O sorteio da Copa ainda não começou.</div>
 }
+else if (Estado.FaseDeLiga is { } sequencia)
+{
+    var estado = Estado;
+    var ultimo = estado.UltimoTime;
+
+    <div class="sorteio-destaque card mb-3 text-center">
+        <div class="card-body">
+            @if (estado.Terminado)
+            {
+                <div class="sorteio-titulo"><Icone Nome="trophy" Tamanho="14" /> Sorteio encerrado</div>
+                <div class="text-muted">Os 4 jogos de cada time na fase de liga da @estado.LigaNome estão definidos.</div>
+            }
+            else if (ultimo is null)
+            {
+                <div class="sorteio-titulo"><Icone Nome="dices" Tamanho="14" /> O sorteio vai começar</div>
+                <div class="text-muted">Cada time pega 2 adversários do pote 1 e 2 do pote 2, com 2 jogos em casa e 2 fora. Primeiro sai o pote 1.</div>
+            }
+            else
+            {
+                <div class="text-muted small text-uppercase fw-bold">Pote @ultimo.Pote · @(ultimo.Ranking)º no ranking</div>
+                <div class="d-flex align-items-center justify-content-center gap-3 my-2 sorteio-revelado" @key="ultimo.Ordem">
+                    <img src="@EscudoService.GetEscudo(ultimo.TimeNome)" alt="" class="sorteio-escudo" />
+                    <div class="sorteio-time">@ultimo.TimeNome</div>
+                </div>
+                <div class="d-flex flex-wrap justify-content-center gap-2 sorteio-revelado" @key="ultimo.Ordem + 1000">
+                    @foreach (var a in ultimo.Adversarios)
+                    {
+                        <div class="sorteio-adversario">
+                            <div class="small text-muted">Rodada @a.Rodada · @(a.EmCasa ? "em casa" : "fora")</div>
+                            <div class="d-flex align-items-center gap-2 justify-content-center">
+                                <img src="@EscudoService.GetEscudo(a.TimeNome)" alt="" style="width:28px;height:28px;object-fit:contain" />
+                                <span class="fw-semibold">@a.TimeNome</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (!estado.Terminado)
+            {
+                <div class="mt-2">
+                    <span class="badge bg-dark fs-6">Próximo em @SegundosRestantes s</span>
+                    <span class="text-muted small ms-2">@estado.Reveladas de @estado.Total revelados</span>
+                </div>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress-bar" style="width: @(estado.Reveladas * 100 / Math.Max(estado.Total, 1))%"></div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row g-3">
+        @foreach (var pote in sequencia.GroupBy(t => t.Pote).OrderBy(p => p.Key))
+        {
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header fw-bold">Pote @pote.Key</div>
+                    <ul class="list-group list-group-flush">
+                        @foreach (var t in pote.OrderBy(t => t.Ranking))
+                        {
+                            var revelado = estado.JaRevelado(t.TimeId);
+                            var novo = t.Ordem == ultimo?.Ordem;
+                            // Jogo conhecido: o time ou o adversário já saiu do pote.
+                            var conhecidos = t.Adversarios.Where(a => revelado || estado.JaRevelado(a.TimeId)).ToList();
+                            <li class="list-group-item py-1 @(novo ? "sorteio-novo" : "")">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img src="@EscudoService.GetEscudo(t.TimeNome)" alt="" style="width:22px;height:22px;object-fit:contain" />
+                                    <span class="@(revelado ? "fw-bold" : "fw-semibold text-muted")">@t.TimeNome</span>
+                                    <span class="text-muted small ms-auto">@conhecidos.Count/4</span>
+                                </div>
+                                @if (conhecidos.Count > 0)
+                                {
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        @foreach (var a in conhecidos)
+                                        {
+                                            <span class="badge bg-light text-dark border" title="Rodada @a.Rodada">
+                                                @($"R{a.Rodada} · {a.TimeNome} ({(a.EmCasa ? "casa" : "fora")})")
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+    </div>
+}
 else
 {
     var estado = Estado;
@@ -41,10 +130,10 @@ else
             {
                 <div class="mt-2">
                     <span class="badge bg-dark fs-6">Próximo em @SegundosRestantes s</span>
-                    <span class="text-muted small ms-2">@estado.Reveladas de @estado.Sequencia.Count revelados</span>
+                    <span class="text-muted small ms-2">@estado.Reveladas de @estado.Total revelados</span>
                 </div>
                 <div class="progress mt-2" style="height: 6px;">
-                    <div class="progress-bar" style="width: @(estado.Reveladas * 100 / Math.Max(estado.Sequencia.Count, 1))%"></div>
+                    <div class="progress-bar" style="width: @(estado.Reveladas * 100 / Math.Max(estado.Total, 1))%"></div>
                 </div>
             }
         </div>
@@ -123,6 +212,7 @@ else
     .sorteio-revelado { animation: sorteio-entra .6s ease-out; }
     .sorteio-novo { animation: sorteio-brilho 2s ease-out; }
     .sorteio-saiu { text-decoration: line-through; }
+    .sorteio-adversario { border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: .35rem .75rem; min-width: 10rem; }
     @@keyframes sorteio-entra { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
     @@keyframes sorteio-brilho { from { background-color: rgba(255, 193, 7, .45); } to { background-color: transparent; } }
 </style>

@@ -14,6 +14,9 @@ namespace Fc25Draft.Infra.Services;
 /// </summary>
 public class PremiacaoService : IPremiacaoService
 {
+    /// <summary>Prêmio de quem cai no playoff da Copa em fase de liga (decidido em 23/11/2026).</summary>
+    private const decimal PremioDoPlayoffDaCopa = 5_000_000m;
+
     private const string OrigemLedger = "PREMIACAO";
 
     private readonly DraftDbContext _db;
@@ -103,6 +106,19 @@ public class PremiacaoService : IPremiacaoService
                     PosicaoAte = item.PosicaoAte,
                     Fase = item.Fase,
                     Valor = item.Valor
+                });
+
+            // A Copa em fase de liga (2011+) tem o playoff: quem cai nele ganha 5 Mi, entre a primeira
+            // fase (4) e as quartas (6). Só entra se a origem ainda não tinha o item.
+            if (premiacao.Itens.Any(i => i.Tipo == TipoCompetition.Copa && i.Fase is not null)
+                && !premiacao.Itens.Any(i => i.Tipo == TipoCompetition.Copa && i.Fase == FasePremiacao.Playoff))
+                premiacao.Itens.Add(new PremiacaoItem
+                {
+                    PremiacaoItemId = Guid.NewGuid(),
+                    PremiacaoId = premiacao.PremiacaoId,
+                    Tipo = TipoCompetition.Copa,
+                    Fase = FasePremiacao.Playoff,
+                    Valor = PremioDoPlayoffDaCopa
                 });
         }
 
@@ -445,7 +461,7 @@ public class PremiacaoService : IPremiacaoService
         new(p.PremiacaoId, p.Temporada, p.Nome, p.AtualizadoEm,
             p.Itens
                 .OrderBy(i => i.Tipo).ThenBy(i => i.Divisao ?? 0)
-                .ThenBy(i => i.Fase ?? 0).ThenBy(i => i.PosicaoDe ?? 0)
+                .ThenBy(i => i.Fase is FasePremiacao f ? PremiacaoLabels.Ordem(f) : 0).ThenBy(i => i.PosicaoDe ?? 0)
                 .Select(i => new PremiacaoItemDto(i.PremiacaoItemId, i.Tipo, i.Divisao, i.PosicaoDe, i.PosicaoAte, i.Fase, i.Valor))
                 .ToArray(),
             new BonusDiretoriaDto(p.BonusMetaLigaCumprida, p.BonusMetaLigaSuperada, p.BonusMetaCopaCumprida, p.BonusMetaCopaSuperada));

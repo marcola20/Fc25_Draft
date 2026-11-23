@@ -18,7 +18,7 @@ public static class FasesDoMataMata
         {
             if (timeId is not Guid id || id == Guid.Empty) return;
             // A fase mais longe vale: quem perdeu a final não volta a ser "eliminado nas quartas".
-            if (!fases.TryGetValue(id, out var atual) || fase < atual) fases[id] = fase;
+            if (!fases.TryGetValue(id, out var atual) || PremiacaoLabels.Ordem(fase) < PremiacaoLabels.Ordem(atual)) fases[id] = fase;
         }
 
         foreach (var jogo in lista)
@@ -28,6 +28,7 @@ public static class FasesDoMataMata
                 FaseKnockout.Final => FasePremiacao.Vice,
                 FaseKnockout.Semi1 or FaseKnockout.Semi2 => FasePremiacao.Semifinal,
                 FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => FasePremiacao.Quartas,
+                _ when FasesKnockout.EhPlayoff(jogo.Fase) => FasePremiacao.Playoff,
                 _ => FasePremiacao.FaseDeGrupos
             };
 

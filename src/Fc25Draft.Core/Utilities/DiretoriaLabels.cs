@@ -103,7 +103,9 @@ public static class DiretoriaLabels
         (FasePremiacao.Semifinal, false) => "Caiu na semifinal",
         (FasePremiacao.Quartas, true) => "Nas quartas",
         (FasePremiacao.Quartas, false) => "Caiu nas quartas",
-        (_, true) => "Fase de grupos",
-        _ => "Caiu na fase de grupos"
+        (FasePremiacao.Playoff, true) => "No playoff",
+        (FasePremiacao.Playoff, false) => "Caiu no playoff",
+        (_, true) => "Primeira fase",
+        _ => "Caiu na primeira fase"
     };
 }

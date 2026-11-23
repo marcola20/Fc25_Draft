@@ -198,11 +198,11 @@
                 ]),
             ],
             new("As chances acima são as da pick #1. As picks 2 a 6 saem em sequência do mesmo pool (sem reposição), então os seis ficam com as seis primeiras picks, só muda a ordem. Os rebaixados da Série A <strong>não</strong> entram na loteria: eles descem com elenco melhor que o dos times da B.")),
-        R2Desc: "Baseado só na campanha na Copa, com os 18 times juntos. Como há grupos de 4 e de 5 times, os eliminados nos grupos são ordenados primeiro pela posição no grupo (5°s, depois 4°s, depois 3°s) e depois pelo aproveitamento. Nas quartas e nas semis, quem teve pior aproveitamento na Copa escolhe antes.",
+        R2Desc: "Baseado só na campanha na Copa, com os 18 times juntos. Os 10 que não chegam às quartas (13° ao 18° da fase de liga e os 4 que caem no playoff) são ordenados pela posição na tabela da fase de liga, do pior para o melhor. Nas quartas e nas semis, quem teve pior aproveitamento na Copa escolhe antes.",
         R2: new List<PickRow>
         {
-            new("🎰", "Elim. Grupos — 5 piores",    [1, 2, 3, 4, 5],    "Loteria 1–5", "red",    "Lot. Grupos A"),
-            new("🎰", "Elim. Grupos — 5 seguintes", [6, 7, 8, 9, 10],   "Loteria 6–10", "orange", "Lot. Grupos B"),
+            new("🎰", "18° ao 14° da fase de liga",      [1, 2, 3, 4, 5],    "Loteria 1–5", "red",    "Lot. bloco A"),
+            new("🎰", "13° e eliminados no playoff",     [6, 7, 8, 9, 10],   "Loteria 6–10", "orange", "Lot. bloco B"),
             new("🎖️", "Eliminados nas Quartas",    [11, 12, 13, 14],   "11–14",       "blue",   "Quartas"),
             new("🎖️", "Eliminados nas Semis",      [15, 16],           "15–16",       "green",  "Semis"),
             new("🥈", "Vice-Campeão Copa",          [17],               "17",          "silver", "Vice Copa"),
@@ -210,9 +210,9 @@
         },
         R2Loteria: new(
             "Loteria R2 — Picks #1–10",
-            "Os 10 eliminados na fase de grupos disputam as picks 1–10 em dois blocos de 5: os 5 piores brigam pelas picks 1–5 e os 5 seguintes pelas picks 6–10.",
+            "Os 10 que não chegam às quartas disputam as picks 1–10 em dois blocos de 5: os 5 piores da fase de liga (18° ao 14°) brigam pelas picks 1–5 e o 13° com os 4 eliminados no playoff pelas picks 6–10.",
             [
-                new("Bloco A — Picks 1–5", "5 piores eliminados nos grupos",
+                new("Bloco A — Picks 1–5", "18° ao 14° da fase de liga",
                 [
                     new("🔴", "Pior eliminado", "10° entre os eliminados", 30, "red"),
                     new("🔴", "2° pior",        "9° entre os eliminados",  30, "red"),
@@ -220,7 +220,7 @@
                     new("🟠", "4° pior",        "7° entre os eliminados",  15, "orange"),
                     new("🟠", "5° pior",        "6° entre os eliminados",  10, "orange"),
                 ]),
-                new("Bloco B — Picks 6–10", "5 melhores eliminados nos grupos",
+                new("Bloco B — Picks 6–10", "13° da fase de liga e os 4 eliminados no playoff",
                 [
                     new("🔵", "6° pior",  "5° entre os eliminados", 30, "blue"),
                     new("🔵", "7° pior",  "4° entre os eliminados", 30, "blue"),

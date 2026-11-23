@@ -52,13 +52,14 @@
         {
             var itensGrupo = OrdenarGrupo(grupo);
             if (itensGrupo.Count == 0) continue;
-            var posicoes = LigaDesempate.PosicoesCopa(itensGrupo, c => c.TimeId, CopaStats, _decisivos);
+            var posicoes = CopaTabela.Posicoes(itensGrupo, FaseDeLiga, c => c.TimeId, CopaStats, _decisivos);
+            var nomeDoGrupo = FaseDeLiga ? "Fase de liga" : $"Grupo {grupo}";
 
-            <h5 class="mt-3 mb-2">Grupo @grupo</h5>
+            <h5 class="mt-3 mb-2">@nomeDoGrupo</h5>
             <ShareableCard Id='@($"cap-classif-grupo-{grupo}")'
                            Titulo="@LigaNome"
-                           Subtitulo='@($"Classificação — Grupo {grupo}")'
-                           Arquivo='@($"cbfv-grupo-{grupo}.png")'>
+                           Subtitulo='@($"Classificação — {nomeDoGrupo}")'
+                           Arquivo='@(FaseDeLiga ? "cbfv-copa-fase-de-liga.png" : $"cbfv-grupo-{grupo}.png")'>
             <div class="table-responsive painel mb-4">
                 <table class="table table-sm table-hover align-middle mb-0">
                     <thead class="table-dark">
@@ -80,8 +81,8 @@
                         {
                             var item = itensGrupo[i];
                             var grupoPos = posicoes[i];
-                            var emDecisao = posicoes.Count(x => x == grupoPos) > 1;
-                            <tr class="@CopaRowClass(grupoPos, emDecisao)" title="@(emDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
+                            var emDecisao = CopaTabela.EmDecisao(posicoes, i, FaseDeLiga);
+                            <tr class="@CopaTabela.ClasseDaLinha(grupoPos, emDecisao, FaseDeLiga)" title="@(emDecisao ? CopaTabela.RotuloEmpate(FaseDeLiga) : null)">
                                 <td><span class="@CopaBadgeClass(grupoPos, emDecisao)">@grupoPos</span></td>
                                 <td class="fw-semibold">@item.TimeNome</td>
                                 <td class="text-center fw-bold">@item.Pontos</td>
@@ -131,9 +132,13 @@
         }
 
         <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
-            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-titulo"></span>Avança (1º-2º do grupo)</span>
+            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-titulo"></span>@CopaTabela.Rotulo(CopaTabela.Faixa.Quartas, FaseDeLiga)</span>
+            @if (FaseDeLiga)
+            {
+                <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-playoff-acesso"></span>@CopaTabela.Rotulo(CopaTabela.Faixa.Playoff, true)</span>
+            }
             <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-rebaixamento"></span>Eliminado</span>
-            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-empate"></span>Empatados (Pts, V e SG): jogo decisivo</span>
+            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-empate"></span>@CopaTabela.RotuloEmpate(FaseDeLiga)</span>
         </div>
     }
     else
@@ -302,14 +307,10 @@
 
     // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
     // para a tabela já refletir o desempate mesmo antes do próximo recálculo.
+    private bool FaseDeLiga => _liga?.FaseDeLiga == true;
+
     private List<LigaClassificacaoItemDto> OrdenarGrupo(GrupoCopa grupo) =>
-        LigaDesempate.Ordenar(
-            _classif!.Where(c => c.Grupo == grupo),
-            TipoCompetition.Copa,
-            c => c.TimeId,
-            CopaStats,
-            Array.Empty<ConfrontoDireto>(),
-            _decisivos);
+        CopaTabela.Ordenar(_classif!.Where(c => c.Grupo == grupo), FaseDeLiga, c => c.TimeId, CopaStats, _decisivos);
 
     // Copa: Pontos → Vitórias → Saldo de Gols. Quem empatar nos três divide a posição
     // e a vaga sai em jogo decisivo — por isso a linha fica azul.
@@ -319,8 +320,13 @@
     private static string CopaRowClass(int pos, bool emDecisao) =>
         emDecisao ? "table-primary" : pos <= 2 ? "table-success" : "table-danger";
 
-    private static string CopaBadgeClass(int pos, bool emDecisao) =>
-        emDecisao ? ZonaEstilo.BadgeEmpateTopo : pos <= 2 ? "num-posicao zona-titulo" : "num-posicao zona-rebaixamento";
+    private string CopaBadgeClass(int pos, bool emDecisao) =>
+        emDecisao ? ZonaEstilo.BadgeEmpateTopo : CopaTabela.FaixaDa(pos, FaseDeLiga) switch
+        {
+            CopaTabela.Faixa.Quartas => "num-posicao zona-titulo",
+            CopaTabela.Faixa.Playoff => "num-posicao zona-playoff-acesso",
+            _ => "num-posicao zona-rebaixamento"
+        };
 
     private static string StatusLabel(LigaStatus s) => s switch
     {

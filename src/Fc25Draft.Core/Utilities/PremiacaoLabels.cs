@@ -11,8 +11,16 @@ public static class PremiacaoLabels
         FasePremiacao.Vice => "Vice-campeão",
         FasePremiacao.Semifinal => "Eliminado nas semifinais",
         FasePremiacao.Quartas => "Eliminado nas quartas",
-        FasePremiacao.FaseDeGrupos => "Eliminado na fase de grupos",
+        FasePremiacao.Playoff => "Eliminado no playoff",
+        FasePremiacao.FaseDeGrupos => "Eliminado na primeira fase",
         _ => fase.ToString()
+    };
+
+    /// <summary>Da fase mais longe (campeão) para a primeira; o playoff fica entre as quartas e a primeira fase.</summary>
+    public static int Ordem(FasePremiacao fase) => fase switch
+    {
+        FasePremiacao.Playoff => 45,
+        _ => (int)fase * 10
     };
 
     /// <summary>"3º lugar" para uma posição só, "4º ao 1º" para uma faixa, "3º em diante" quando é aberta.</summary>

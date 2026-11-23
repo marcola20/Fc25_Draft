@@ -24,7 +24,12 @@ public record LigaDto(
     int? VagasDiretas = null,
     int? VagasPlayoff = null,
     Guid? ConfrontoFinalTimeAId = null,
-    Guid? ConfrontoFinalTimeBId = null);
+    Guid? ConfrontoFinalTimeBId = null,
+    FormatoCopa FormatoCopa = FormatoCopa.Grupos)
+{
+    /// <summary>Copa com fase de liga (tabela única) em vez de grupos.</summary>
+    public bool FaseDeLiga => Tipo == TipoCompetition.Copa && FormatoCopa == FormatoCopa.FaseDeLiga;
+}
 
 /// <summary>
 /// Uma edição de competição (atual ou já encerrada) com o resumo do que ela teve —
@@ -314,6 +319,43 @@ public record LigaCopaSorteioDto(
 
 public record LigaCopaPotesRequest(IReadOnlyDictionary<Guid, int> PotePorTime);
 
+/// <summary>
+/// Um time no ranking do sorteio da fase de liga: a posição geral na temporada anterior (Série A
+/// primeiro, depois a Série B) e o quanto a Copa o fez subir.
+/// </summary>
+/// <param name="Ranking">1 = mais forte. Os 9 primeiros vão ao pote 1.</param>
+/// <param name="PosicaoGeral">Posição na liga somando as divisões (A: 1º a 10º, B: 11º a 18º); nulo se não jogou.</param>
+/// <param name="Origem">Ex.: "Série A 1º · Copa: quartas".</param>
+/// <param name="Bonus">Posições que a Copa anterior dá: campeão 4, vice 3, semifinal 2, quartas 1.</param>
+public record CopaRankingTimeDto(
+    int Ranking,
+    Guid TimeId,
+    string TimeNome,
+    int? PosicaoGeral,
+    string Origem,
+    int Bonus,
+    int Pote);
+
+public record CopaJogoSorteadoDto(int Rodada, Guid CasaId, string CasaNome, Guid ForaId, string ForaNome);
+
+/// <summary>Sorteio da fase de liga da Copa: ranking, potes e os jogos (vazio antes de sortear).</summary>
+public record CopaFaseDeLigaSorteioDto(
+    Guid LigaId,
+    int TemporadaDoRanking,
+    bool JaSorteada,
+    bool PodeSortear,
+    string? Impedimento,
+    IReadOnlyList<CopaRankingTimeDto> Ranking,
+    IReadOnlyList<CopaJogoSorteadoDto> Jogos)
+{
+    /// <summary>Média da posição no ranking dos 4 adversários de cada time.</summary>
+    public IReadOnlyDictionary<Guid, double> MediaDosAdversarios => Ranking.Count == 0 || Jogos.Count == 0
+        ? new Dictionary<Guid, double>()
+        : Utilities.SorteioFaseDeLiga.MediaDosAdversarios(
+            Jogos.Select(j => new Utilities.JogoDaFaseDeLiga(j.Rodada, j.CasaId, j.ForaId)),
+            Ranking.ToDictionary(r => r.TimeId, r => r.Ranking));
+}
+
 /// <summary>Grupo de cada time inscrito na Copa (quem não aparece fica fora).</summary>
 public record LigaConfigurarGruposRequest(IReadOnlyDictionary<Guid, GrupoCopa> GrupoPorTime);
 
@@ -482,7 +524,8 @@ public record TimeTemporadaCompeticaoDto(
     int GolsPro,
     int GolsContra,
     int SaldoGols,
-    string? FaseLabel);
+    string? FaseLabel,
+    bool FaseDeLiga = false);
 
 public record TimeTemporadaJogadorDto(
     int JogadorId,

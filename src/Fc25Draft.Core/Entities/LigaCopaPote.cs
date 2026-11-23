@@ -10,6 +10,12 @@ public class LigaCopaPote
     /// <summary>Número do pote (1, 2, 3...).</summary>
     public int Pote { get; set; }
 
+    /// <summary>
+    /// Copa em fase de liga: a posição do time no ranking do sorteio (1 = mais forte). Define a meta da
+    /// diretoria na Copa. Nulo nos sorteios de grupos.
+    /// </summary>
+    public int? Ranking { get; set; }
+
     public Liga Liga { get; set; } = null!;
     public Team Time { get; set; } = null!;
 }

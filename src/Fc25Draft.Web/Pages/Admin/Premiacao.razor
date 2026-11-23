@@ -306,7 +306,7 @@
         public int? PosicaoAte { get; set; }
         public FasePremiacao? Fase { get; set; }
         public decimal ValorEmMilhoes { get; set; }
-        public int Ordem => Fase is FasePremiacao f ? (int)f : PosicaoDe ?? 0;
+        public int Ordem => Fase is FasePremiacao f ? PremiacaoLabels.Ordem(f) : PosicaoDe ?? 0;
         public decimal Valor => ValorEmMilhoes * 1_000_000m;
     }
 

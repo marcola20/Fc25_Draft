@@ -377,7 +377,7 @@
         var itens = _premiacao?.Da(tipo, null) ?? Array.Empty<PremiacaoItemDto>();
 
         return itens
-            .OrderBy(i => i.Fase ?? 0)
+            .OrderBy(i => i.Fase is FasePremiacao f ? PremiacaoLabels.Ordem(f) : 0)
             .Select(i =>
             {
                 var fase = i.Fase ?? FasePremiacao.Campeao;
@@ -404,6 +404,7 @@
         FasePremiacao.Vice => "medal",
         FasePremiacao.Semifinal => "swords",
         FasePremiacao.Quartas => "flag",
+        FasePremiacao.Playoff => "shuffle",
         _ => "list"
     };
 
@@ -412,6 +413,7 @@
         FasePremiacao.Campeao or FasePremiacao.Vice => "1 time",
         FasePremiacao.Semifinal => "2 times",
         FasePremiacao.Quartas => "4 times",
+        FasePremiacao.Playoff => "4 times",
         _ => null
     };
 

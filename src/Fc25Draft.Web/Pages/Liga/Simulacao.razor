@@ -112,7 +112,11 @@
                 @if (_liga.Tipo == TipoCompetition.Copa)
                 {
                     <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
-                        <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-titulo"></span>Avança (1º-2º do grupo)</span>
+                        <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-titulo"></span>@CopaTabela.Rotulo(CopaTabela.Faixa.Quartas, FaseDeLiga)</span>
+                        @if (FaseDeLiga)
+                        {
+                            <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-playoff-acesso"></span>@CopaTabela.Rotulo(CopaTabela.Faixa.Playoff, true)</span>
+                        }
                         <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-rebaixamento"></span>Eliminado</span>
                         <span class="d-inline-flex align-items-center gap-2"><span class="legenda-cor zona-empate"></span>Empatados (Pts, V e SG): jogo decisivo</span>
                     </div>
@@ -408,15 +412,16 @@
         var resultado = new List<TimeSim>(todos.Count);
         foreach (var grupo in GruposDaCopa())
         {
-            var doGrupo = LigaDesempate.Ordenar(
-                todos.Where(t => t.Grupo == grupo), tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
+            var doGrupo = FaseDeLiga
+                ? LigaDesempate.OrdenarFaseDeLiga(todos.Where(t => t.Grupo == grupo), t => t.TimeId, TimeSim.Stats, _decisivos)
+                : LigaDesempate.Ordenar(todos.Where(t => t.Grupo == grupo), tipo, t => t.TimeId, TimeSim.Stats, confrontos, _decisivos);
 
-            var posicoes = LigaDesempate.PosicoesCopa(doGrupo, t => t.TimeId, TimeSim.Stats, _decisivos);
+            var posicoes = CopaTabela.Posicoes(doGrupo, FaseDeLiga, t => t.TimeId, TimeSim.Stats, _decisivos);
             for (int i = 0; i < doGrupo.Count; i++)
             {
                 doGrupo[i].Posicao = posicoes[i];
                 doGrupo[i].Ordem = i + 1;
-                doGrupo[i].EmDecisao = posicoes.Count(x => x == posicoes[i]) > 1;
+                doGrupo[i].EmDecisao = CopaTabela.EmDecisao(posicoes, i, FaseDeLiga);
             }
 
             resultado.AddRange(doGrupo);
@@ -425,6 +430,8 @@
         resultado.AddRange(todos.Where(t => t.Grupo is null));
         return resultado;
     }
+
+    private bool FaseDeLiga => _liga?.FaseDeLiga == true;
 
     /// <summary>Grupos que a competição realmente tem (a Copa pode ter 2 ou 4).</summary>
     private IEnumerable<GrupoCopa> GruposDaCopa() =>
@@ -442,7 +449,7 @@
         foreach (var grupo in GruposDaCopa())
         {
             var doGrupo = _tabela.Where(t => t.Grupo == grupo).ToList();
-            if (doGrupo.Count > 0) yield return ($"Grupo {grupo}", doGrupo);
+            if (doGrupo.Count > 0) yield return (FaseDeLiga ? "Fase de liga" : $"Grupo {grupo}", doGrupo);
         }
     }
 
@@ -476,7 +483,7 @@
     private string RowClass(TimeSim t)
     {
         if (_liga?.Tipo == TipoCompetition.Copa)
-            return t.EmDecisao ? "table-primary" : t.Posicao <= 2 ? "table-success" : "table-danger";
+            return CopaTabela.ClasseDaLinha(t.Posicao, t.EmDecisao, FaseDeLiga);
 
         // Liga: campeão e, com Série A e B na temporada, as zonas de acesso/playoff/rebaixamento.
         return t.EmDecisao ? ZonaEstilo.LinhaEmpateTopo : ZonaEstilo.Linha(LigaZonas.Zona(_regra, t.Posicao, _tabela.Count));
@@ -485,7 +492,12 @@
     private string BadgeClass(TimeSim t)
     {
         if (_liga?.Tipo == TipoCompetition.Copa)
-            return t.EmDecisao ? ZonaEstilo.BadgeEmpateTopo : t.Posicao <= 2 ? "num-posicao zona-titulo" : "num-posicao zona-rebaixamento";
+            return t.EmDecisao ? ZonaEstilo.BadgeEmpateTopo : CopaTabela.FaixaDa(t.Posicao, FaseDeLiga) switch
+            {
+                CopaTabela.Faixa.Quartas => "num-posicao zona-titulo",
+                CopaTabela.Faixa.Playoff => "num-posicao zona-playoff-acesso",
+                _ => "num-posicao zona-rebaixamento"
+            };
 
         return t.EmDecisao ? ZonaEstilo.BadgeEmpateTopo : ZonaEstilo.Badge(LigaZonas.Zona(_regra, t.Posicao, _tabela.Count));
     }

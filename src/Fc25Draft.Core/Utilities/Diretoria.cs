@@ -188,11 +188,21 @@ public static class Diretoria
         return limite >= 1 ? limite : totalTimes;
     }
 
-    public static FasePremiacao? MetaDaCopa(int pote) => pote switch
+    /// <summary>
+    /// Meta na Copa. Com grupos, pelo pote (pote 1 semifinal, pote 2 quartas). Na fase de liga os potes
+    /// são só dois, então vale o ranking do sorteio: 1º ao 4º semifinal, 5º ao 8º quartas, como antes.
+    /// </summary>
+    public static FasePremiacao? MetaDaCopa(int pote, int? rankingNaFaseDeLiga = null) => rankingNaFaseDeLiga switch
     {
-        1 => DiretoriaCriterios.MetaPote1,
-        2 => DiretoriaCriterios.MetaPote2,
-        _ => null
+        int r when r <= 4 => DiretoriaCriterios.MetaPote1,
+        int r when r <= 8 => DiretoriaCriterios.MetaPote2,
+        int => null,
+        null => pote switch
+        {
+            1 => DiretoriaCriterios.MetaPote1,
+            2 => DiretoriaCriterios.MetaPote2,
+            _ => null
+        }
     };
 
     /// <summary>

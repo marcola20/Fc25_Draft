@@ -211,6 +211,7 @@ public partial class ResultadoPesService : IResultadoPesService
         FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "quartas de final",
         FaseKnockout.Semi1 or FaseKnockout.Semi2 => "semifinal",
         FaseKnockout.Final => "final",
+        _ when FasesKnockout.EhPlayoff(fase) => "playoff da Copa",
         _ => "play-in"
     };
 

@@ -35,11 +35,18 @@ internal static class CalendarioDaTemporada
         var rodadasGrupoCopa = await db.LigaRodadas
             .CountAsync(r => r.Liga.Temporada == temporada && r.Liga.Tipo == TipoCompetition.Copa && r.Numero > 0 && !r.Desempate, ct);
 
+        // Copa ainda não criada: a nova nasce em fase de liga.
+        var formatoDaCopa = await db.Ligas.AsNoTracking()
+            .Where(l => l.Temporada == temporada && l.Tipo == TipoCompetition.Copa)
+            .Select(l => (FormatoCopa?)l.FormatoCopa)
+            .FirstOrDefaultAsync(ct) ?? FormatoCopa.FaseDeLiga;
+
         return CalendarioTemporada.Montar(
             abertura,
             rodadasSerieA > 0 ? rodadasSerieA : 9,
             rodadasSerieB,
-            rodadasGrupoCopa > 0 ? rodadasGrupoCopa : 4);
+            rodadasGrupoCopa > 0 ? rodadasGrupoCopa : 4,
+            formatoDaCopa == FormatoCopa.FaseDeLiga);
     }
 
     /// <summary>

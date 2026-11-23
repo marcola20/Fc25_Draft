@@ -6,6 +6,12 @@ namespace Fc25Draft.Web.Services;
 /// <summary>Um time saindo do pote para o grupo, na ordem em que aparece no sorteio ao vivo.</summary>
 public sealed record CopaSorteioRevelacao(int Ordem, int Pote, GrupoCopa Grupo, Guid TimeId, string TimeNome);
 
+/// <summary>Um adversário de um time na fase de liga: rodada e se o time joga em casa.</summary>
+public sealed record CopaAdversarioSorteado(int Rodada, Guid TimeId, string TimeNome, bool EmCasa);
+
+/// <summary>Fase de liga: um time revelado com os seus 4 adversários.</summary>
+public sealed record CopaSorteioDoTime(int Ordem, int Pote, int Ranking, Guid TimeId, string TimeNome, IReadOnlyList<CopaAdversarioSorteado> Adversarios);
+
 public sealed class CopaSorteioAoVivo
 {
     public required Guid LigaId { get; init; }
@@ -14,10 +20,18 @@ public sealed class CopaSorteioAoVivo
     public required IReadOnlyList<CopaSorteioRevelacao> Sequencia { get; init; }
     public required TimeSpan Intervalo { get; init; }
 
+    /// <summary>Copa em fase de liga: a revelação é time a time com os adversários (e não grupo a grupo).</summary>
+    public IReadOnlyList<CopaSorteioDoTime>? FaseDeLiga { get; init; }
+
     public int Reveladas { get; set; }
     public DateTime? ProximaEmUtc { get; set; }
 
-    public bool Terminado => Reveladas >= Sequencia.Count;
+    public int Total => FaseDeLiga?.Count ?? Sequencia.Count;
+    public bool Terminado => Reveladas >= Total;
+    public CopaSorteioDoTime? UltimoTime => FaseDeLiga is not null && Reveladas > 0 ? FaseDeLiga[Reveladas - 1] : null;
+
+    /// <summary>Fase de liga: se o time já saiu do pote.</summary>
+    public bool JaRevelado(Guid timeId) => FaseDeLiga?.Take(Reveladas).Any(t => t.TimeId == timeId) == true;
     public IEnumerable<CopaSorteioRevelacao> JaReveladas => Sequencia.Take(Reveladas);
     public CopaSorteioRevelacao? Ultima => Reveladas > 0 ? Sequencia[Reveladas - 1] : null;
     public CopaSorteioRevelacao? Proxima => Terminado ? null : Sequencia[Reveladas];
@@ -67,11 +81,8 @@ public sealed class CopaSorteioAoVivoService : IDisposable
         return sequencia;
     }
 
-    public void Iniciar(Guid ligaId, string ligaNome, LigaCopaSorteioDto sorteio, TimeSpan intervalo)
-    {
-        CancelarLoop();
-
-        var estado = new CopaSorteioAoVivo
+    public void Iniciar(Guid ligaId, string ligaNome, LigaCopaSorteioDto sorteio, TimeSpan intervalo) =>
+        Comecar(new CopaSorteioAoVivo
         {
             LigaId = ligaId,
             LigaNome = ligaNome,
@@ -79,7 +90,45 @@ public sealed class CopaSorteioAoVivoService : IDisposable
             Sequencia = MontarSequencia(sorteio),
             Intervalo = intervalo,
             ProximaEmUtc = DateTime.UtcNow + intervalo
-        };
+        });
+
+    /// <summary>
+    /// Fase de liga: os jogos já estão gravados; a tela revela o pote 1 (em ordem sorteada) e depois o
+    /// pote 2, cada time com os seus 4 adversários.
+    /// </summary>
+    public void IniciarFaseDeLiga(Guid ligaId, string ligaNome, CopaFaseDeLigaSorteioDto sorteio, TimeSpan intervalo) =>
+        Comecar(new CopaSorteioAoVivo
+        {
+            LigaId = ligaId,
+            LigaNome = ligaNome,
+            TamanhosDosGrupos = Array.Empty<int>(),
+            Sequencia = Array.Empty<CopaSorteioRevelacao>(),
+            FaseDeLiga = MontarSequenciaFaseDeLiga(sorteio),
+            Intervalo = intervalo,
+            ProximaEmUtc = DateTime.UtcNow + intervalo
+        });
+
+    public static List<CopaSorteioDoTime> MontarSequenciaFaseDeLiga(CopaFaseDeLigaSorteioDto sorteio)
+    {
+        var ordem = 0;
+        return sorteio.Ranking
+            .GroupBy(r => r.Pote).OrderBy(p => p.Key)
+            .SelectMany(p => p.OrderBy(_ => Random.Shared.Next()))
+            .Select(r => new CopaSorteioDoTime(
+                ++ordem, r.Pote, r.Ranking, r.TimeId, r.TimeNome,
+                sorteio.Jogos
+                    .Where(j => j.CasaId == r.TimeId || j.ForaId == r.TimeId)
+                    .OrderBy(j => j.Rodada)
+                    .Select(j => j.CasaId == r.TimeId
+                        ? new CopaAdversarioSorteado(j.Rodada, j.ForaId, j.ForaNome, true)
+                        : new CopaAdversarioSorteado(j.Rodada, j.CasaId, j.CasaNome, false))
+                    .ToList()))
+            .ToList();
+    }
+
+    private void Comecar(CopaSorteioAoVivo estado)
+    {
+        CancelarLoop();
 
         var cts = new CancellationTokenSource();
         lock (_lock)
@@ -124,7 +173,7 @@ public sealed class CopaSorteioAoVivoService : IDisposable
         lock (_lock)
         {
             if (Estado is null) return;
-            Estado.Reveladas = Estado.Sequencia.Count;
+            Estado.Reveladas = Estado.Total;
             Estado.ProximaEmUtc = null;
         }
         Notificar();

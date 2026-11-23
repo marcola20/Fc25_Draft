@@ -39,7 +39,7 @@
             <div class="liga-titulo">
                 <h1>@_liga.Nome</h1>
                 <p>
-                    @LigaLabels.Status(_liga.Status, _liga.Tipo)
+                    @LigaLabels.Status(_liga.Status, _liga.Tipo, _liga.FaseDeLiga)
                     @if (_liga.Status == LigaStatus.Encerrada && !string.IsNullOrWhiteSpace(CampeaoDaEdicao))
                     {
                         <span class="liga-campeao"><Icone Nome="trophy" Tamanho="14" Classe="text-acento" /> Campeão: <strong>@CampeaoDaEdicao</strong></span>
@@ -153,11 +153,12 @@
             else if (_liga.Tipo == TipoCompetition.Copa)
             {
                 var itensGrupo = OrdenarGrupo(_grupoSelecionado);
-                var posicoesGrupo = LigaDesempate.PosicoesCopa(itensGrupo, c => c.TimeId, CopaStats, _decisivos);
+                var posicoesGrupo = CopaTabela.Posicoes(itensGrupo, FaseDeLiga, c => c.TimeId, CopaStats, _decisivos);
+                var nomeDoGrupo = FaseDeLiga ? "Fase de liga" : $"Grupo {_grupoSelecionado}";
 
-                <!-- Copa: seletor de grupo -->
+                <!-- Copa: seletor de grupo (a fase de liga é uma tabela só) -->
                 <div class="mb-3 d-flex gap-2 flex-wrap">
-                    @foreach (var grupo in GruposDaCopa())
+                    @foreach (var grupo in FaseDeLiga ? Enumerable.Empty<GrupoCopa>() : GruposDaCopa())
                     {
                         var atual = grupo;
                         <button class="btn @(_grupoSelecionado == atual ? "btn-primary" : "btn-outline-primary")" @onclick="() => _grupoSelecionado = atual">
@@ -175,8 +176,8 @@
                 {
                     <ShareableCard Id="cap-tabela-copa"
                                    Titulo="@LigaNome"
-                                   Subtitulo='@($"Classificação — Grupo {_grupoSelecionado}")'
-                                   Arquivo='@($"cbfv-grupo-{_grupoSelecionado}.png")'
+                                   Subtitulo='@($"Classificação — {nomeDoGrupo}")'
+                                   Arquivo='@(FaseDeLiga ? "cbfv-copa-fase-de-liga.png" : $"cbfv-grupo-{_grupoSelecionado}.png")'
                                    MostrarBotao="false"
                                    @ref="_classifCardRef">
                         <div class="table-responsive painel mb-3">
@@ -197,9 +198,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = posicoesGrupo[i], EmDecisao = posicoesGrupo.Count(p => p == posicoesGrupo[i]) > 1 }))
+                                    @foreach (var item in itensGrupo.Select((x, i) => new { Item = x, Position = posicoesGrupo[i], EmDecisao = CopaTabela.EmDecisao(posicoesGrupo, i, FaseDeLiga) }))
                                     {
-                                        <tr class="@CopaRowClass(item.Position, item.EmDecisao)" title="@(item.EmDecisao ? "Empate em Pontos, Vitórias e Saldo de Gols — decidido em jogo decisivo" : null)">
+                                        <tr class="@CopaRowClass(item.Position, item.EmDecisao)" title="@(item.EmDecisao ? CopaTabela.RotuloEmpate(FaseDeLiga) : null)">
                                             <td><span class="@CopaBadgeClass(item.Position, item.EmDecisao)">@item.Position</span></td>
                                             <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                                 <img src="@EscudoUrl(item.Item.TimeNome)" alt="" width="22" height="22" class="escudo-tabela" onerror="this.src='/images/escudos/escudo.png'" />
@@ -223,9 +224,13 @@
                         </div>
 
                         <div class="d-flex flex-wrap gap-3 mt-2 small text-muted">
-                            <span><span class="badge bg-success me-1">●</span> Avança (1º-2º)</span>
+                            <span><span class="badge bg-success me-1">●</span> @CopaTabela.Rotulo(CopaTabela.Faixa.Quartas, FaseDeLiga)</span>
+                            @if (FaseDeLiga)
+                            {
+                                <span><span class="badge bg-warning me-1">●</span> @CopaTabela.Rotulo(CopaTabela.Faixa.Playoff, true)</span>
+                            }
                             <span><span class="badge bg-danger me-1">●</span> Eliminado</span>
-                            <span><span class="badge bg-primary me-1">●</span> Empatados (Pts, V e SG) — jogo decisivo</span>
+                            <span><span class="badge bg-primary me-1">●</span> @CopaTabela.RotuloEmpate(FaseDeLiga)</span>
                         </div>
                     </ShareableCard>
                 }
@@ -523,6 +528,21 @@
                         if (jogo is not null)
                         {
                             <div class="col-12 col-md-4"><KnockoutCard Jogo="jogo" OnClick="AbrirJogoKnockout" /></div>
+                        }
+                    }
+                </div>
+                }
+
+                @if (_knockoutJogos.Any(j => FasesKnockout.EhPlayoff(j.Fase)))
+                {
+                <div class="secao-titulo"><h2>Playoff</h2></div>
+                <div class="row g-3 mb-4">
+                    @foreach (var fase in new[] { FaseKnockout.PO1, FaseKnockout.PO2, FaseKnockout.PO3, FaseKnockout.PO4 })
+                    {
+                        var jogo = _knockoutJogos.FirstOrDefault(j => j.Fase == fase);
+                        if (jogo is not null)
+                        {
+                            <div class="col-12 col-md-3"><KnockoutCard Jogo="jogo" OnClick="AbrirJogoKnockout" /></div>
                         }
                     }
                 </div>
@@ -1724,25 +1744,28 @@
 
     // A ordem do grupo é derivada dos próprios critérios, e não da posição gravada,
     // para a tabela já refletir o desempate mesmo antes do próximo recálculo.
+    private bool FaseDeLiga => _liga?.FaseDeLiga == true;
+
     private List<LigaClassificacaoItemDto> OrdenarGrupo(GrupoCopa grupo) =>
-        LigaDesempate.Ordenar(
-            _classif.Where(c => c.Grupo == grupo),
-            TipoCompetition.Copa,
-            c => c.TimeId,
-            CopaStats,
-            Array.Empty<ConfrontoDireto>(),
-            _decisivos);
+        CopaTabela.Ordenar(_classif!.Where(c => c.Grupo == grupo), FaseDeLiga, c => c.TimeId, CopaStats, _decisivos);
 
     // Copa: Pontos → Vitórias → Saldo de Gols. Empatados nos três dividem a posição
     // e decidem a vaga em jogo decisivo — linha azul.
     private static DesempateStats CopaStats(LigaClassificacaoItemDto c) =>
         new(c.Pontos, c.Vitorias, c.SaldoGols, c.GolsPro);
 
-    private static string CopaRowClass(int pos, bool emDecisao) =>
-        emDecisao ? ZonaEstilo.LinhaEmpateTopo : pos <= 2 ? "linha-zona zona-titulo" : "linha-zona zona-rebaixamento";
+    private string CopaZona(int pos) => CopaTabela.FaixaDa(pos, FaseDeLiga) switch
+    {
+        CopaTabela.Faixa.Quartas => "zona-titulo",
+        CopaTabela.Faixa.Playoff => "zona-playoff-acesso",
+        _ => "zona-rebaixamento"
+    };
 
-    private static string CopaBadgeClass(int pos, bool emDecisao) =>
-        emDecisao ? ZonaEstilo.BadgeEmpateTopo : pos <= 2 ? "num-posicao zona-titulo" : "num-posicao zona-rebaixamento";
+    private string CopaRowClass(int pos, bool emDecisao) =>
+        emDecisao ? ZonaEstilo.LinhaEmpateTopo : $"linha-zona {CopaZona(pos)}";
+
+    private string CopaBadgeClass(int pos, bool emDecisao) =>
+        emDecisao ? ZonaEstilo.BadgeEmpateTopo : $"num-posicao {CopaZona(pos)}";
 
     private static string EscudoUrl(string? teamName)
     {

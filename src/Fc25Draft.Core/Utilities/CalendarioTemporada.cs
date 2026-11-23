@@ -36,13 +36,14 @@ public static class CalendarioTemporada
     public const DayOfWeek DiaDaSerieB = DayOfWeek.Tuesday, DiaDaSerieA = DayOfWeek.Thursday, DiaDaCopa = DayOfWeek.Saturday;
 
     /// <summary>Detalhe das datas do mata-mata da Copa (que não têm número de rodada).</summary>
-    public const string QuartasDaCopa = "Quartas de final", SemifinaisDaCopa = "Semifinais", FinalDaCopa = "Final";
+    public const string PlayoffDaCopa = "Playoff", QuartasDaCopa = "Quartas de final", SemifinaisDaCopa = "Semifinais", FinalDaCopa = "Final";
 
     public static IReadOnlyList<DataDaTemporada> Montar(
         DateTime abertura,
         int rodadasSerieA = 9,
         int rodadasSerieB = 7,
-        int rodadasGrupoCopa = 4)
+        int rodadasGrupoCopa = 4,
+        bool copaEmFaseDeLiga = false)
     {
         var datas = new List<DataDaTemporada>();
         void Add(DateTime dia, TipoCompetition? tipo, Divisao? divisao, int? rodada, string titulo, string detalhe,
@@ -63,7 +64,9 @@ public static class CalendarioTemporada
 
         // Datas da Copa na ordem em que acontecem, uma por sábado.
         var daCopa = new Queue<(string Titulo, string Detalhe, int? Rodada)>();
-        for (int g = 1; g <= rodadasGrupoCopa; g++) daCopa.Enqueue(("Copa", $"Rodada {g} · grupos", g));
+        var primeiraFase = copaEmFaseDeLiga ? "fase de liga" : "grupos";
+        for (int g = 1; g <= rodadasGrupoCopa; g++) daCopa.Enqueue(("Copa", $"Rodada {g} · {primeiraFase}", g));
+        if (copaEmFaseDeLiga) daCopa.Enqueue(("Copa", PlayoffDaCopa, null));
         daCopa.Enqueue(("Copa", QuartasDaCopa, null));
         daCopa.Enqueue(("Copa", SemifinaisDaCopa, null));
         daCopa.Enqueue(("Copa", FinalDaCopa, null));

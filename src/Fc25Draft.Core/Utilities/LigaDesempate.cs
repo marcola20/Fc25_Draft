@@ -376,6 +376,61 @@ public static class LigaDesempate
         return posicoes;
     }
 
+    /// <summary>Linhas da fase de liga da Copa: até o 4º vai às quartas, até o 12º joga o playoff.</summary>
+    public static readonly IReadOnlyList<int> LinhasDaFaseDeLiga = new[] { 4, 12 };
+
+    /// <summary>Empate na fase de liga da Copa: Pontos, Vitórias, Saldo e Gols Pró iguais.</summary>
+    public static bool EmpatadosNaFaseDeLiga(DesempateStats a, DesempateStats b) =>
+        EmpatadosNaCopa(a, b) && a.GolsPro == b.GolsPro;
+
+    /// <summary>
+    /// Tabela da fase de liga da Copa: Pontos → Vitórias → Saldo → Gols Pró. Empatados em tudo ficam
+    /// numa ordem fixa, e o jogo decisivo (exigido só quando o empate cai numa linha) põe o vencedor na frente.
+    /// </summary>
+    public static List<T> OrdenarFaseDeLiga<T>(
+        IEnumerable<T> itens, Func<T, Guid> timeId, Func<T, DesempateStats> stats, JogosDecisivos? decisivos = null)
+    {
+        var porCriterio = itens
+            .OrderByDescending(x => stats(x).Pontos)
+            .ThenByDescending(x => stats(x).Vitorias)
+            .ThenByDescending(x => stats(x).SaldoGols)
+            .ThenByDescending(x => stats(x).GolsPro)
+            .ThenBy(timeId)
+            .ToList();
+
+        return decisivos is null
+            ? porCriterio
+            : PorBloco(porCriterio, (a, b) => EmpatadosNaFaseDeLiga(stats(a), stats(b)),
+                bloco => OrdenarPorJogoDecisivo(bloco, timeId, decisivos));
+    }
+
+    /// <summary>Numeração da fase de liga já ordenada: empatados em tudo dividem a posição, salvo jogo decisivo.</summary>
+    public static List<int> PosicoesFaseDeLiga<T>(
+        IReadOnlyList<T> ordenados, Func<T, Guid> timeId, Func<T, DesempateStats> stats, JogosDecisivos? decisivos = null)
+    {
+        var posicoes = new List<int>(ordenados.Count);
+        for (int i = 0; i < ordenados.Count; i++)
+        {
+            var empatadoComAnterior = i > 0
+                && EmpatadosNaFaseDeLiga(stats(ordenados[i]), stats(ordenados[i - 1]))
+                && decisivos?.Decidiu(timeId(ordenados[i]), timeId(ordenados[i - 1])) != true;
+            posicoes.Add(empatadoComAnterior ? posicoes[i - 1] : i + 1);
+        }
+        return posicoes;
+    }
+
+    /// <summary>
+    /// Se a dupla vizinha (posições <paramref name="i"/> e i+1 da lista) está num empate que atravessa
+    /// uma linha da fase de liga: o bloco de empatados começa antes da linha e termina depois dela.
+    /// </summary>
+    public static bool EmpateNaLinha(IReadOnlyList<int> posicoes, int i)
+    {
+        if (i + 1 >= posicoes.Count || posicoes[i] != posicoes[i + 1]) return false;
+        var inicio = posicoes[i];
+        var fim = posicoes.Select((p, idx) => (p, idx)).Where(x => x.p == inicio).Max(x => x.idx) + 1;
+        return LinhasDaFaseDeLiga.Any(linha => inicio <= linha && fim > linha);
+    }
+
     /// <summary>Aplica <paramref name="resolver"/> a cada bloco de times empatados em Pts/V/SG.</summary>
     private static List<T> PorBlocoEmpatado<T>(
         List<T> ordenados,

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fc25Draft.Infra.Services;
 
-public class LigaAdminService : ILigaAdminService
+public partial class LigaAdminService : ILigaAdminService
 {
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
@@ -174,7 +174,13 @@ public class LigaAdminService : ILigaAdminService
             .OrderBy(g => g.Key)
             .ToDictionary(g => g.Key, g => g.Select(x => x.TimeId).ToList());
 
-        if (porGrupo.Count < 2 || porGrupo.Values.Any(t => t.Count < 2))
+        if (liga.FormatoCopa == FormatoCopa.FaseDeLiga)
+        {
+            // A fase de liga já sai do sorteio com as rodadas gravadas.
+            if (grupos.Count < 12 || !await _db.LigaRodadas.AnyAsync(r => r.LigaId == liga.LigaId, ct))
+                throw new InvalidOperationException("Faça o sorteio da fase de liga (aba Sortear Copa) antes de iniciar.");
+        }
+        else if (porGrupo.Count < 2 || porGrupo.Values.Any(t => t.Count < 2))
             throw new InvalidOperationException("A Copa precisa de pelo menos 2 grupos, com 2 times ou mais em cada.");
 
         // Classificação com grupo definido
@@ -1370,6 +1376,7 @@ public class LigaAdminService : ILigaAdminService
             FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => CalendarioTemporada.QuartasDaCopa,
             FaseKnockout.Semi1 or FaseKnockout.Semi2 => CalendarioTemporada.SemifinaisDaCopa,
             FaseKnockout.Final => CalendarioTemporada.FinalDaCopa,
+            _ when FasesKnockout.EhPlayoff(fase) => CalendarioTemporada.PlayoffDaCopa,
             _ => null
         };
         if (detalhe is null) return null;
@@ -1756,6 +1763,16 @@ public class LigaAdminService : ILigaAdminService
             .ToListAsync(ct);
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
+        var copa = await _db.Ligas.AsNoTracking().FirstAsync(x => x.LigaId == ligaId, ct);
+
+        if (copa.FormatoCopa == FormatoCopa.FaseDeLiga)
+        {
+            var tabela = OrdenarGrupoCopa(classifs, GrupoDaFaseDeLiga, decisivos, faseDeLiga: true).Select(c => c.TimeId).ToList();
+            _db.LigaKnockoutJogos.AddRange(ChaveDaFaseDeLiga(ligaId, tabela));
+            await _db.SaveChangesAsync(ct);
+            await AgendarJogosDoMataMataAsync(ligaId, ct);
+            return await GetKnockoutDtosAsync(ligaId, ct);
+        }
 
         var gruposDaCopa = classifs
             .Where(c => c.Grupo is not null)
@@ -1766,7 +1783,7 @@ public class LigaAdminService : ILigaAdminService
 
         var classificados = gruposDaCopa.ToDictionary(
             g => g,
-            g => OrdenarGrupoCopa(classifs, g, decisivos).Take(2).ToList());
+            g => OrdenarGrupoCopa(classifs, g, decisivos, faseDeLiga: false).Take(2).ToList());
 
         if (classificados.Values.Any(c => c.Count < 2))
             throw new InvalidOperationException("Precisa de ao menos 2 classificados por grupo.");
@@ -1847,14 +1864,22 @@ public class LigaAdminService : ILigaAdminService
 
     /// <summary>Grupo da Copa já ordenado pelos critérios e pelos jogos decisivos encerrados.</summary>
     private static List<LigaClassificacao> OrdenarGrupoCopa(
-        IEnumerable<LigaClassificacao> classifs, GrupoCopa grupo, JogosDecisivos decisivos) =>
-        LigaDesempate.Ordenar(
-            classifs.Where(c => c.Grupo == grupo),
-            TipoCompetition.Copa,
-            c => c.TimeId,
-            StatsDaClassificacao,
-            Array.Empty<ConfrontoDireto>(),
-            decisivos);
+        IEnumerable<LigaClassificacao> classifs, GrupoCopa grupo, JogosDecisivos decisivos, bool faseDeLiga) =>
+        faseDeLiga
+            ? LigaDesempate.OrdenarFaseDeLiga(classifs.Where(c => c.Grupo == grupo), c => c.TimeId, StatsDaClassificacao, decisivos)
+            : LigaDesempate.Ordenar(
+                classifs.Where(c => c.Grupo == grupo),
+                TipoCompetition.Copa,
+                c => c.TimeId,
+                StatsDaClassificacao,
+                Array.Empty<ConfrontoDireto>(),
+                decisivos);
+
+    /// <summary>Posições do grupo já ordenado (empatados dividem a posição, salvo jogo decisivo).</summary>
+    private static List<int> PosicoesGrupoCopa(List<LigaClassificacao> ordenados, JogosDecisivos decisivos, bool faseDeLiga) =>
+        faseDeLiga
+            ? LigaDesempate.PosicoesFaseDeLiga(ordenados, c => c.TimeId, StatsDaClassificacao, decisivos)
+            : LigaDesempate.PosicoesCopa(ordenados, c => c.TimeId, StatsDaClassificacao, decisivos);
 
     public async Task<IReadOnlyList<LigaEmpateCopaDto>> ListEmpatesCopaAsync(Guid ligaId, CancellationToken ct)
     {
@@ -1875,11 +1900,17 @@ public class LigaAdminService : ILigaAdminService
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
         var empates = new List<LigaEmpateCopaDto>();
+        var faseDeLiga = liga.FormatoCopa == FormatoCopa.FaseDeLiga;
+
+        // Na fase de liga só interessa o empate que cai numa linha (4º/5º e 12º/13º), e só depois de
+        // todos os jogos: antes disso a tabela ainda vai mudar.
+        var faseTerminou = !faseDeLiga || !await _db.LigaPartidas.AnyAsync(p =>
+            p.Rodada.LigaId == ligaId && p.Rodada.Numero > 0 && !p.Rodada.Desempate && p.Status != PartidaStatus.Encerrada, ct);
 
         foreach (var grupo in classifs.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g))
         {
-            var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos);
-            var posicoes = LigaDesempate.PosicoesCopa(doGrupo, c => c.TimeId, StatsDaClassificacao, decisivos);
+            var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos, faseDeLiga);
+            var posicoes = PosicoesGrupoCopa(doGrupo, decisivos, faseDeLiga);
 
             for (int i = 0; i + 1 < doGrupo.Count; i++)
             {
@@ -1892,6 +1923,7 @@ public class LigaAdminService : ILigaAdminService
 
                 // Interessa o empate ainda em aberto e também o que já virou jogo decisivo.
                 if (posicoes[i] != posicoes[i + 1] && partida is null) continue;
+                if (faseDeLiga && partida is null && (!faseTerminou || !LigaDesempate.EmpateNaLinha(posicoes, i))) continue;
 
                 var vencedorId = partida is null ? null : decisivos.VencedorEntre(a.TimeId, b.TimeId);
 
@@ -1942,7 +1974,12 @@ public class LigaAdminService : ILigaAdminService
         if (a.Grupo is null || a.Grupo != b.Grupo)
             throw new InvalidOperationException("Os dois times precisam ser do mesmo grupo.");
 
-        if (!LigaDesempate.EmpatadosNaCopa(StatsDaClassificacao(a), StatsDaClassificacao(b)))
+        if (liga.FormatoCopa == FormatoCopa.FaseDeLiga)
+        {
+            if (!LigaDesempate.EmpatadosNaFaseDeLiga(StatsDaClassificacao(a), StatsDaClassificacao(b)))
+                throw new InvalidOperationException("Os times não estão empatados em Pontos, Vitórias, Saldo e Gols Pró.");
+        }
+        else if (!LigaDesempate.EmpatadosNaCopa(StatsDaClassificacao(a), StatsDaClassificacao(b)))
             throw new InvalidOperationException("Os times não estão empatados em Pontos, Vitórias e Saldo de Gols.");
 
         var partidaId = await AdicionarJogoDecisivoAsync(liga, timeAId, timeBId, ct);
@@ -2213,11 +2250,26 @@ public class LigaAdminService : ILigaAdminService
 
         var decisivos = await CarregarJogosDecisivosAsync(ligaId, ct);
 
+        if (await _db.Ligas.AnyAsync(l => l.LigaId == ligaId && l.FormatoCopa == FormatoCopa.FaseDeLiga, ct))
+        {
+            // Fase de liga: só o empate que cai numa linha (4º/5º, 12º/13º) precisa do jogo decisivo.
+            var tabela = OrdenarGrupoCopa(classifs, GrupoDaFaseDeLiga, decisivos, faseDeLiga: true);
+            var posicoesNaTabela = PosicoesGrupoCopa(tabela, decisivos, faseDeLiga: true);
+            for (int i = 0; i + 1 < tabela.Count; i++)
+            {
+                if (!LigaDesempate.EmpateNaLinha(posicoesNaTabela, i)) continue;
+                throw new InvalidOperationException(
+                    $"Fase de liga: {tabela[i].Time.TeamName} e {tabela[i + 1].Time.TeamName} estão empatados em Pontos, " +
+                    $"Vitórias, Saldo e Gols Pró na linha do {posicoesNaTabela[i]}º lugar. Crie e encerre o jogo decisivo antes de encerrar a fase.");
+            }
+            return;
+        }
+
         // Empate dentro da faixa que decide a vaga (1º-2º) deixaria o mata-mata indefinido.
         foreach (var grupo in classifs.Where(c => c.Grupo is not null).Select(c => c.Grupo!.Value).Distinct().OrderBy(g => g))
         {
-            var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos);
-            var posicoes = LigaDesempate.PosicoesCopa(doGrupo, c => c.TimeId, StatsDaClassificacao, decisivos);
+            var doGrupo = OrdenarGrupoCopa(classifs, grupo, decisivos, faseDeLiga: false);
+            var posicoes = PosicoesGrupoCopa(doGrupo, decisivos, faseDeLiga: false);
 
             for (int i = 0; i + 1 < doGrupo.Count && posicoes[i] <= 2; i++)
             {
@@ -2452,6 +2504,12 @@ public class LigaAdminService : ILigaAdminService
     {
         var perdedorId = jogo.TimeCasaId == vencedorId ? jogo.TimeForaId!.Value : jogo.TimeCasaId!.Value;
 
+        if (QuartasDoPlayoff(jogo.Fase) is FaseKnockout quartas)
+        {
+            await SetKnockoutSlotAsync(jogo.LigaId, quartas, timeForaId: vencedorId, ct: ct);
+            return;
+        }
+
         switch (jogo.Fase)
         {
             case FaseKnockout.PlayIn_A:
@@ -2666,8 +2724,9 @@ public class LigaAdminService : ILigaAdminService
             resultado = new List<LigaClassificacao>(classifs.Count);
             foreach (var grupo in classifs.Select(c => c.Grupo).Distinct().OrderBy(g => g))
             {
-                resultado.AddRange(LigaDesempate.Ordenar(
-                    classifs.Where(c => c.Grupo == grupo), liga.Tipo, c => c.TimeId, Stats, confrontos, decisivos));
+                resultado.AddRange(liga.FormatoCopa == FormatoCopa.FaseDeLiga
+                    ? LigaDesempate.OrdenarFaseDeLiga(classifs.Where(c => c.Grupo == grupo), c => c.TimeId, Stats, decisivos)
+                    : LigaDesempate.Ordenar(classifs.Where(c => c.Grupo == grupo), liga.Tipo, c => c.TimeId, Stats, confrontos, decisivos));
             }
         }
         else
@@ -2801,10 +2860,10 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.TimeFora)
             .Include(x => x.Vencedor)
             .Include(x => x.Partida)
-            .OrderBy(x => x.Fase)
+            .Include(x => x.Liga)
             .ToListAsync(ct);
 
-        return jogos.Select(ToKnockoutJogoDto).ToArray();
+        return jogos.OrderBy(x => FasesKnockout.Ordem(x.Fase)).Select(ToKnockoutJogoDto).ToArray();
     }
 
     private async Task<LigaKnockoutJogoDto> GetKnockoutJogoDtoAsync(Guid knockoutJogoId, CancellationToken ct)
@@ -2815,6 +2874,7 @@ public class LigaAdminService : ILigaAdminService
             .Include(x => x.TimeFora)
             .Include(x => x.Vencedor)
             .Include(x => x.Partida)
+            .Include(x => x.Liga)
             .FirstAsync(x => x.KnockoutJogoId == knockoutJogoId, ct);
 
         return ToKnockoutJogoDto(jogo);
@@ -2823,7 +2883,7 @@ public class LigaAdminService : ILigaAdminService
     private static LigaDto ToDto(Liga l) =>
         new(l.LigaId, l.Nome, l.TotalRodadas, l.DataInicio, l.DataFim, l.Status, l.Tipo, l.CriadoEm, l.AtualizadoEm,
             l.CampeaoTimeId, l.Campeao?.TeamName, l.Temporada, l.Divisao, l.VagasDiretas, l.VagasPlayoff,
-            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId);
+            l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId, l.FormatoCopa);
 
     private static LigaPartidaDto ToPartidaDto(LigaPartida p) =>
         new(p.PartidaId, p.RodadaId, p.Rodada?.Numero ?? 0, p.TimeCasaId, p.TimeCasa?.TeamName ?? "?", p.TimeForaId, p.TimeFora?.TeamName ?? "?",
@@ -2835,7 +2895,7 @@ public class LigaAdminService : ILigaAdminService
             ev.AssistenteId, ev.Assistente?.Name, ev.Minuto, ev.CriadoEm, ev.JogadorSaiuId, ev.JogadorSaiu?.Name);
 
     private static LigaKnockoutJogoDto ToKnockoutJogoDto(LigaKnockoutJogo j) =>
-        new(j.KnockoutJogoId, j.Fase, FaseLabelMap[j.Fase], j.TimeCasaId, j.TimeCasa?.TeamName,
+        new(j.KnockoutJogoId, j.Fase, FasesKnockout.Rotulo(j.Fase, j.Liga?.FormatoCopa == FormatoCopa.FaseDeLiga), j.TimeCasaId, j.TimeCasa?.TeamName,
             j.TimeForaId, j.TimeFora?.TeamName, j.VencedorId, j.Vencedor?.TeamName,
             j.PartidaId,
             // Partida agendada ainda não tem placar: o 0 x 0 dela não é resultado.
@@ -2844,18 +2904,4 @@ public class LigaAdminService : ILigaAdminService
             j.Partida is null ? null : (PartidaStatus?)j.Partida.Status,
             j.Partida?.TemPenaltis ?? false,
             j.Partida?.YoutubeVideoId);
-
-    private static readonly Dictionary<FaseKnockout, string> FaseLabelMap = new()
-    {
-        [FaseKnockout.PlayIn_A] = "Play-In Jogo 1 (9º vs 10º)",
-        [FaseKnockout.PlayIn_B] = "Play-In Jogo 2 (7º vs 8º)",
-        [FaseKnockout.PlayIn_C] = "Play-In Jogo 3 (Decisivo)",
-        [FaseKnockout.QF1] = "Quartas 1 — 1º Grupo A x 2º Grupo B",
-        [FaseKnockout.QF2] = "Quartas 2 — 1º Grupo B x 2º Grupo A",
-        [FaseKnockout.QF3] = "Quartas 3 — 1º Grupo C x 2º Grupo D",
-        [FaseKnockout.QF4] = "Quartas 4 — 1º Grupo D x 2º Grupo C",
-        [FaseKnockout.Semi1] = "Semifinal 1",
-        [FaseKnockout.Semi2] = "Semifinal 2",
-        [FaseKnockout.Final] = "Final"
-    };
 }

@@ -21,10 +21,10 @@ public static class LigaLabels
     };
 
     /// <summary>Status da competição em linguagem de torcedor (na Copa, os nomes das fases mudam).</summary>
-    public static string Status(LigaStatus status, TipoCompetition tipo) => status switch
+    public static string Status(LigaStatus status, TipoCompetition tipo, bool faseDeLiga = false) => status switch
     {
         LigaStatus.Criada => "Criada",
-        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Copa ? "Fase de Grupos" : "Primeira Fase",
+        LigaStatus.PrimeiraFase => tipo != TipoCompetition.Copa ? "Primeira Fase" : faseDeLiga ? "Fase de Liga" : "Fase de Grupos",
         // Na Copa o status interno PlayIn corresponde ao mata-mata (semifinais e final).
         LigaStatus.PlayIn => tipo == TipoCompetition.Copa ? "Mata-Mata" : "Play-In",
         LigaStatus.Playoffs => "Playoffs",

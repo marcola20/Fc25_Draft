@@ -13,12 +13,19 @@ public sealed record TimeNaCopa(
     public double Aproveitamento => Jogos == 0 ? 0 : Pontos / (3.0 * Jogos);
 }
 
-/// <summary>Quem caiu em cada fase do mata-mata da Copa.</summary>
+/// <summary>
+/// Quem caiu em cada fase do mata-mata da Copa. <paramref name="EliminadosPlayoff"/> só existe na Copa
+/// em fase de liga (2011+): eles entram com os eliminados da primeira fase, pela posição na tabela.
+/// </summary>
 public sealed record ChaveCopa(
     IReadOnlyList<Guid> EliminadosQuartas,
     IReadOnlyList<Guid> EliminadosSemis,
     Guid Vice,
-    Guid Campeao);
+    Guid Campeao,
+    IReadOnlyList<Guid>? EliminadosPlayoff = null)
+{
+    public bool FaseDeLiga => EliminadosPlayoff is { Count: > 0 };
+}
 
 /// <summary>Uma pick sorteada. <paramref name="Origem"/> é o que a loteria mostra (ex.: "8º da Série B").</summary>
 public sealed record PickLoteria(int Pick, Guid TimeId, string TimeNome, int Posicao, string Origem);
@@ -95,6 +102,8 @@ public static class LoteriaDraft
         var naChave = chave.EliminadosQuartas.Concat(chave.EliminadosSemis).Append(chave.Vice).Append(chave.Campeao).ToHashSet();
 
         // Eliminados nos grupos: 5ºs, depois 4ºs, depois 3ºs; dentro da mesma posição, pior aproveitamento primeiro.
+        // Na fase de liga é a tabela única: 18º ao 14º no primeiro bloco; o 13º e os 4 que caíram no
+        // playoff (5º ao 12º) no segundo, também do pior para o melhor colocado.
         var eliminados = copa
             .Where(t => !naChave.Contains(t.TimeId))
             .OrderByDescending(t => t.PosicaoNoGrupo)
@@ -115,7 +124,9 @@ public static class LoteriaDraft
             var sorteio = bloco.Select((t, i) => (Time: t, Peso: (double)PesosGruposCopa[i])).ToList();
             foreach (var t in SortearOrdem(sorteio, rng))
                 picks.Add(new PickLoteria(picks.Count + 1, t.TimeId, t.TimeNome, t.PosicaoNoGrupo,
-                    $"{t.PosicaoNoGrupo}º do Grupo {t.Grupo}"));
+                    !chave.FaseDeLiga ? $"{t.PosicaoNoGrupo}º do Grupo {t.Grupo}"
+                    : chave.EliminadosPlayoff!.Contains(t.TimeId) ? $"Eliminado no playoff ({t.PosicaoNoGrupo}º da fase de liga)"
+                    : $"{t.PosicaoNoGrupo}º da fase de liga"));
         }
 
         // Quartas e semis: pior aproveitamento na Copa escolhe antes.

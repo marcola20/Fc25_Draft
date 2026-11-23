@@ -270,7 +270,7 @@ public class TreinadorService : ITreinadorService
         // Uma temporada entra na carreira quando ele comandou o clube em jogos da competição.
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => l.Temporada != null)
-            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.Temporada, l.DataInicio, l.DataFim, l.CampeaoTimeId, l.VagasDiretas, l.VagasPlayoff })
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Divisao, l.Status, l.Temporada, l.DataInicio, l.DataFim, l.CampeaoTimeId, l.VagasDiretas, l.VagasPlayoff, l.FormatoCopa })
             .ToListAsync(ct);
 
         var classificacoes = await _db.LigaClassificacoes.AsNoTracking()
@@ -365,9 +365,14 @@ public class TreinadorService : ITreinadorService
                 .ToList();
 
             if (doTime.Count == 0)
-                return mataMata.Any(k => k.LigaId == ligaId) ? "Fase de grupos" : null;
+                return mataMata.Any(k => k.LigaId == ligaId)
+                    ? ligas.Any(l => l.LigaId == ligaId && l.FormatoCopa == FormatoCopa.FaseDeLiga && l.Tipo == TipoCompetition.Copa)
+                        ? "Fase de liga" : "Fase de grupos"
+                    : null;
 
-            return doTime.Max(k => k.Fase) switch
+            var maisLonge = doTime.MaxBy(k => FasesKnockout.Ordem(k.Fase))!.Fase;
+            if (FasesKnockout.EhPlayoff(maisLonge)) return "Playoff";
+            return maisLonge switch
             {
                 FaseKnockout.Final => "Vice",
                 FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",

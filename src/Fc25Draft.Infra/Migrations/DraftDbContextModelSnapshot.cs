@@ -1532,6 +1532,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<int?>("Divisao")
                         .HasColumnType("integer");
 
+                    b.Property<int>("FormatoCopa")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -1635,6 +1638,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Pote")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Ranking")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("TimeId")

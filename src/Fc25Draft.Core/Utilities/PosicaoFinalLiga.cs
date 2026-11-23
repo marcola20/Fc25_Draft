@@ -58,14 +58,5 @@ public static class PosicaoFinalLiga
         return posicoes;
     }
 
-    /// <summary>Quão longe a fase fica no chaveamento (os dois jogos de uma mesma fase empatam).</summary>
-    private static int Nivel(FaseKnockout fase) => fase switch
-    {
-        FaseKnockout.Final => 5,
-        FaseKnockout.Semi1 or FaseKnockout.Semi2 => 4,
-        FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => 3,
-        FaseKnockout.PlayIn_C => 2,
-        FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B => 1,
-        _ => 0
-    };
+    private static int Nivel(FaseKnockout fase) => FasesKnockout.Nivel(fase);
 }

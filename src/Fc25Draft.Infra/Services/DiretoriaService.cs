@@ -276,7 +276,7 @@ public class DiretoriaService : IDiretoriaService
         {
             var potes = await _db.LigaCopaPotes.AsNoTracking()
                 .Where(p => p.LigaId == copa.LigaId)
-                .Select(p => new { p.TimeId, p.Pote })
+                .Select(p => new { p.TimeId, p.Pote, p.Ranking })
                 .ToListAsync(ct);
 
             foreach (var p in potes)
@@ -287,7 +287,7 @@ public class DiretoriaService : IDiretoriaService
                     LigaId = copa.LigaId,
                     TimeId = p.TimeId,
                     Pote = p.Pote,
-                    MetaFase = Diretoria.MetaDaCopa(p.Pote),
+                    MetaFase = Diretoria.MetaDaCopa(p.Pote, p.Ranking),
                     CriadaEm = agora
                 });
         }

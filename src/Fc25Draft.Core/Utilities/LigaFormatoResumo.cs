@@ -47,6 +47,10 @@ public static class LigaFormatoResumo
         if (e.Grupos > 1)
             return $"{rodadas} na fase de grupos";
 
+        // Copa com um grupo só é a fase de liga (2011+): tabela única, sem turno completo.
+        if (e.Tipo == TipoCompetition.Copa && e.Grupos == 1)
+            return $"{rodadas} na fase de liga (tabela única)";
+
         if (e.TotalTimes > 1 && e.Rodadas >= (e.TotalTimes - 1) * 2)
             return $"{rodadas} (ida e volta)";
 
@@ -63,6 +67,8 @@ public static class LigaFormatoResumo
         var partes = new List<string>();
         if (fases.Any(f => f is FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C))
             partes.Add("play-in");
+        if (fases.Any(FasesKnockout.EhPlayoff))
+            partes.Add("playoff (5º ao 12º)");
         if (fases.Any(f => f is FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4))
             partes.Add("quartas");
         if (fases.Any(f => f is FaseKnockout.Semi1 or FaseKnockout.Semi2))

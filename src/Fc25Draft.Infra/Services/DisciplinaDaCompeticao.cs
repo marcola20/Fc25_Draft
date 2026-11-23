@@ -35,7 +35,7 @@ internal static class DisciplinaDaCompeticao
         // Ordem dos jogos: rodadas, jogos decisivos dos grupos, mata-mata pela fase e, na Liga, mini liga,
         // decisão do título e playoff de acesso.
         int Etapa(Guid partidaId, int numero, bool desempate) =>
-            fases.TryGetValue(partidaId, out var fase) ? 2000 + (int)fase
+            fases.TryGetValue(partidaId, out var fase) ? 2000 + FasesKnockout.Ordem(fase)
             : numero > 0 ? (desempate ? 1000 + numero : numero)
             : 3000 - numero * 100;
 
@@ -46,6 +46,7 @@ internal static class DisciplinaDaCompeticao
                     FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas",
                     FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
                     FaseKnockout.Final => "Final",
+                    _ when FasesKnockout.EhPlayoff(fase) => "Playoff",
                     _ => "Play-in"
                 }
             : numero switch

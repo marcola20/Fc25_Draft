@@ -87,7 +87,7 @@
                             <label class="form-label">Tipo</label>
                             <select class="form-select" @bind="_formTipo" disabled="@_editandoLigaId.HasValue">
                                 <option value="@TipoCompetition.Liga">Liga (pontos corridos)</option>
-                                <option value="@TipoCompetition.Copa">Copa (grupos + mata-mata)</option>
+                                <option value="@TipoCompetition.Copa">Copa (fase de liga + mata-mata)</option>
                             </select>
                         </div>
                         <div class="row g-2 mb-2">
@@ -164,7 +164,7 @@
                                             @(liga.Divisao == Divisao.SerieA ? "↓" : "↑")@(liga.VagasDiretas ?? 0) direto · @(liga.VagasPlayoff ?? 0) playoff
                                         </span>
                                     }
-                                    <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo)</span>
+                                    <span class="badge ms-1 @StatusBadge(liga.Status)">@StatusLabel(liga.Status, liga.Tipo, liga.FaseDeLiga)</span>
                                     @if (liga.Status == LigaStatus.Encerrada && liga.CampeaoNome is not null)
                                     {
                                         <span class="badge ms-1 bg-warning text-dark"><Icone Nome="trophy" Tamanho="14" /> Campeão: @liga.CampeaoNome</span>
@@ -175,11 +175,11 @@
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => EditarLiga(liga)">Editar</button>
                                     @if (liga.Status == LigaStatus.Criada)
                                     {
-                                        <button class="btn btn-sm btn-success" @onclick="() => IniciarFase(liga.LigaId)">@(liga.Tipo == TipoCompetition.Liga ? "Iniciar Temporada" : "Iniciar Fase de Grupos")</button>
+                                        <button class="btn btn-sm btn-success" @onclick="() => IniciarFase(liga.LigaId)">@(liga.Tipo == TipoCompetition.Liga ? "Iniciar Temporada" : liga.FaseDeLiga ? "Iniciar Fase de Liga" : "Iniciar Fase de Grupos")</button>
                                     }
                                     @if (liga.Status == LigaStatus.PrimeiraFase)
                                     {
-                                        <button class="btn btn-sm btn-warning" @onclick="() => ConfirmarEncerrarFase(liga)">@(liga.Tipo == TipoCompetition.Liga ? "Encerrar Temporada" : "Encerrar Fase de Grupos")</button>
+                                        <button class="btn btn-sm btn-warning" @onclick="() => ConfirmarEncerrarFase(liga)">@(liga.Tipo == TipoCompetition.Liga ? "Encerrar Temporada" : liga.FaseDeLiga ? "Encerrar Fase de Liga" : "Encerrar Fase de Grupos")</button>
                                     }
                                     @if (liga.Status == LigaStatus.MiniLiga)
                                     {
@@ -260,9 +260,117 @@
         }
     }
 
-    <!-- ─ Tab: Sortear Copa ─ -->
-    @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa)
+    <!-- ─ Tab: Sortear Copa (fase de liga) ─ -->
+    @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.FaseDeLiga)
     {
+        <div class="alert alert-secondary py-2 small">
+            <strong>Fase de liga:</strong> os times das Séries A e B ficam numa tabela só e cada um faz <strong>4 jogos</strong>
+            (2 em casa, 2 fora). O ranking sai da temporada passada: posição geral na liga (Série A antes da B) e a Copa sobe o time
+            (campeão 4 posições, vice 3, semifinal 2, quartas 1). A primeira metade vai ao <strong>pote 1</strong> e o resto ao <strong>pote 2</strong>;
+            cada time pega 2 de cada pote, e o sorteio fica com uma tabela em que a força média dos adversários é parecida para todos.
+            1º ao 4º vão às quartas, 5º ao 12º jogam o playoff. A revelação é <strong>ao vivo</strong> na
+            <a href="/copa/sorteio" target="_blank">tela do sorteio</a>, um time a cada 10 segundos. Pode sortear de novo enquanto a Copa não começar.
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+            <button class="btn btn-success" @onclick="SortearFaseDeLiga" disabled="@(_saving || _sorteioLiga?.PodeSortear != true || SorteioAoVivo.EmAndamento)">
+                <Icone Nome="dices" Tamanho="14" /> @(_sorteioLiga?.JaSorteada == true ? "Sortear de novo ao vivo" : "Sortear e revelar ao vivo")
+            </button>
+            @if (SorteioAoVivo.EmAndamento)
+            {
+                <button class="btn btn-outline-secondary" @onclick="() => SorteioAoVivo.RevelarTudo()">⏩ Revelar tudo</button>
+            }
+            else if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+            {
+                <button class="btn btn-outline-secondary" @onclick="() => SorteioAoVivo.Limpar()">Tirar da tela</button>
+            }
+            <a class="btn btn-outline-dark" href="/copa/sorteio" target="_blank"><Icone Nome="tv" Tamanho="14" /> Tela do sorteio</a>
+            @if (_sorteioLiga?.JaSorteada != true && _ligaAtual.Status == LigaStatus.Criada)
+            {
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => MudarFormatoCopa(FormatoCopa.Grupos)" disabled="@_saving">Usar grupos em vez da fase de liga</button>
+            }
+            @if (_sorteioLiga?.Impedimento is not null)
+            {
+                <span class="text-muted small">@_sorteioLiga.Impedimento</span>
+            }
+        </div>
+
+        @if (SorteioAoVivo.Estado?.LigaId == _ligaAtual.LigaId)
+        {
+            <div class="mb-3"><CopaSorteioPainel /></div>
+        }
+
+        @if (_sorteioLiga is not null)
+        {
+            var medias = _sorteioLiga.MediaDosAdversarios;
+            <div class="row g-3">
+                <div class="col-12 col-xl-6">
+                    <div class="card">
+                        <div class="card-header fw-bold">Ranking de @_sorteioLiga.TemporadaDoRanking e potes</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>#</th><th>Time</th><th>De onde vem</th><th>Pote</th>
+                                        @if (medias.Count > 0)
+                                        {
+                                            <th class="text-end" title="Média da posição no ranking dos 4 adversários (menor = adversários mais fortes)">Adv.</th>
+                                        }
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _sorteioLiga.Ranking)
+                                    {
+                                        <tr>
+                                            <td class="text-muted">@r.Ranking</td>
+                                            <td class="fw-semibold">@r.TimeNome</td>
+                                            <td class="small">@r.Origem</td>
+                                            <td><span class="badge @(r.Pote == 1 ? "bg-dark" : "bg-secondary")">Pote @r.Pote</span></td>
+                                            @if (medias.Count > 0)
+                                            {
+                                                <td class="text-end small">@(medias.TryGetValue(r.TimeId, out var m) ? m.ToString("0.0") : "—")</td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-xl-6">
+                    @if (_sorteioLiga.Jogos.Count == 0)
+                    {
+                        <div class="alert alert-info">Os jogos aparecem aqui depois do sorteio.</div>
+                    }
+                    else
+                    {
+                        @foreach (var rodada in _sorteioLiga.Jogos.GroupBy(j => j.Rodada).OrderBy(g => g.Key))
+                        {
+                            <div class="card mb-2">
+                                <div class="card-header fw-medium py-1">Rodada @rodada.Key</div>
+                                <ul class="list-group list-group-flush small">
+                                    @foreach (var j in rodada)
+                                    {
+                                        <li class="list-group-item py-1">@j.CasaNome <span class="text-muted">x</span> @j.ForaNome</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    <!-- ─ Tab: Sortear Copa (grupos) ─ -->
+    @if (_tab == "sorteio" && _ligaAtual is not null && _ligaAtual.Tipo == TipoCompetition.Copa && !_ligaAtual.FaseDeLiga)
+    {
+        @if (_ligaAtual.Status == LigaStatus.Criada && _sorteio?.JaSorteada != true)
+        {
+            <div class="mb-2">
+                <button class="btn btn-outline-primary btn-sm" @onclick="() => MudarFormatoCopa(FormatoCopa.FaseDeLiga)" disabled="@_saving">Usar a fase de liga (tabela única, 2011 em diante)</button>
+            </div>
+        }
         <div class="alert alert-secondary py-2 small">
             Monte os <strong>4 potes</strong> e confirme. Ao sortear, a revelação é <strong>ao vivo para todo mundo</strong> na tela
             <a href="/copa/sorteio" target="_blank">Sorteio da Copa</a>: um time a cada <strong>10 segundos</strong>, começando pelos cabeças de chave (pote 1),
@@ -1144,6 +1252,7 @@
     private readonly Dictionary<Guid, GrupoCopa?> _grupoPorTime = new();
     private readonly Dictionary<Guid, int> _potePorTime = new();
     private LigaCopaSorteioDto? _sorteio;
+    private CopaFaseDeLigaSorteioDto? _sorteioLiga;
 
     private void DefinirPote(Guid timeId, string? valor) =>
         _potePorTime[timeId] = int.TryParse(valor, out var pote) ? pote : 0;
@@ -1263,6 +1372,7 @@
                 _empatesCopa = await AdminSvc.ListEmpatesCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
                 _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
                 _sorteio = await AdminSvc.GetSorteioCopaAsync(_ligaAtual.LigaId, CancellationToken.None);
+                _sorteioLiga = _ligaAtual.FaseDeLiga ? await AdminSvc.GetSorteioFaseDeLigaAsync(_ligaAtual.LigaId, CancellationToken.None) : null;
                 AplicarSorteio();
                 PreencherSelects();
             }
@@ -1487,12 +1597,13 @@
     private void ConfirmarEncerrarFase(LigaDto liga)
     {
         var isLiga = liga.Tipo == TipoCompetition.Liga;
+        var fase = liga.FaseDeLiga ? "Fase de Liga" : "Fase de Grupos";
         PedirConfirmacao(
-            isLiga ? "Encerrar Temporada" : "Encerrar Fase de Grupos",
+            isLiga ? "Encerrar Temporada" : $"Encerrar {fase}",
             isLiga
                 ? $"Tem certeza que deseja encerrar a temporada de \"{liga.Nome}\"? A classificação atual será usada para definir o campeão (ou o desempate, se houver empate no topo). Você pode reverter depois."
-                : $"Tem certeza que deseja encerrar a fase de grupos de \"{liga.Nome}\"? Os classificados avançarão para o mata-mata. Você pode reverter depois.",
-            isLiga ? "Encerrar Temporada" : "Encerrar Fase de Grupos",
+                : $"Tem certeza que deseja encerrar a {fase.ToLowerInvariant()} de \"{liga.Nome}\"? Os classificados avançarão para o mata-mata. Você pode reverter depois.",
+            isLiga ? "Encerrar Temporada" : $"Encerrar {fase}",
             "btn-warning",
             () => EncerrarFase(liga.LigaId));
     }
@@ -1811,6 +1922,37 @@
         finally { _saving = false; }
     }
 
+    private async Task SortearFaseDeLiga()
+    {
+        if (_sorteioLiga?.JaSorteada == true &&
+            !await JS.InvokeAsync<bool>("confirm", "Já existe um sorteio. Refazer e trocar todos os jogos da fase de liga?")) return;
+
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            // Os jogos são gravados agora; a revelação ao vivo só controla o que já apareceu na tela.
+            var sorteio = await AdminSvc.SortearFaseDeLigaAsync(_ligaAtual!.LigaId, CancellationToken.None);
+            SorteioAoVivo.IniciarFaseDeLiga(_ligaAtual.LigaId, _ligaAtual.Nome, sorteio, TimeSpan.FromSeconds(10));
+            _ok = "Sorteio começou! Um time a cada 10 segundos na tela do sorteio.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task MudarFormatoCopa(FormatoCopa formato)
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            await AdminSvc.DefinirFormatoCopaAsync(_ligaAtual!.LigaId, formato, CancellationToken.None);
+            _ok = formato == FormatoCopa.FaseDeLiga ? "A Copa agora é em fase de liga." : "A Copa agora é com grupos.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
     private void AplicarSorteio()
     {
         _potePorTime.Clear();
@@ -1928,10 +2070,10 @@
         _  => $"Rodada {numero}"
     };
 
-    private static string StatusLabel(LigaStatus s, TipoCompetition tipo) => s switch
+    private static string StatusLabel(LigaStatus s, TipoCompetition tipo, bool faseDeLiga = false) => s switch
     {
         LigaStatus.Criada => "Não iniciada",
-        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Liga ? "Em andamento" : "Fase de Grupos",
+        LigaStatus.PrimeiraFase => tipo == TipoCompetition.Liga ? "Em andamento" : faseDeLiga ? "Fase de Liga" : "Fase de Grupos",
         LigaStatus.PlayIn => tipo == TipoCompetition.Copa ? "Mata-Mata" : "Play-In",
         LigaStatus.Playoffs => "Playoffs",
         LigaStatus.DecisaoCampeao => "Decisão Campeão",

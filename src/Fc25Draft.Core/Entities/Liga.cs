@@ -28,6 +28,9 @@ public class Liga
     public Guid? ConfrontoFinalTimeAId { get; set; }
     public Guid? ConfrontoFinalTimeBId { get; set; }
 
+    /// <summary>Formato da primeira fase da Copa (só vale para Copa). Copas novas já nascem em fase de liga.</summary>
+    public FormatoCopa FormatoCopa { get; set; } = FormatoCopa.FaseDeLiga;
+
     public DateTime CriadoEm { get; set; }
     public DateTime AtualizadoEm { get; set; }
 

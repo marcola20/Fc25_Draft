@@ -485,11 +485,16 @@
                 return j.TimeCasaId == j.VencedorId ? j.TimeForaId!.Value : j.TimeCasaId!.Value;
             }
 
+            // Copa em fase de liga: os 4 que caíram no playoff entram com os eliminados da tabela.
+            var temPlayoff = knockout.Any(k => FasesKnockout.EhPlayoff(k.Fase));
             var chave = new ChaveCopa(
                 [Perdedor(FaseKnockout.QF1), Perdedor(FaseKnockout.QF2), Perdedor(FaseKnockout.QF3), Perdedor(FaseKnockout.QF4)],
                 [Perdedor(FaseKnockout.Semi1), Perdedor(FaseKnockout.Semi2)],
                 Perdedor(FaseKnockout.Final),
-                Jogo(FaseKnockout.Final).VencedorId!.Value);
+                Jogo(FaseKnockout.Final).VencedorId!.Value,
+                temPlayoff
+                    ? [Perdedor(FaseKnockout.PO1), Perdedor(FaseKnockout.PO2), Perdedor(FaseKnockout.PO3), Perdedor(FaseKnockout.PO4)]
+                    : null);
 
             var picks = LoteriaDraft.Round2(copa, chave, Random.Shared);
             LotteryService.AdvanceToRound2(ParaRevelar(picks));

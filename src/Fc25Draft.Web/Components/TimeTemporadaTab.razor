@@ -40,7 +40,7 @@ else
                                 <div class="text-end">
                                     <div class="display-6 mb-0 lh-1">@(comp.Posicao?.ToString() ?? "—")º</div>
                                     <small class="text-muted">
-                                        @(comp.Grupo is not null ? $"Grupo {comp.Grupo}" : "na tabela")
+                                        @(comp.Grupo is not null && !comp.FaseDeLiga ? $"Grupo {comp.Grupo}" : "na tabela")
                                     </small>
                                 </div>
                             </div>

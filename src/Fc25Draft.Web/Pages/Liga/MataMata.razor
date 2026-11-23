@@ -55,6 +55,24 @@
             </div>
         }
 
+        @if (_jogos.Any(j => FasesKnockout.EhPlayoff(j.Fase)))
+        {
+            <!-- Playoff da fase de liga da Copa: 5º ao 12º -->
+            <div class="secao-titulo"><h2>Playoff</h2></div>
+            <div class="row g-3 mb-4">
+                @foreach (var fase in new[] { FaseKnockout.PO1, FaseKnockout.PO2, FaseKnockout.PO3, FaseKnockout.PO4 })
+                {
+                    var jogo = _jogos.FirstOrDefault(j => j.Fase == fase);
+                    if (jogo is not null)
+                    {
+                        <div class="col-12 col-md-3">
+                            <KnockoutCard Jogo="jogo" OnClick="AbrirJogo" />
+                        </div>
+                    }
+                }
+            </div>
+        }
+
         @if (_jogos.Any(j => j.Fase is FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4))
         {
             <!-- Quartas -->

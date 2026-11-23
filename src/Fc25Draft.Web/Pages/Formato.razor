@@ -223,85 +223,98 @@
 
         <div class="fmt-overview-grid fmt-overview-grid-4">
             <div class="fmt-stat-card">
+                <div class="fmt-stat-number">18</div>
+                <div class="fmt-stat-label">Times numa tabela só</div>
+            </div>
+            <div class="fmt-stat-card">
                 <div class="fmt-stat-number">4</div>
-                <div class="fmt-stat-label">Grupos</div>
+                <div class="fmt-stat-label">Jogos por time</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">4-5</div>
-                <div class="fmt-stat-label">Times por grupo</div>
+                <div class="fmt-stat-number">1º–4º</div>
+                <div class="fmt-stat-label">Direto às quartas</div>
             </div>
             <div class="fmt-stat-card">
-                <div class="fmt-stat-number">2</div>
-                <div class="fmt-stat-label">Classificados por grupo</div>
-            </div>
-            <div class="fmt-stat-card">
-                <div class="fmt-stat-number">3</div>
-                <div class="fmt-stat-label">Fases finais</div>
+                <div class="fmt-stat-number">5º–12º</div>
+                <div class="fmt-stat-label">Playoff</div>
             </div>
         </div>
 
         <div class="fmt-copa-phase">
             <div class="fmt-phase-label">
-                <span>Fase de grupos</span>
+                <span>Fase de liga</span>
             </div>
 
             <p class="fmt-desc">
-                Todos os times da temporada entram na Copa, divididos em <strong>4 grupos</strong> por <strong>sorteio em potes</strong>.
-                Com <strong>18 times</strong> ficam <strong>2 grupos de 4 (A e B) e 2 de 5 (C e D)</strong>; os times do último pote é que completam os grupos maiores.
-                Dentro do grupo, todos se enfrentam uma vez e os <strong>2 melhores avançam</strong>. A fase de grupos tem
-                <strong>4 rodadas</strong>, o mesmo tanto de jogos que cada time faz: nos grupos de 5, a última rodada
-                junta os jogos que sobrariam e alguns times jogam duas vezes nela; nos grupos de 4, os times folgam numa delas.
+                Todos os times da temporada entram na Copa e ficam numa <strong>tabela só</strong>, como na Champions.
+                Cada time faz <strong>4 jogos</strong> (2 em casa e 2 fora), um por rodada, contra adversários sorteados.
+                O sorteio parte do <strong>ranking da temporada anterior</strong>: a posição geral na liga (Série A antes da B)
+                e a Copa anterior, que sobe o time (campeão 4 posições, vice 3, semifinal 2, quartas 1).
+                Os 9 primeiros do ranking formam o <strong>pote 1</strong> e os outros 9 o <strong>pote 2</strong>;
+                cada time pega <strong>2 adversários de cada pote</strong>, e entre os sorteios possíveis fica um em que a
+                <strong>força média dos adversários é parecida para todo mundo</strong>. A revelação é ao vivo.
             </p>
 
             <div class="fmt-groups-grid fmt-groups-grid-2">
-                @foreach (var (grupo, times) in new[] { ("A", 4), ("B", 4), ("C", 5), ("D", 5) })
-                {
-                    <div class="fmt-group-card">
-                        <div class="fmt-group-header @(times == 4 ? "fmt-group-a" : "fmt-group-b")">
-                            Grupo @grupo <small>· @times times</small>
-                        </div>
-                        <div class="fmt-group-body">
-                            <div class="fmt-group-teams">
-                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-a"></span>Pote 1</div>
-                                <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 2</div>
-                                @for (int i = 0; i < times - 2; i++)
-                                {
-                                    <div class="fmt-group-team"><span class="fmt-team-dot fmt-dot-b"></span>Pote 3</div>
-                                }
-                            </div>
-                            <div class="fmt-group-desc">
-                                Todos contra todos <strong>dentro do grupo</strong> · @(times - 1) jogos
-                            </div>
-                            <div class="fmt-group-advance">
-                                <span class="fmt-advance-badge"><Icone Nome="circle-check" Tamanho="12" /> Top 2 avançam</span>
-                            </div>
+                <div class="fmt-group-card">
+                    <div class="fmt-group-header fmt-group-a">Pote 1 <small>· 9 times</small></div>
+                    <div class="fmt-group-body">
+                        <div class="fmt-group-desc">Os 9 melhores do ranking</div>
+                        <div class="fmt-group-advance">
+                            <span class="fmt-advance-badge"><Icone Nome="circle-check" Tamanho="12" /> 2 jogos contra o pote 1 e 2 contra o pote 2</span>
                         </div>
                     </div>
-                }
+                </div>
+                <div class="fmt-group-card">
+                    <div class="fmt-group-header fmt-group-b">Pote 2 <small>· 9 times</small></div>
+                    <div class="fmt-group-body">
+                        <div class="fmt-group-desc">Do 10º ao 18º do ranking</div>
+                        <div class="fmt-group-advance">
+                            <span class="fmt-advance-badge"><Icone Nome="circle-check" Tamanho="12" /> 2 jogos contra o pote 1 e 2 contra o pote 2</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <p class="fmt-desc mt-3">
+                Desempate na tabela: <strong>Pontos → Vitórias → Saldo de Gols → Gols Pró</strong>. Se ainda houver empate
+                bem na linha (4º/5º ou 12º/13º), a vaga sai num <strong>jogo decisivo</strong>.
+                Do <strong>1º ao 4º</strong> vão direto às quartas, do <strong>5º ao 12º</strong> jogam o playoff e do
+                <strong>13º ao 18º</strong> estão eliminados.
+            </p>
         </div>
 
         <div class="fmt-copa-phase">
             <div class="fmt-phase-label">
-                <span>Fases finais</span>
+                <span>Fases finais (jogo único, mando do melhor colocado)</span>
             </div>
 
             <div class="fmt-knockout-bracket">
                 <div class="fmt-knockout-col">
-                    @foreach (var (numero, casa, fora) in new[] { (1, "A", "B"), (2, "B", "A"), (3, "C", "D"), (4, "D", "C") })
+                    @foreach (var (numero, casa, fora) in new[] { (4, 8, 9), (1, 5, 12), (3, 7, 10), (2, 6, 11) })
                     {
-                        <div class="fmt-ko-match @(numero % 2 == 1 ? "fmt-ko-match-a" : "fmt-ko-match-b")">
+                        <div class="fmt-ko-match @(numero is 4 or 1 ? "fmt-ko-match-a" : "fmt-ko-match-b")">
+                            <div class="fmt-ko-label">Playoff @numero</div>
+                            <div class="fmt-ko-matchup">
+                                <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">@(casa)°</span><span class="fmt-ko-name">@(casa)º da tabela</span></div>
+                                <div class="fmt-ko-vs">x</div>
+                                <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">@(fora)°</span><span class="fmt-ko-name">@(fora)º da tabela</span></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="fmt-knockout-arrow"><Icone Nome="chevron-right" Tamanho="18" /></div>
+
+                <div class="fmt-knockout-col">
+                    @foreach (var (numero, cabeca, playoff) in new[] { (1, 1, 4), (4, 4, 1), (2, 2, 3), (3, 3, 2) })
+                    {
+                        <div class="fmt-ko-match @(numero is 1 or 4 ? "fmt-ko-match-a" : "fmt-ko-match-b")">
                             <div class="fmt-ko-label">Quartas @numero</div>
                             <div class="fmt-ko-matchup">
-                                <div class="fmt-ko-team">
-                                    <span class="fmt-ko-seed fmt-seed-a">@(casa)1°</span>
-                                    <span class="fmt-ko-name">1º do Grupo @casa</span>
-                                </div>
+                                <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-a">@(cabeca)°</span><span class="fmt-ko-name">@(cabeca)º da tabela</span></div>
                                 <div class="fmt-ko-vs">x</div>
-                                <div class="fmt-ko-team">
-                                    <span class="fmt-ko-seed fmt-seed-b">@(fora)2°</span>
-                                    <span class="fmt-ko-name">2º do Grupo @fora</span>
-                                </div>
+                                <div class="fmt-ko-team"><span class="fmt-ko-seed fmt-seed-b">P@(playoff)</span><span class="fmt-ko-name">Vencedor Playoff @playoff</span></div>
                             </div>
                         </div>
                     }
@@ -356,8 +369,16 @@
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon"><Icone Nome="list-ordered" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
-                    <strong>Fase de grupos</strong>
-                    <span>4 grupos de 4 e 5 · 4 rodadas</span>
+                    <strong>Fase de liga</strong>
+                    <span>18 times · 4 rodadas</span>
+                </div>
+            </div>
+            <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
+            <div class="fmt-flow-step">
+                <div class="fmt-flow-icon"><Icone Nome="shuffle" Tamanho="18" /></div>
+                <div class="fmt-flow-content">
+                    <strong>Playoff</strong>
+                    <span>5º ao 12º</span>
                 </div>
             </div>
             <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
@@ -365,23 +386,15 @@
                 <div class="fmt-flow-icon"><Icone Nome="swords" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
                     <strong>Quartas e semifinais</strong>
-                    <span>Top 2 de cada grupo</span>
-                </div>
-            </div>
-            <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
-            <div class="fmt-flow-step">
-                <div class="fmt-flow-icon"><Icone Nome="medal" Tamanho="18" /></div>
-                <div class="fmt-flow-content">
-                    <strong>Final</strong>
-                    <span>Vencedores de cada SF</span>
+                    <span>1º ao 4º + vencedores do playoff</span>
                 </div>
             </div>
             <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon"><Icone Nome="trophy" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
-                    <strong>Campeão da Copa</strong>
-                    <span>Vencedor da Final</span>
+                    <strong>Final</strong>
+                    <span>Campeão da Copa</span>
                 </div>
             </div>
         </div>

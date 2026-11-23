@@ -40,7 +40,7 @@ public class RetrospectivaService : IRetrospectivaService
 
         var ligas = await _db.Ligas.AsNoTracking()
             .Where(l => l.Temporada == temporada)
-            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Status, l.CampeaoTimeId, l.DataFim, l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId })
+            .Select(l => new { l.LigaId, l.Nome, l.Tipo, l.Status, l.CampeaoTimeId, l.DataFim, l.ConfrontoFinalTimeAId, l.ConfrontoFinalTimeBId, l.FormatoCopa })
             .ToListAsync(ct);
         var ligaIds = ligas.Select(l => l.LigaId).ToList();
 
@@ -84,7 +84,7 @@ public class RetrospectivaService : IRetrospectivaService
             else
             {
                 var jogos = mataMata.Where(k => k.LigaId == l.LigaId).ToList();
-                var fase = jogos.Count == 0 ? FaseKnockout.None : jogos.Max(k => k.Fase);
+                var fase = jogos.Count == 0 ? FaseKnockout.None : jogos.MaxBy(k => FasesKnockout.Ordem(k.Fase))!.Fase;
                 var perdeuAFinal = jogos.Any(k => k.Fase == FaseKnockout.Final && k.VencedorId is Guid v && v != timeId)
                                    || (l.Tipo == TipoCompetition.Supercopa && encerrada && l.CampeaoTimeId is not null);
                 resultado = perdeuAFinal ? "Vice-campeão" : fase switch
@@ -93,7 +93,9 @@ public class RetrospectivaService : IRetrospectivaService
                     FaseKnockout.Semi1 or FaseKnockout.Semi2 => "Semifinal",
                     FaseKnockout.QF1 or FaseKnockout.QF2 or FaseKnockout.QF3 or FaseKnockout.QF4 => "Quartas de final",
                     FaseKnockout.PlayIn_A or FaseKnockout.PlayIn_B or FaseKnockout.PlayIn_C => "Play-in",
-                    _ => l.Tipo == TipoCompetition.Supercopa ? "Final" : "Fase de grupos"
+                    _ when FasesKnockout.EhPlayoff(fase) => "Playoff",
+                    _ => l.Tipo == TipoCompetition.Supercopa ? "Final"
+                        : l.FormatoCopa == FormatoCopa.FaseDeLiga ? "Fase de liga" : "Fase de grupos"
                 };
             }
 
