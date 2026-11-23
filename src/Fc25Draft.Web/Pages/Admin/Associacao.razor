@@ -1,0 +1,551 @@
+@page "/admin/associacao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IAssociacaoService AssociacaoSvc
+@inject ITreinadorService TreinadorSvc
+@inject IJSRuntime JS
+
+<PageTitle>Eleição da Associação — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @if (_lista.Count > 0)
+            {
+                <select class="form-select w-auto" @onchange="TrocarEleicao">
+                    @foreach (var x in _lista)
+                    {
+                        <option value="@x.EleicaoId" selected="@(x.EleicaoId == _eleicao?.EleicaoId)">
+                            @x.Titulo@(x.Turno > 1 ? $" · {x.Turno}º turno" : "") (@Situacao(x.Situacao))
+                        </option>
+                    }
+                </select>
+            }
+            <button class="btn btn-outline-primary" @onclick="NovaEleicao" disabled="@_salvando"><Icone Nome="plus" Tamanho="14" /> Nova eleição</button>
+            <a href="/associacao" class="btn btn-outline-secondary" target="_blank">Ver página pública</a>
+        </div>
+
+        @if (_eleicao is null && !_criando)
+        {
+            <div class="alert alert-secondary">
+                Nenhuma eleição ainda. Crie uma, inscreva as chapas e publique o edital: aí a eleição aparece em
+                <a href="/associacao">/associacao</a> com a lista de eleitores.
+            </div>
+        }
+        else
+        {
+            var e = _eleicao;
+            var podeMontar = e is null || e.Situacao is SituacaoEleicao.Rascunho or SituacaoEleicao.Inscricoes;
+
+            @* ── Dados da eleição ── *@
+            <div class="card mb-3">
+                <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold">@(e is null ? "Nova eleição" : "Eleição")</span>
+                    @if (e is not null)
+                    {
+                        <span class="badge bg-secondary">@Situacao(e.Situacao)</span>
+                        @if (e.Turno > 1) { <span class="badge bg-dark">@e.Turno º turno</span> }
+                    }
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label small mb-1">Título</label>
+                            <input class="form-control" @bind="_titulo" placeholder="Eleição da Diretoria 2011" />
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label small mb-1">Comissão eleitoral (nomes)</label>
+                            <input class="form-control" @bind="_comissao" placeholder="Fulano, Beltrano e Sicrano" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small mb-1">Inscrições até (Brasília)</label>
+                            <input type="datetime-local" class="form-control" @bind="_inscricoesAte" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small mb-1">Urna abre (Brasília)</label>
+                            <input type="datetime-local" class="form-control" @bind="_abreEm" />
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small mb-1">Urna fecha (Brasília)</label>
+                            <input type="datetime-local" class="form-control" @bind="_fechaEm" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small mb-1">Edital (aparece na página; ## título, - item, *negrito*)</label>
+                            <textarea class="form-control font-monospace" rows="6" @bind="_edital"></textarea>
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        Com a votação aberta, a urna só aceita voto entre a abertura e o fechamento (se preenchidos). Fora disso fica fechada
+                        sozinha, mesmo que você esqueça de encerrar.
+                    </p>
+                </div>
+                <div class="card-footer d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" @onclick="SalvarEleicao" disabled="@_salvando"><Icone Nome="save" Tamanho="14" /> Salvar</button>
+                    @if (e is null)
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="CancelarNova">Cancelar</button>
+                    }
+                    else
+                    {
+                        @switch (e.Situacao)
+                        {
+                            case SituacaoEleicao.Rascunho:
+                                <button class="btn btn-success" @onclick="PublicarEdital" disabled="@_salvando">Publicar edital</button>
+                                <button class="btn btn-outline-danger ms-auto" @onclick="Excluir" disabled="@_salvando">Excluir eleição</button>
+                                break;
+                            case SituacaoEleicao.Inscricoes:
+                                <button class="btn btn-success" @onclick="AbrirVotacao" disabled="@_salvando">Abrir votação</button>
+                                <button class="btn btn-outline-secondary" @onclick="Voltar" disabled="@_salvando">Voltar para rascunho</button>
+                                break;
+                            case SituacaoEleicao.Votacao:
+                                <button class="btn btn-warning" @onclick="Encerrar" disabled="@_salvando">Encerrar votação</button>
+                                @if (e.Votaram == 0)
+                                {
+                                    <button class="btn btn-outline-secondary" @onclick="Voltar" disabled="@_salvando">Voltar para inscrições</button>
+                                }
+                                break;
+                            case SituacaoEleicao.Apuracao:
+                                <button class="btn btn-primary" @onclick="PublicarResultado" disabled="@_salvando">Homologar e publicar resultado</button>
+                                <button class="btn btn-outline-secondary" @onclick="Reabrir" disabled="@_salvando">Reabrir votação</button>
+                                break;
+                            case SituacaoEleicao.Resultado when e.ChapaVencedoraId is null && e.Chapas.Count >= 2:
+                                <button class="btn btn-primary" @onclick="SegundoTurno" disabled="@_salvando">Criar 2º turno</button>
+                                break;
+                        }
+                    }
+                </div>
+            </div>
+
+            @if (e is not null)
+            {
+                @* ── Apuração ── *@
+                @if (e.Apuracao is { } ap)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">@(e.Situacao == SituacaoEleicao.Apuracao ? "Apuração (só você vê até publicar)" : "Resultado")</div>
+                        <ul class="list-group list-group-flush">
+                            @foreach (var c in e.Chapas.OrderByDescending(c => c.Votos))
+                            {
+                                var pct = ap.Validos == 0 ? 0m : Math.Round((c.Votos ?? 0) * 100m / ap.Validos, 1);
+                                <li class="list-group-item d-flex gap-2 @(c.ChapaId == e.ChapaVencedoraId || (e.Situacao == SituacaoEleicao.Apuracao && (c.Votos ?? 0) * 2 > ap.Validos) ? "fw-semibold" : "")" @key="c.ChapaId">
+                                    <span>@c.Numero · @c.Nome</span>
+                                    <span class="ms-auto">@(c.Votos ?? 0) votos · @pct.ToString("0.#")%</span>
+                                </li>
+                            }
+                        </ul>
+                        <div class="card-footer small text-muted">
+                            @ap.Validos válidos · @ap.Brancos em branco · @ap.Abstencoes não votaram (de @e.Eleitores eleitores)
+                        </div>
+                    </div>
+                }
+                else if (e.Situacao == SituacaoEleicao.Votacao)
+                {
+                    <div class="alert alert-info">
+                        <strong>@e.Votaram de @e.Eleitores</strong> já votaram. A contagem fica fechada até encerrar, inclusive para o admin.
+                    </div>
+                }
+
+                @* ── Chapas ── *@
+                <div class="d-flex align-items-center gap-2 mt-4 mb-2">
+                    <h5 class="mb-0">Chapas</h5>
+                    @if (podeMontar && _editandoChapa is null)
+                    {
+                        <button class="btn btn-sm btn-outline-primary ms-auto" @onclick="() => EditarChapa(null)"><Icone Nome="plus" Tamanho="14" /> Inscrever chapa</button>
+                    }
+                </div>
+
+                @if (_editandoChapa is not null)
+                {
+                    <div class="card mb-3 border-primary">
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Nome da chapa</label>
+                                <input class="form-control" @bind="_chapaNome" />
+                            </div>
+                            <div class="row g-2 mb-2">
+                                @foreach (var cargo in CargosAssociacao.Todos)
+                                {
+                                    var cargoLocal = cargo;
+                                    <div class="col-12 col-md-6 col-xl-4" @key="cargo">
+                                        <label class="form-label small mb-1">@CargosAssociacao.Nome(cargo)</label>
+                                        <select class="form-select" value="@(_chapaMembros.TryGetValue(cargo, out var sel) ? sel.ToString() : "")"
+                                                @onchange="ev => EscolherMembro(cargoLocal, ev)">
+                                            <option value="">— escolher —</option>
+                                            @foreach (var t in _treinadores)
+                                            {
+                                                <option value="@t.TreinadorId">@t.Nome · @t.TimeAtual</option>
+                                            }
+                                        </select>
+                                        @if (_chapaMembros.TryGetValue(cargo, out var escolhido) && escolhido != Guid.Empty)
+                                        {
+                                            <div class="small text-muted mt-1">@Temporadas(escolhido)</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small mb-1">Plano de gestão (opcional; ## título, - item, *negrito*)</label>
+                                <textarea class="form-control" rows="5" @bind="_chapaPlano"></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" @onclick="SalvarChapa" disabled="@_salvando">Salvar chapa</button>
+                                <button class="btn btn-outline-secondary" @onclick="() => _editandoChapa = null">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @if (e.Chapas.Count == 0)
+                {
+                    <div class="text-muted small mb-3">Nenhuma chapa inscrita.</div>
+                }
+                @foreach (var c in e.Chapas)
+                {
+                    <div class="card mb-2" @key="c.ChapaId">
+                        <div class="card-body py-2">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-bold">@c.Numero · @c.Nome</span>
+                                @if (!c.Completa)
+                                {
+                                    <span class="badge bg-warning text-dark">faltam cargos</span>
+                                }
+                                @if (podeMontar)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => EditarChapa(c)"><Icone Nome="pencil" Tamanho="14" /></button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ExcluirChapa(c)"><Icone Nome="x" Tamanho="14" /></button>
+                                }
+                            </div>
+                            <ul class="small mb-0 mt-1 ps-3">
+                                @foreach (var m in c.Membros)
+                                {
+                                    <li>@CargosAssociacao.Nome(m.Cargo): <strong>@m.Nome</strong> <span class="text-muted">(@(m.TimeAtual ?? "sem clube") · @Temporadas(m.TreinadorId))</span></li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+                <p class="text-muted small">
+                    As temporadas ao lado de cada nome vêm da carreira no site, para conferir o Art. 1º (3 temporadas completas).
+                    O site não barra: quem decide a impugnação é a comissão.
+                </p>
+
+                @* ── Eleitores ── *@
+                <div class="d-flex align-items-center gap-2 mt-4 mb-2 flex-wrap">
+                    <h5 class="mb-0">Eleitores (@_eleitores.Count)</h5>
+                    @if (podeMontar)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary ms-auto" @onclick="RefazerEleitores" disabled="@_salvando">
+                            <Icone Nome="refresh-cw" Tamanho="14" /> Refazer pela regra
+                        </button>
+                    }
+                </div>
+                <p class="text-muted small mb-2">
+                    Regra do Art. 8º: treinadores e auxiliares ativos e com clube hoje. A lista é montada ao publicar o edital
+                    e trava ao abrir a votação.
+                </p>
+                @if (podeMontar)
+                {
+                    <div class="d-flex gap-2 mb-2">
+                        <select class="form-select form-select-sm w-auto" @bind="_eleitorNovo">
+                            <option value="">— incluir alguém —</option>
+                            @foreach (var t in _treinadores.Where(t => _eleitores.All(x => x.TreinadorId != t.TreinadorId)))
+                            {
+                                <option value="@t.TreinadorId">@t.Nome · @t.TimeAtual</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="IncluirEleitor" disabled="@(_salvando || string.IsNullOrEmpty(_eleitorNovo))">Incluir</button>
+                    </div>
+                }
+                <div class="table-responsive mb-4">
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th>Nome</th><th>Clube</th><th>Papel</th><th>Votou</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var el in _eleitores)
+                            {
+                                <tr @key="el.TreinadorId">
+                                    <td>@el.Nome</td>
+                                    <td>@(el.Time ?? "—")</td>
+                                    <td>@(el.Papel == PapelTreinador.Auxiliar ? "auxiliar" : el.Papel is null ? "—" : "treinador")</td>
+                                    <td>@(el.Votou ? "✓" : "")</td>
+                                    <td class="text-end">
+                                        @if (podeMontar)
+                                        {
+                                            <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoverEleitor(el)">tirar</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _salvando;
+    private bool _criando;
+    private string? _erro, _ok;
+
+    private IReadOnlyList<EleicaoResumoDto> _lista = Array.Empty<EleicaoResumoDto>();
+    private EleicaoDto? _eleicao;
+    private IReadOnlyList<EleicaoEleitorDto> _eleitores = Array.Empty<EleicaoEleitorDto>();
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
+    private readonly Dictionary<Guid, string> _temporadas = new();
+
+    // Formulário da eleição (datas no horário de Brasília).
+    private string _titulo = "", _comissao = "", _edital = "";
+    private DateTime? _inscricoesAte, _abreEm, _fechaEm;
+
+    // Chapa em edição: Guid.Empty = nova.
+    private Guid? _editandoChapa;
+    private string _chapaNome = "", _chapaPlano = "";
+    private readonly Dictionary<CargoAssociacao, Guid> _chapaMembros = new();
+
+    private string? _eleitorNovo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _treinadores = (await TreinadorSvc.ListAsync(false, CancellationToken.None)).OrderBy(t => t.Nome).ToList();
+            _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
+            await Carregar(_lista.FirstOrDefault()?.EleicaoId);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _carregando = false; }
+    }
+
+    private async Task Carregar(Guid? eleicaoId)
+    {
+        _criando = false;
+        _editandoChapa = null;
+        _eleicao = eleicaoId is Guid id ? await AssociacaoSvc.GetAsync(id, true, CancellationToken.None) : null;
+        _eleitores = _eleicao is null ? Array.Empty<EleicaoEleitorDto>() : await AssociacaoSvc.EleitoresAsync(_eleicao.EleicaoId, CancellationToken.None);
+
+        if (_eleicao is { } e)
+        {
+            _titulo = e.Titulo;
+            _comissao = e.Comissao;
+            _edital = e.Edital;
+            _inscricoesAte = ParaBrasilia(e.InscricoesAte);
+            _abreEm = ParaBrasilia(e.AbreEm);
+            _fechaEm = ParaBrasilia(e.FechaEm);
+            foreach (var m in e.Chapas.SelectMany(c => c.Membros)) await CarregarTemporadas(m.TreinadorId);
+        }
+    }
+
+    private async Task Recarregar()
+    {
+        _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
+        await Carregar(_eleicao?.EleicaoId);
+    }
+
+    private async Task TrocarEleicao(ChangeEventArgs ev)
+    {
+        if (Guid.TryParse(ev.Value?.ToString(), out var id)) await Carregar(id);
+    }
+
+    private void NovaEleicao()
+    {
+        _eleicao = null;
+        _eleitores = Array.Empty<EleicaoEleitorDto>();
+        _criando = true;
+        _editandoChapa = null;
+        _titulo = "Eleição da Diretoria Executiva";
+        _comissao = _edital = "";
+        _inscricoesAte = _abreEm = _fechaEm = null;
+    }
+
+    private async Task CancelarNova() => await Carregar(_lista.FirstOrDefault()?.EleicaoId);
+
+    private EleicaoSalvarRequest Pedido() =>
+        new(_titulo, ParaUtc(_inscricoesAte), ParaUtc(_abreEm), ParaUtc(_fechaEm), _edital, _comissao);
+
+    private async Task SalvarEleicao() => await Executar(async () =>
+    {
+        if (_eleicao is null)
+        {
+            var nova = await AssociacaoSvc.CriarAsync(Pedido(), CancellationToken.None);
+            _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
+            await Carregar(nova.EleicaoId);
+            return "Eleição criada em rascunho. Inscreva as chapas e publique o edital.";
+        }
+        await AssociacaoSvc.SalvarAsync(_eleicao.EleicaoId, Pedido(), CancellationToken.None);
+        await Recarregar();
+        return "Salvo.";
+    });
+
+    private async Task Acao(Func<Guid, CancellationToken, Task> acao, string? pergunta, string mensagem)
+    {
+        if (_eleicao is null) return;
+        if (pergunta is not null && !await JS.InvokeAsync<bool>("confirm", pergunta)) return;
+        await Executar(async () =>
+        {
+            await acao(_eleicao.EleicaoId, CancellationToken.None);
+            await Recarregar();
+            return mensagem;
+        });
+    }
+
+    private Task PublicarEdital() => Acao(AssociacaoSvc.PublicarEditalAsync, null, "Edital no ar: a eleição aparece na página com a lista de eleitores.");
+    private Task AbrirVotacao() => Acao(AssociacaoSvc.AbrirVotacaoAsync, "Abrir a votação? Chapas e eleitores ficam travados.", "Votação aberta.");
+    private Task Voltar() => Acao(AssociacaoSvc.VoltarAsync, null, "Voltou um passo.");
+    private Task Encerrar() => Acao(AssociacaoSvc.EncerrarAsync, "Encerrar a votação agora?", "Votação encerrada. Confira a apuração e publique.");
+    private Task Reabrir() => Acao(AssociacaoSvc.ReabrirAsync, "Reabrir a urna?", "Urna reaberta.");
+
+    private async Task PublicarResultado()
+    {
+        if (_eleicao is null) return;
+        if (!await JS.InvokeAsync<bool>("confirm", "Homologar e publicar o resultado? A contagem aparece para todo mundo.")) return;
+        await Executar(async () =>
+        {
+            var msg = await AssociacaoSvc.PublicarResultadoAsync(_eleicao.EleicaoId, CancellationToken.None);
+            await Recarregar();
+            return msg;
+        });
+    }
+
+    private async Task SegundoTurno() => await Executar(async () =>
+    {
+        var segundo = await AssociacaoSvc.CriarSegundoTurnoAsync(_eleicao!.EleicaoId, CancellationToken.None);
+        _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
+        await Carregar(segundo.EleicaoId);
+        return "2º turno criado em rascunho, com as duas mais votadas e os mesmos eleitores. Ajuste as datas e publique.";
+    });
+
+    private async Task Excluir()
+    {
+        if (_eleicao is null || !await JS.InvokeAsync<bool>("confirm", $"Excluir \"{_eleicao.Titulo}\" com chapas e eleitores?")) return;
+        await Executar(async () =>
+        {
+            await AssociacaoSvc.ExcluirAsync(_eleicao.EleicaoId, CancellationToken.None);
+            _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
+            await Carregar(_lista.FirstOrDefault()?.EleicaoId);
+            return "Eleição excluída.";
+        });
+    }
+
+    private void EditarChapa(ChapaDto? c)
+    {
+        _editandoChapa = c?.ChapaId ?? Guid.Empty;
+        _chapaNome = c?.Nome ?? "";
+        _chapaPlano = c?.Plano ?? "";
+        _chapaMembros.Clear();
+        if (c is not null)
+            foreach (var m in c.Membros) _chapaMembros[m.Cargo] = m.TreinadorId;
+    }
+
+    private async Task SalvarChapa() => await Executar(async () =>
+    {
+        var id = _editandoChapa == Guid.Empty ? null : _editandoChapa;
+        await AssociacaoSvc.SalvarChapaAsync(_eleicao!.EleicaoId, id,
+            new ChapaSalvarRequest(_chapaNome, _chapaPlano, new Dictionary<CargoAssociacao, Guid>(_chapaMembros)), CancellationToken.None);
+        await Recarregar();
+        return "Chapa salva.";
+    });
+
+    private async Task ExcluirChapa(ChapaDto c)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Tirar a chapa {c.Nome}?")) return;
+        await Executar(async () =>
+        {
+            await AssociacaoSvc.ExcluirChapaAsync(c.ChapaId, CancellationToken.None);
+            await Recarregar();
+            return "Chapa retirada.";
+        });
+    }
+
+    private async Task RefazerEleitores()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Refazer a lista pela regra? Inclusões e retiradas feitas à mão se perdem.")) return;
+        await Executar(async () =>
+        {
+            var n = await AssociacaoSvc.RefazerEleitoresAsync(_eleicao!.EleicaoId, CancellationToken.None);
+            await Recarregar();
+            return $"Lista refeita: {n} eleitores.";
+        });
+    }
+
+    private async Task IncluirEleitor() => await Executar(async () =>
+    {
+        if (!Guid.TryParse(_eleitorNovo, out var id)) return null;
+        await AssociacaoSvc.AdicionarEleitorAsync(_eleicao!.EleicaoId, id, CancellationToken.None);
+        _eleitorNovo = null;
+        await Recarregar();
+        return "Eleitor incluído.";
+    });
+
+    private async Task RemoverEleitor(EleicaoEleitorDto el) => await Executar(async () =>
+    {
+        await AssociacaoSvc.RemoverEleitorAsync(_eleicao!.EleicaoId, el.TreinadorId, CancellationToken.None);
+        await Recarregar();
+        return $"{el.Nome} saiu da lista.";
+    });
+
+    private async Task Executar(Func<Task<string?>> acao)
+    {
+        _erro = null; _ok = null; _salvando = true;
+        try { _ok = await acao(); }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+
+    // Um carregamento de carreira por vez: as escolhas seguidas nos selects não podem dividir a conexão.
+    private readonly SemaphoreSlim _carreiraUmaPorVez = new(1, 1);
+
+    private async Task CarregarTemporadas(Guid treinadorId)
+    {
+        await _carreiraUmaPorVez.WaitAsync();
+        try
+        {
+            if (_temporadas.ContainsKey(treinadorId)) return;
+            var carreira = await TreinadorSvc.GetCarreiraAsync(treinadorId, CancellationToken.None);
+            var anos = carreira?.Temporadas.Select(t => t.Temporada).Distinct().OrderBy(t => t).ToList() ?? new List<int>();
+            _temporadas[treinadorId] = anos.Count == 0 ? "sem temporadas" : $"temporadas: {string.Join(", ", anos)}";
+        }
+        catch { /* sem a linha das temporadas; tenta de novo na próxima escolha */ }
+        finally { _carreiraUmaPorVez.Release(); }
+    }
+
+    private string Temporadas(Guid treinadorId) => _temporadas.GetValueOrDefault(treinadorId, "…");
+
+    private async Task EscolherMembro(CargoAssociacao cargo, ChangeEventArgs ev)
+    {
+        _chapaMembros[cargo] = Guid.TryParse(ev.Value?.ToString(), out var g) ? g : Guid.Empty;
+        if (g != Guid.Empty) await CarregarTemporadas(g);
+    }
+
+    private static DateTime? ParaBrasilia(DateTime? utc) => utc is DateTime u ? BrazilTime.ConvertFromUtc(u) : null;
+
+    private static DateTime? ParaUtc(DateTime? local) =>
+        local is DateTime l ? BrazilTime.ConvertToUtc(DateTime.SpecifyKind(l, DateTimeKind.Unspecified)) : null;
+
+    private static string Situacao(SituacaoEleicao s) => s switch
+    {
+        SituacaoEleicao.Inscricoes => "inscrições",
+        SituacaoEleicao.Votacao => "votação",
+        SituacaoEleicao.Apuracao => "apuração",
+        SituacaoEleicao.Resultado => "resultado",
+        _ => "rascunho"
+    };
+}

@@ -86,6 +86,11 @@ public class DraftDbContext : DbContext
     public DbSet<CatalogoEscalacaoSalvo> CatalogoEscalacao => Set<CatalogoEscalacaoSalvo>();
     public DbSet<AbaEscondida> AbasEscondidas => Set<AbaEscondida>();
     public DbSet<Anuncio> Anuncios => Set<Anuncio>();
+    public DbSet<EleicaoAssociacao> AssociacaoEleicoes => Set<EleicaoAssociacao>();
+    public DbSet<ChapaAssociacao> AssociacaoChapas => Set<ChapaAssociacao>();
+    public DbSet<ChapaMembro> AssociacaoChapaMembros => Set<ChapaMembro>();
+    public DbSet<EleicaoEleitor> AssociacaoEleitores => Set<EleicaoEleitor>();
+    public DbSet<EleicaoVoto> AssociacaoVotos => Set<EleicaoVoto>();
     public DbSet<AberturaTemporada> AberturasTemporada => Set<AberturaTemporada>();
     public DbSet<PremiacaoItem> PremiacaoItens => Set<PremiacaoItem>();
     public DbSet<PremiacaoPagamento> PremiacaoPagamentos => Set<PremiacaoPagamento>();

@@ -1,0 +1,402 @@
+@page "/associacao"
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
+@inject IAssociacaoService AssociacaoSvc
+@inject ITreinadorService TreinadorSvc
+@inject AdminAuthService AdminAuth
+@inject EscudoService EscudoService
+@implements IDisposable
+
+<PageTitle>Associação de Treinadores</PageTitle>
+
+<div class="associacao">
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    @if (_carregando)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <p class="assoc-intro">
+            A Associação de Treinadores representa treinadores e auxiliares da CBFV junto à Liga: leva demandas,
+            propostas e o resultado de plebiscitos da categoria. A Liga segue soberana e com a palavra final.
+            @if (AdminAuth.IsAdmin)
+            {
+                <a href="/admin/associacao" class="btn btn-sm btn-outline-secondary ms-2"><Icone Nome="settings" Tamanho="14" /> Admin</a>
+            }
+        </p>
+
+        @* ── Diretoria em exercício ── *@
+        <div class="secao-titulo"><h2>Diretoria Executiva</h2></div>
+        @if (_diretoria is { } d)
+        {
+            <p class="text-muted small mb-2">
+                Chapa <strong>@d.Chapa.Nome</strong> · eleita em @Data(d.PosseEm) · mandato de 2 temporadas
+            </p>
+            @Membros(d.Chapa)
+        }
+        else
+        {
+            <div class="alert alert-secondary">Ainda não há diretoria eleita.</div>
+        }
+
+        @if (_eleicao is { } e)
+        {
+            <div class="secao-titulo mt-4 d-flex align-items-center gap-2 flex-wrap">
+                <h2 class="mb-0">@e.Titulo@(e.Turno > 1 ? $" · {e.Turno}º turno" : "")</h2>
+                <span class="badge @CorDaSituacao(e)">@TextoDaSituacao(e)</span>
+            </div>
+
+            <div class="assoc-calendario">
+                @if (e.InscricoesAte is DateTime insc)
+                {
+                    <div><span class="text-muted">Inscrição de chapas até</span> <strong>@DataHora(insc)</strong></div>
+                }
+                @if (e.AbreEm is DateTime abre)
+                {
+                    <div><span class="text-muted">Votação abre</span> <strong>@DataHora(abre)</strong></div>
+                }
+                @if (e.FechaEm is DateTime fecha)
+                {
+                    <div><span class="text-muted">Votação fecha</span> <strong>@DataHora(fecha)</strong></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(e.Comissao))
+                {
+                    <div><span class="text-muted">Comissão eleitoral</span> <strong>@e.Comissao</strong></div>
+                }
+                @if (e.Situacao >= SituacaoEleicao.Votacao)
+                {
+                    <div><span class="text-muted">Comparecimento</span> <strong>@e.Votaram de @e.Eleitores</strong></div>
+                }
+            </div>
+
+            @* ── Urna ── *@
+            @if (UrnaAberta(e))
+            {
+                <div class="card assoc-urna mb-4">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <Icone Nome="vote" Tamanho="18" /> <span class="fw-bold">Sua cédula</span>
+                        <span class="text-muted small ms-auto">voto secreto · um por pessoa · não dá para trocar</span>
+                    </div>
+                    <div class="card-body">
+                        @if (_eu is null)
+                        {
+                            <div class="alert alert-info mb-0">Entre com o seu token (botão <strong>Entrar</strong> no topo) para votar.</div>
+                        }
+                        else if (_meuEleitor is null)
+                        {
+                            <div class="alert alert-secondary mb-0">
+                                @_eu.Nome, você não está na lista de eleitores desta eleição. Se acha que é engano, fale com a comissão eleitoral.
+                            </div>
+                        }
+                        else if (_meuEleitor.Votou)
+                        {
+                            <div class="alert alert-success mb-0">
+                                <Icone Nome="circle-check" Tamanho="16" /> Seu voto está na urna. Ninguém sabe em quem foi: o site guarda só que você votou.
+                            </div>
+                        }
+                        else if (_confirmando)
+                        {
+                            <p class="mb-3">
+                                Confirma o voto
+                                @if (_escolha is Guid id && e.Chapas.FirstOrDefault(c => c.ChapaId == id) is { } c)
+                                {
+                                    <span>na chapa <strong>@c.Numero · @c.Nome</strong>?</span>
+                                }
+                                else
+                                {
+                                    <strong>em branco</strong><span>?</span>
+                                }
+                                Depois de confirmar não dá para mudar.
+                            </p>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" @onclick="Votar" disabled="@_salvando">Confirmar voto</button>
+                                <button class="btn btn-outline-secondary" @onclick="() => _confirmando = false" disabled="@_salvando">Voltar</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-grid gap-2 mb-3">
+                                @foreach (var c in e.Chapas)
+                                {
+                                    <label class="assoc-opcao @(_escolha == c.ChapaId && _marcou ? "marcada" : "")" @key="c.ChapaId">
+                                        <input type="radio" class="form-check-input mt-0" name="cedula" checked="@(_escolha == c.ChapaId && _marcou)"
+                                               @onchange="() => Escolher(c.ChapaId)" />
+                                        <span class="assoc-numero">@c.Numero</span>
+                                        <span class="flex-grow-1">
+                                            <span class="fw-semibold">@c.Nome</span>
+                                            <span class="d-block text-muted small">
+                                                @string.Join(" · ", c.Membros.Where(m => m.Cargo <= CargoAssociacao.VicePresidente).Select(m => $"{CargosAssociacao.Nome(m.Cargo)}: {m.Nome}"))
+                                            </span>
+                                        </span>
+                                    </label>
+                                }
+                                <label class="assoc-opcao @(_escolha is null && _marcou ? "marcada" : "")">
+                                    <input type="radio" class="form-check-input mt-0" name="cedula" checked="@(_escolha is null && _marcou)"
+                                           @onchange="() => Escolher(null)" />
+                                    <span class="assoc-numero">—</span>
+                                    <span class="flex-grow-1 text-muted">Em branco</span>
+                                </label>
+                            </div>
+                            <button class="btn btn-primary" @onclick="() => _confirmando = true" disabled="@(!_marcou)">Votar</button>
+                        }
+                    </div>
+                </div>
+            }
+            else if (e.Situacao == SituacaoEleicao.Votacao)
+            {
+                <div class="alert alert-secondary">
+                    @(e.AbreEm is DateTime a && Agora < a ? $"A urna abre {DataHora(a)}." : "A urna fechou. O resultado sai depois da apuração.")
+                </div>
+            }
+            else if (e.Situacao == SituacaoEleicao.Apuracao)
+            {
+                <div class="alert alert-secondary">Votação encerrada. A comissão está apurando; o resultado sai aqui.</div>
+            }
+
+            @* ── Resultado ── *@
+            @if (e.Situacao == SituacaoEleicao.Resultado && e.Apuracao is { } ap)
+            {
+                @if (e.ChapaVencedoraId is null)
+                {
+                    <div class="alert alert-warning">
+                        Nenhuma chapa passou de 50% dos votos válidos@(ap.Validos > 0 ? ": vai ter segundo turno entre as duas mais votadas." : ".")
+                    </div>
+                }
+                <div class="card mb-4">
+                    <ul class="list-group list-group-flush">
+                        @foreach (var c in e.Chapas.OrderByDescending(c => c.Votos))
+                        {
+                            var pct = ap.Validos == 0 ? 0m : Math.Round((c.Votos ?? 0) * 100m / ap.Validos, 1);
+                            var venceu = c.ChapaId == e.ChapaVencedoraId;
+                            <li class="list-group-item d-flex align-items-center gap-2 @(venceu ? "fw-semibold" : "")" @key="c.ChapaId">
+                                <span style="width:1.5rem;" class="text-acento">@if (venceu) { <Icone Nome="trophy" Tamanho="14" /> }</span>
+                                <span style="min-width:10rem;">@c.Numero · @c.Nome</span>
+                                <div class="flex-grow-1 d-none d-sm-block">
+                                    <div class="progress" style="height:8px;">
+                                        <div class="progress-bar" style="width:@(pct.ToString(System.Globalization.CultureInfo.InvariantCulture))%; background: @(venceu ? "var(--cbfv-acento)" : "var(--bs-tertiary-color)");"></div>
+                                    </div>
+                                </div>
+                                <span class="text-nowrap ms-auto text-end" style="min-width:7rem;">@(c.Votos ?? 0) @(c.Votos == 1 ? "voto" : "votos") · @pct.ToString("0.#", Br)%</span>
+                            </li>
+                        }
+                    </ul>
+                    <div class="card-footer small text-muted">
+                        @ap.Validos válidos · @ap.Brancos em branco · @ap.Abstencoes não votaram. Vence quem passa de 50% dos válidos (brancos não contam).
+                    </div>
+                </div>
+            }
+
+            @* ── Chapas ── *@
+            <h3 class="assoc-sub">Chapas inscritas</h3>
+            @if (e.Chapas.Count == 0)
+            {
+                <div class="alert alert-secondary">Nenhuma chapa inscrita ainda.</div>
+            }
+            @foreach (var c in e.Chapas)
+            {
+                <div class="card mb-3" @key="c.ChapaId">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <span class="assoc-numero">@c.Numero</span>
+                        <span class="fw-bold">@c.Nome</span>
+                        @if (c.ChapaId == e.ChapaVencedoraId)
+                        {
+                            <span class="badge bg-primary ms-auto">eleita</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @Membros(c)
+                        @if (!string.IsNullOrWhiteSpace(c.Plano))
+                        {
+                            <details class="mt-3">
+                                <summary class="fw-semibold">Plano de gestão</summary>
+                                <div class="texto-site mt-2">@((MarkupString)TextoDoSite.ParaHtml(c.Plano))</div>
+                            </details>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── Eleitores ── *@
+            <h3 class="assoc-sub">Quem vota (@_eleitores.Count)</h3>
+            <p class="text-muted small">
+                Treinadores e auxiliares em exercício na data da eleição, um voto cada (Art. 8º).
+                @if (e.Situacao >= SituacaoEleicao.Votacao)
+                {
+                    <span>O ✓ mostra só quem já votou, não em quem.</span>
+                }
+            </p>
+            <div class="assoc-eleitores mb-4">
+                @foreach (var el in _eleitores)
+                {
+                    <span class="assoc-eleitor @(el.Votou ? "votou" : "")" @key="el.TreinadorId" title="@DicaEleitor(el)">
+                        @if (el.Time is { Length: > 0 } t)
+                        {
+                            <img src="@EscudoService.GetEscudo(t)" alt="" />
+                        }
+                        @el.Nome@(el.Papel == PapelTreinador.Auxiliar ? " (aux.)" : "")
+                        @if (el.Votou)
+                        {
+                            <Icone Nome="check" Tamanho="12" />
+                        }
+                    </span>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(e.Edital))
+            {
+                <details class="card mb-4">
+                    <summary class="card-header fw-semibold">Edital da eleição</summary>
+                    <div class="card-body texto-site">@((MarkupString)TextoDoSite.ParaHtml(e.Edital))</div>
+                </details>
+            }
+        }
+    }
+</div>
+
+@code {
+    private static readonly System.Globalization.CultureInfo Br = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
+    private bool _carregando = true;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    private DiretoriaAssociacaoDto? _diretoria;
+    private EleicaoDto? _eleicao;
+    private IReadOnlyList<EleicaoEleitorDto> _eleitores = Array.Empty<EleicaoEleitorDto>();
+    private TreinadorDto? _eu;
+    private EleicaoEleitorDto? _meuEleitor;
+
+    private Guid? _escolha;
+    private bool _marcou;
+    private bool _confirmando;
+
+    private readonly SemaphoreSlim _umaPorVez = new(1, 1);
+
+    private static DateTime Agora => DateTime.UtcNow;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AdminAuth.AuthenticationChanged += AoTrocarDeToken;
+        await Carregar();
+    }
+
+    public void Dispose() => AdminAuth.AuthenticationChanged -= AoTrocarDeToken;
+
+    private void AoTrocarDeToken() => _ = InvokeAsync(async () => { await Carregar(); StateHasChanged(); });
+
+    private async Task Carregar()
+    {
+        await _umaPorVez.WaitAsync();
+        _carregando = true;
+        try
+        {
+            await AdminAuth.EnsureInitializedAsync();
+            var token = await AdminAuth.GetTokenAsync();
+            _eu = string.IsNullOrWhiteSpace(token) ? null : await TreinadorSvc.GetPorTokenAsync(token, CancellationToken.None);
+
+            _diretoria = await AssociacaoSvc.GetDiretoriaAsync(CancellationToken.None);
+            _eleicao = await AssociacaoSvc.GetAtualAsync(CancellationToken.None);
+            _eleitores = _eleicao is null
+                ? Array.Empty<EleicaoEleitorDto>()
+                : await AssociacaoSvc.EleitoresAsync(_eleicao.EleicaoId, CancellationToken.None);
+            _meuEleitor = _eu is null ? null : _eleitores.FirstOrDefault(x => x.TreinadorId == _eu.TreinadorId);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally
+        {
+            _carregando = false;
+            _umaPorVez.Release();
+        }
+    }
+
+    private void Escolher(Guid? chapaId)
+    {
+        _escolha = chapaId;
+        _marcou = true;
+    }
+
+    private async Task Votar()
+    {
+        if (_eleicao is null || _eu is null || !_marcou) return;
+        _erro = null; _ok = null; _salvando = true;
+        try
+        {
+            await AssociacaoSvc.VotarAsync(_eleicao.EleicaoId, _eu.TreinadorId, _escolha, CancellationToken.None);
+            _confirmando = false;
+            _marcou = false;
+            _escolha = null;
+            await Carregar();
+            _ok = "Voto registrado. Obrigado!";
+        }
+        catch (Exception ex)
+        {
+            _confirmando = false;
+            _erro = ex.Message;
+        }
+        finally { _salvando = false; }
+    }
+
+    private static string DicaEleitor(EleicaoEleitorDto el) =>
+        (el.Time ?? "sem clube") + (el.Papel == PapelTreinador.Auxiliar ? " · auxiliar" : "");
+
+    private static bool UrnaAberta(EleicaoDto e) =>
+        e.Situacao == SituacaoEleicao.Votacao
+        && (e.AbreEm is not DateTime a || Agora >= a)
+        && (e.FechaEm is not DateTime f || Agora < f);
+
+    private RenderFragment Membros(ChapaDto c) => __builder =>
+    {
+        <div class="assoc-membros">
+            @foreach (var m in c.Membros)
+            {
+                <div class="assoc-membro" @key="m.Cargo">
+                    @if (m.TimeAtual is { Length: > 0 } time)
+                    {
+                        <img src="@EscudoService.GetEscudo(time)" alt="" title="@time" />
+                    }
+                    else
+                    {
+                        <span class="assoc-sem-escudo"></span>
+                    }
+                    <div>
+                        <div class="assoc-cargo">@CargosAssociacao.Nome(m.Cargo)</div>
+                        <a href="/treinadores/@m.TreinadorId" class="fw-semibold">@m.Nome</a>
+                        <div class="text-muted small">@(m.TimeAtual ?? "sem clube")</div>
+                    </div>
+                </div>
+            }
+        </div>
+    };
+
+    private string TextoDaSituacao(EleicaoDto e) => e.Situacao switch
+    {
+        SituacaoEleicao.Inscricoes => "inscrições",
+        SituacaoEleicao.Votacao => UrnaAberta(e) ? "votação aberta" : (e.AbreEm is DateTime a && Agora < a ? "votação em breve" : "urna fechada"),
+        SituacaoEleicao.Apuracao => "apuração",
+        SituacaoEleicao.Resultado => "resultado",
+        _ => "rascunho"
+    };
+
+    private string CorDaSituacao(EleicaoDto e) => e.Situacao switch
+    {
+        SituacaoEleicao.Votacao when UrnaAberta(e) => "bg-success",
+        SituacaoEleicao.Votacao or SituacaoEleicao.Apuracao => "bg-warning text-dark",
+        SituacaoEleicao.Resultado => "bg-primary",
+        _ => "bg-secondary"
+    };
+
+    private static string Data(DateTime utc) => BrazilTime.ConvertFromUtc(utc).ToString("d 'de' MMMM 'de' yyyy", Br);
+
+    private static string DataHora(DateTime utc) => BrazilTime.ConvertFromUtc(utc).ToString("dd/MM 'às' HH'h'mm", Br);
+}

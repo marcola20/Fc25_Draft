@@ -50,6 +50,7 @@ public class LayoutNavigationService
             new("Jogadores", "/players", "user"),
             new("Comparar Jogadores", "/jogadores/comparar", "arrow-left-right"),
             new("Treinadores", "/treinadores", "briefcase"),
+            new("Associação de Treinadores", "/associacao", "landmark"),
             new("Valor de Elenco", "/times/caixa", "banknote"),
             new("Virada de Temporada", "/virada", "refresh-cw"),
             new("Como o overall é calculado", "/overall", "calculator")
@@ -101,6 +102,7 @@ public class LayoutNavigationService
             new("Prêmios da Temporada", "/admin/premios", "star"),
             new("Gerenciar Regulamento", "/admin/regulamento", "file-text"),
             new("Anúncios", "/admin/anuncios", "megaphone"),
+            new("Eleição da Associação", "/admin/associacao", "vote"),
             new("Artes automáticas", "/admin/artes", "camera")
         }, RequiredRole: "Admin", CollapseByDefault: true),
         new("Admin · Mercado", new List<MenuItem>
@@ -316,6 +318,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Artes automáticas")
+            }
+        },
+        ["/associacao"] = new PageDefinition
+        {
+            Route = "/associacao",
+            Title = "Associação de Treinadores",
+            Subtitle = "Diretoria, eleição e votação da categoria",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Clubes e Jogadores"),
+                new("Associação de Treinadores")
+            }
+        },
+        ["/admin/associacao"] = new PageDefinition
+        {
+            Route = "/admin/associacao",
+            Title = "Eleição da Associação",
+            Subtitle = "Chapas, eleitores, urna e resultado — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Eleição da Associação")
             }
         },
         ["/admin/anuncios"] = new PageDefinition

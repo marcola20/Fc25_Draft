@@ -12,6 +12,7 @@
 @inject ITreinoService TreinoSvc
 @inject IPicksDoDraftService PicksSvc
 @inject IAnuncioService AnuncioSvc
+@inject IAssociacaoService AssociacaoSvc
 @inject IMosaicoService MosaicoSvc
 
 @implements IDisposable
@@ -109,6 +110,7 @@
             try { noticias.AddRange(await TreinoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await PicksSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             try { noticias.AddRange(await AnuncioSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
+            try { noticias.AddRange(await AssociacaoSvc.GetNoticiasAsync(CancellationToken.None)); } catch { }
             _noticias = noticias.OrderByDescending(n => n.Data).Take(NoticiasNaPaginaInicial).ToList();
         }
         catch { }

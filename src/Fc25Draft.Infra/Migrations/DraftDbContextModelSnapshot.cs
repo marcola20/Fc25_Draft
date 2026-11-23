@@ -524,6 +524,55 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("CatalogoEscalacao", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ChapaAssociacao", b =>
+                {
+                    b.Property<Guid>("ChapaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EleicaoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Plano")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
+
+                    b.HasKey("ChapaId");
+
+                    b.HasIndex("EleicaoId", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("AssociacaoChapas", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ChapaMembro", b =>
+                {
+                    b.Property<Guid>("ChapaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Cargo")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ChapaId", "Cargo");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.ToTable("AssociacaoChapaMembros", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.ChavePush", b =>
                 {
                     b.Property<int>("ChavePushId")
@@ -1066,6 +1115,106 @@ namespace Fc25Draft.Infra.Migrations
                         .IsUnique();
 
                     b.ToTable("DraftWishlistEntries", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoAssociacao", b =>
+                {
+                    b.Property<Guid>("EleicaoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AbreEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("ChapaVencedoraId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comissao")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Edital")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTime?>("EncerradaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("FechaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("InscricoesAte")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("ResultadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Situacao")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<int>("Turno")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("VotacaoAbertaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("EleicaoId");
+
+                    b.HasIndex("CriadaEm");
+
+                    b.ToTable("AssociacaoEleicoes", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoEleitor", b =>
+                {
+                    b.Property<Guid>("EleicaoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("VotouEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("EleicaoId", "TreinadorId");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.ToTable("AssociacaoEleitores", (string)null);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoVoto", b =>
+                {
+                    b.Property<Guid>("VotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChapaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EleicaoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("VotoId");
+
+                    b.HasIndex("ChapaId");
+
+                    b.HasIndex("EleicaoId");
+
+                    b.ToTable("AssociacaoVotos", (string)null);
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Emprestimo", b =>
@@ -4407,6 +4556,36 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Team");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ChapaAssociacao", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.EleicaoAssociacao", "Eleicao")
+                        .WithMany("Chapas")
+                        .HasForeignKey("EleicaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Eleicao");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ChapaMembro", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.ChapaAssociacao", "Chapa")
+                        .WithMany("Membros")
+                        .HasForeignKey("ChapaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Chapa");
+
+                    b.Navigation("Treinador");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.ClausulaRevenda", b =>
                 {
                     b.HasOne("Fc25Draft.Core.Entities.Team", "Beneficiario")
@@ -4701,6 +4880,39 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Player");
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoEleitor", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.EleicaoAssociacao", "Eleicao")
+                        .WithMany("Eleitores")
+                        .HasForeignKey("EleicaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Eleicao");
+
+                    b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoVoto", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.ChapaAssociacao", null)
+                        .WithMany()
+                        .HasForeignKey("ChapaId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Fc25Draft.Core.Entities.EleicaoAssociacao", null)
+                        .WithMany()
+                        .HasForeignKey("EleicaoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Emprestimo", b =>
@@ -5968,6 +6180,11 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Figurinhas");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ChapaAssociacao", b =>
+                {
+                    b.Navigation("Membros");
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Draft", b =>
                 {
                     b.Navigation("Picks");
@@ -5999,6 +6216,13 @@ namespace Fc25Draft.Infra.Migrations
             modelBuilder.Entity("Fc25Draft.Core.Entities.DraftWishlistEdicao", b =>
                 {
                     b.Navigation("Entradas");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.EleicaoAssociacao", b =>
+                {
+                    b.Navigation("Chapas");
+
+                    b.Navigation("Eleitores");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.Liga", b =>

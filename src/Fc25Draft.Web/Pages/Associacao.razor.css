@@ -1,0 +1,107 @@
+.associacao {
+    padding: 1rem 0.75rem 2rem;
+    max-width: 1100px;
+}
+
+.assoc-intro {
+    color: var(--bs-secondary-color);
+    max-width: 70ch;
+    margin-bottom: 1.5rem;
+}
+
+.assoc-sub {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.75rem;
+}
+
+.assoc-calendario {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.5rem;
+    font-size: 0.9rem;
+    margin: 0.5rem 0 1.25rem;
+}
+
+.assoc-membros {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.75rem;
+}
+
+.assoc-membro {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+}
+
+.assoc-membro img,
+.assoc-sem-escudo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+}
+
+.assoc-cargo {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+}
+
+.assoc-numero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 0.4rem;
+    border: 1px solid var(--bs-border-color);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.assoc-opcao {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.8rem;
+    cursor: pointer;
+}
+
+.assoc-opcao.marcada {
+    border-color: var(--cbfv-acento, var(--bs-primary));
+    box-shadow: 0 0 0 1px var(--cbfv-acento, var(--bs-primary));
+}
+
+.assoc-eleitores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.assoc-eleitor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem 0.15rem 0.3rem;
+    font-size: 0.85rem;
+}
+
+.assoc-eleitor img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+.assoc-eleitor.votou {
+    border-color: var(--bs-success);
+}
+
+details > summary {
+    cursor: pointer;
+}
