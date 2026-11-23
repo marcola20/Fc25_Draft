@@ -399,7 +399,7 @@
 
     private string _nomeA = "", _nomeB = "";
     private DateTime _inicio = DateTime.Today, _fim = DateTime.Today.AddMonths(2);
-    private int _vagasDiretasA = 1, _vagasPlayoffA = 1, _vagasDiretasB = 1, _vagasPlayoffB = 1;
+    private int _vagasDiretasA = 2, _vagasPlayoffA = 1, _vagasDiretasB = 2, _vagasPlayoffB = 1;
     private bool _criarSerieB = true;
     private readonly HashSet<Guid> _extras = new();
     private TemporadaViradaMercadoDto? _virada;
@@ -435,7 +435,11 @@
         _nomeA = ProximoNome(_resumo.SerieA?.Nome, proxima, "Série A");
         _nomeB = ProximoNome(_resumo.SerieB?.Nome, proxima, "Série B");
         _criarSerieB = true;
-        _vagasDiretasA = _vagasPlayoffA = _vagasDiretasB = _vagasPlayoffB = 1;
+        // A próxima temporada repete as vagas da atual (regra aprovada em 2011: 2 caem/sobem direto + 1 no playoff).
+        _vagasDiretasA = _resumo.SerieA?.VagasDiretas ?? 2;
+        _vagasPlayoffA = _resumo.SerieA?.VagasPlayoff ?? 1;
+        _vagasDiretasB = _resumo.SerieB?.VagasDiretas ?? 2;
+        _vagasPlayoffB = _resumo.SerieB?.VagasPlayoff ?? 1;
     }
 
     /// <summary>Repete o nome da divisão trocando o ano; sem ano no nome, usa "Série X {temporada}".</summary>

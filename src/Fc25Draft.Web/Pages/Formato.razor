@@ -43,6 +43,13 @@
     private int RodadasB => Rodadas(Divisao.SerieB, 7);
     private int TimesB => RodadasB + 1;
 
+    // Acesso e rebaixamento (proposta aprovada para 2011): 2 caem/sobem direto e 1 de cada lado no playoff.
+    private const int CaemDireto = 2;
+    private const int SobemDireto = 2;
+    private int PlayoffA => TimesA - CaemDireto;
+    private const int PlayoffB = SobemDireto + 1;
+    private string Rebaixados => $"{TimesA - 1}° e o {TimesA}°";
+
     private static string Classe(DataDaTemporada data) => data switch
     {
         { EhJogo: false } => "fmt-cal-mercado",
@@ -80,8 +87,8 @@
         <div class="fmt-card fmt-card-liga">
             <p class="fmt-desc">
                 Todos os <strong>@TimesA times</strong> se enfrentam em <strong>pontos corridos</strong> ao longo de <strong>@RodadasA rodadas</strong>.
-                O primeiro colocado ao final é o <strong>campeão da Série A</strong>. O <strong>último cai</strong> para a Série B e o
-                <strong>@(TimesA - 1)° disputa o playoff</strong> contra o 2° da Série B.
+                O primeiro colocado ao final é o <strong>campeão da Série A</strong>. O <strong>@Rebaixados caem</strong> para a Série B e o
+                <strong>@(PlayoffA)° disputa o playoff</strong> contra o @(PlayoffB)° da Série B.
             </p>
 
             <div class="fmt-tiebreak-section">
@@ -146,7 +153,7 @@
             <p class="fmt-desc">
                 A <strong>Série B</strong> é a segunda divisão: <strong>@TimesB times</strong> em <strong>pontos corridos</strong>,
                 ao longo de <strong>@RodadasB rodadas</strong>.
-                O <strong>campeão sobe direto</strong> e o <strong>2° disputa o playoff de acesso</strong>.
+                O <strong>1° e o 2° sobem direto</strong> e o <strong>@(PlayoffB)° disputa o playoff de acesso</strong>.
             </p>
             <p class="fmt-desc">
                 Na Série B o desempate da tabela, que vale também para o título, é
@@ -156,7 +163,7 @@
                 no fim, disputam uma <strong>mini liga</strong> (jogos extras entre eles).
             </p>
             <p class="fmt-desc">
-                O <strong>playoff de acesso</strong> é um <strong>jogo único</strong> entre o 2° da Série B e o @(TimesA - 1)° da Série A.
+                O <strong>playoff de acesso</strong> é um <strong>jogo único</strong> entre o @(PlayoffB)° da Série B e o @(PlayoffA)° da Série A.
                 Quem vencer joga a Série A na temporada seguinte. Em caso de empate, a vaga sai nos <strong>pênaltis</strong>.
             </p>
         </div>
@@ -165,8 +172,8 @@
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon"><Icone Nome="medal" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
-                    <strong>Campeão da Série B</strong>
-                    <span>sobe direto</span>
+                    <strong>1° e 2° da Série B</strong>
+                    <span>sobem direto</span>
                 </div>
             </div>
             <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
@@ -174,15 +181,15 @@
                 <div class="fmt-flow-icon"><Icone Nome="swords" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
                     <strong>Playoff de acesso</strong>
-                    <span>2° da B x @(TimesA - 1)° da A · jogo único</span>
+                    <span>@(PlayoffB)° da B x @(PlayoffA)° da A · jogo único</span>
                 </div>
             </div>
             <div class="fmt-flow-connector"><Icone Nome="chevron-right" Tamanho="16" /></div>
             <div class="fmt-flow-step">
                 <div class="fmt-flow-icon"><Icone Nome="trending-down" Tamanho="18" /></div>
                 <div class="fmt-flow-content">
-                    <strong>Último da Série A</strong>
-                    <span>cai direto</span>
+                    <strong>@Rebaixados da Série A</strong>
+                    <span>caem direto</span>
                 </div>
             </div>
         </div>

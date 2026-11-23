@@ -82,8 +82,16 @@
                         <h3>Série B</h3>
                     </div>
                     <p class="prem-section-desc">
-                        <Icone Nome="arrow-up" Tamanho="14" /> O <strong>campeão sobe direto</strong> para a Série A. O <strong>2° disputa o playoff de acesso</strong>,
-                        em jogo único contra quem ficou logo acima da zona de rebaixamento da Série A.
+                        @if (_premiacao.Temporada >= 2011)
+                        {
+                            <Icone Nome="arrow-up" Tamanho="14" /> @:O <strong>1° e o 2° sobem direto</strong> para a Série A. O <strong>3° disputa o playoff de acesso</strong>,
+                            @:em jogo único contra o 8° da Série A (quem ficou logo acima da zona de rebaixamento).
+                        }
+                        else
+                        {
+                            <Icone Nome="arrow-up" Tamanho="14" /> @:O <strong>campeão sobe direto</strong> para a Série A. O <strong>2° disputa o playoff de acesso</strong>,
+                            @:em jogo único contra quem ficou logo acima da zona de rebaixamento da Série A.
+                        }
                     </p>
 
                     <div class="prem-league-grid">

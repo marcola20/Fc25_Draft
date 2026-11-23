@@ -1117,11 +1117,11 @@
     private Divisao? _formDivisao;
     private int? _formVagasDiretas, _formVagasPlayoff;
 
-    // Padrão das próximas temporadas: 1 direto + 1 no playoff (dá para ajustar, ex.: 2 + 0 na transição de 12 para 10).
+    // Padrão desde 2011: 2 direto + 1 no playoff (Série A: 9º e 10º caem, 8º no playoff; Série B: 1º e 2º sobem, 3º no playoff).
     private void AoMudarDivisao()
     {
         if (_formDivisao is null) { _formVagasDiretas = null; _formVagasPlayoff = null; return; }
-        _formVagasDiretas ??= 1;
+        _formVagasDiretas ??= 2;
         _formVagasPlayoff ??= 1;
     }
 
