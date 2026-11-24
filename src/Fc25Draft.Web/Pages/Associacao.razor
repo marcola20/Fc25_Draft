@@ -53,7 +53,7 @@
         @if (_eleicao is { } e)
         {
             <div class="secao-titulo mt-4 d-flex align-items-center gap-2 flex-wrap">
-                <h2 class="mb-0">@e.Titulo@(e.Turno > 1 ? $" · {e.Turno}º turno" : "")</h2>
+                <h2 class="mb-0">@e.Titulo@(e.Turno > 1 || e.Desempate ? $" · {e.Etapa}" : "")</h2>
                 <span class="badge @CorDaSituacao(e)">@TextoDaSituacao(e)</span>
             </div>
 
@@ -167,11 +167,9 @@
             @* ── Resultado ── *@
             @if (e.Situacao == SituacaoEleicao.Resultado && e.Apuracao is { } ap)
             {
-                @if (e.ChapaVencedoraId is null)
+                @if (e.Desfecho is { } desfecho)
                 {
-                    <div class="alert alert-warning">
-                        Nenhuma chapa passou de 50% dos votos válidos@(ap.Validos > 0 ? ": vai ter segundo turno entre as duas mais votadas." : ".")
-                    </div>
+                    <div class="alert @(desfecho.Tipo == TipoDesfecho.Eleita ? "alert-success" : "alert-warning")">@desfecho.Texto</div>
                 }
                 <div class="card mb-4">
                     <ul class="list-group list-group-flush">

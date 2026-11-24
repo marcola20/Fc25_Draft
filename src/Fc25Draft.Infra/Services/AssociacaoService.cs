@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Fc25Draft.Infra.Services;
 
 /// <summary>Eleição da Associação de Treinadores (página /associacao, admin em /admin/associacao).</summary>
-public class AssociacaoService : IAssociacaoService
+public partial class AssociacaoService : IAssociacaoService
 {
     private readonly DraftDbContext _db;
     private readonly TimeProvider _time;
@@ -110,29 +110,26 @@ public class AssociacaoService : IAssociacaoService
     {
         var eleicoes = await _db.AssociacaoEleicoes.AsNoTracking()
             .Where(e => e.Situacao != SituacaoEleicao.Rascunho)
-            .Select(e => new { e.Titulo, e.Turno, e.VotacaoAbertaEm, e.ResultadoEm, e.ChapaVencedoraId })
+            .Select(e => new { e.Titulo, e.Turno, e.Desempate, e.VotacaoAbertaEm, e.ResultadoEm, e.ChapaVencedoraId })
             .ToListAsync(ct);
 
-        var vencedoras = eleicoes.Where(e => e.ChapaVencedoraId != null).Select(e => e.ChapaVencedoraId!.Value).ToList();
-        var nomes = await _db.AssociacaoChapas.AsNoTracking()
-            .Where(c => vencedoras.Contains(c.ChapaId))
-            .ToDictionaryAsync(c => c.ChapaId, c => c.Nome, ct);
+        var nomes = await NomesAsync(eleicoes.Where(e => e.ChapaVencedoraId != null).Select(e => e.ChapaVencedoraId!.Value), ct);
 
         var noticias = new List<PlantaoNoticiaDto>();
         foreach (var e in eleicoes)
         {
-            var turno = e.Turno > 1 ? $" ({e.Turno}º turno)" : "";
+            var etapa = CargosAssociacao.Etapa(e.Turno, e.Desempate);
             if (e.VotacaoAbertaEm is DateTime aberta)
                 noticias.Add(new PlantaoNoticiaDto(aberta, PlantaoCategoria.Novidade, "🗳️",
-                    $"Associação de Treinadores: votação aberta{turno}",
+                    $"Associação de Treinadores: votação aberta ({etapa})",
                     "Treinadores e auxiliares escolhem a Diretoria Executiva. Voto secreto, no site.", "/associacao", null));
 
             if (e.ResultadoEm is DateTime resultado)
                 noticias.Add(e.ChapaVencedoraId is Guid v && nomes.TryGetValue(v, out var nome)
                     ? new PlantaoNoticiaDto(resultado, PlantaoCategoria.Novidade, "🏛️",
-                        $"Chapa {nome} eleita para a Associação de Treinadores", e.Titulo + turno, "/associacao", null)
+                        $"Chapa {nome} eleita para a Associação de Treinadores", $"{e.Titulo} · {etapa}", "/associacao", null)
                     : new PlantaoNoticiaDto(resultado, PlantaoCategoria.Novidade, "🗳️",
-                        $"Associação de Treinadores: nenhuma chapa passou de 50%", "Vai ter segundo turno.", "/associacao", null));
+                        $"Associação de Treinadores: resultado do {etapa}", "Ainda sem chapa eleita. Veja a próxima etapa.", "/associacao", null));
         }
 
         return noticias;
@@ -143,7 +140,7 @@ public class AssociacaoService : IAssociacaoService
     public async Task<IReadOnlyList<EleicaoResumoDto>> ListAsync(CancellationToken ct) =>
         await _db.AssociacaoEleicoes.AsNoTracking()
             .OrderByDescending(e => e.CriadaEm)
-            .Select(e => new EleicaoResumoDto(e.EleicaoId, e.Titulo, e.Turno, e.Situacao, e.CriadaEm))
+            .Select(e => new EleicaoResumoDto(e.EleicaoId, e.Titulo, e.Turno, e.Desempate, e.Situacao, e.CriadaEm))
             .ToListAsync(ct);
 
     public async Task<EleicaoDto?> GetAsync(Guid eleicaoId, bool comContagem, CancellationToken ct)
@@ -185,9 +182,16 @@ public class AssociacaoService : IAssociacaoService
                 mostraContagem ? porChapa.GetValueOrDefault(c.ChapaId) : null))
             .ToList();
 
-        return new EleicaoDto(e.EleicaoId, e.Titulo, e.Turno, e.Situacao, e.InscricoesAte, e.AbreEm, e.FechaEm,
+        // No resultado, o que ele decide; na apuração (admin), a prévia do que a publicação vai decidir.
+        DesfechoEleicaoDto? desfecho = null;
+        if (mostraContagem)
+            desfecho = await DesfechoAsync(e, e.Situacao == SituacaoEleicao.Resultado
+                ? e.ChapaVencedoraId
+                : VencedoraPelaContagem(e, porChapa), ct);
+
+        return new EleicaoDto(e.EleicaoId, e.Titulo, e.Turno, e.Desempate, e.Situacao, e.InscricoesAte, e.AbreEm, e.FechaEm,
             e.Edital, e.Comissao, chapas, eleitores, votaram, apuracao,
-            e.Situacao == SituacaoEleicao.Resultado ? e.ChapaVencedoraId : null, e.CriadaEm, e.ResultadoEm);
+            e.Situacao == SituacaoEleicao.Resultado ? e.ChapaVencedoraId : null, e.CriadaEm, e.ResultadoEm, desfecho);
     }
 
     public async Task<EleicaoDto> CriarAsync(EleicaoSalvarRequest request, CancellationToken ct)
@@ -408,85 +412,6 @@ public class AssociacaoService : IAssociacaoService
                 throw new InvalidOperationException("Não há passo para voltar.");
         }
         await _db.SaveChangesAsync(ct);
-    }
-
-    public async Task<string> PublicarResultadoAsync(Guid eleicaoId, CancellationToken ct)
-    {
-        var eleicao = await BuscarAsync(eleicaoId, ct);
-        if (eleicao.Situacao != SituacaoEleicao.Apuracao) throw new InvalidOperationException("Encerre a votação antes de publicar.");
-
-        var votos = await _db.AssociacaoVotos.AsNoTracking()
-            .Where(v => v.EleicaoId == eleicaoId && v.ChapaId != null)
-            .GroupBy(v => v.ChapaId!.Value)
-            .Select(g => new { ChapaId = g.Key, Votos = g.Count() })
-            .ToListAsync(ct);
-        var validos = votos.Sum(v => v.Votos);
-
-        // Art. 9º, II: vence quem passar de 50% dos votos válidos (brancos não contam).
-        var vencedora = votos.FirstOrDefault(v => v.Votos * 2 > validos);
-        eleicao.ChapaVencedoraId = vencedora?.ChapaId;
-        eleicao.Situacao = SituacaoEleicao.Resultado;
-        eleicao.ResultadoEm = Agora;
-        await _db.SaveChangesAsync(ct);
-
-        if (vencedora is null)
-            return validos == 0
-                ? "Resultado publicado sem votos válidos: nenhuma chapa eleita."
-                : "Resultado publicado. Nenhuma chapa passou de 50% dos votos válidos: crie o segundo turno.";
-
-        var nome = await _db.AssociacaoChapas.Where(c => c.ChapaId == vencedora.ChapaId).Select(c => c.Nome).FirstAsync(ct);
-        return $"Resultado publicado: chapa {nome} eleita com {vencedora.Votos} de {validos} votos válidos.";
-    }
-
-    public async Task<EleicaoDto> CriarSegundoTurnoAsync(Guid eleicaoId, CancellationToken ct)
-    {
-        var primeiro = await _db.AssociacaoEleicoes.AsNoTracking()
-            .Include(e => e.Chapas).ThenInclude(c => c.Membros)
-            .FirstOrDefaultAsync(e => e.EleicaoId == eleicaoId, ct)
-            ?? throw new InvalidOperationException("Eleição não encontrada.");
-        if (primeiro.Situacao != SituacaoEleicao.Resultado || primeiro.ChapaVencedoraId is not null)
-            throw new InvalidOperationException("Segundo turno só quando o resultado sai sem chapa eleita.");
-        if (await _db.AssociacaoEleicoes.AnyAsync(e => e.CriadaEm > primeiro.CriadaEm, ct))
-            throw new InvalidOperationException("Já existe uma eleição mais nova que esta.");
-
-        var votos = await _db.AssociacaoVotos.AsNoTracking()
-            .Where(v => v.EleicaoId == eleicaoId && v.ChapaId != null)
-            .GroupBy(v => v.ChapaId!.Value)
-            .Select(g => new { ChapaId = g.Key, Votos = g.Count() })
-            .ToDictionaryAsync(v => v.ChapaId, v => v.Votos, ct);
-
-        var ordem = primeiro.Chapas.OrderByDescending(c => votos.GetValueOrDefault(c.ChapaId)).ToList();
-        if (ordem.Count < 2) throw new InvalidOperationException("Precisa de ao menos duas chapas para o segundo turno.");
-        if (ordem.Count > 2 && votos.GetValueOrDefault(ordem[1].ChapaId) == votos.GetValueOrDefault(ordem[2].ChapaId))
-            throw new InvalidOperationException("Empate no segundo lugar: monte o segundo turno à mão, com as chapas certas.");
-
-        var segundo = new EleicaoAssociacao
-        {
-            EleicaoId = Guid.NewGuid(),
-            Titulo = primeiro.Titulo,
-            Turno = primeiro.Turno + 1,
-            Situacao = SituacaoEleicao.Rascunho,
-            Edital = primeiro.Edital,
-            Comissao = primeiro.Comissao,
-            CriadaEm = Agora
-        };
-        _db.AssociacaoEleicoes.Add(segundo);
-
-        var numero = 1;
-        foreach (var c in ordem.Take(2))
-        {
-            var nova = new ChapaAssociacao { ChapaId = Guid.NewGuid(), EleicaoId = segundo.EleicaoId, Numero = numero++, Nome = c.Nome, Plano = c.Plano };
-            _db.AssociacaoChapas.Add(nova);
-            foreach (var m in c.Membros)
-                _db.AssociacaoChapaMembros.Add(new ChapaMembro { ChapaId = nova.ChapaId, Cargo = m.Cargo, TreinadorId = m.TreinadorId });
-        }
-
-        // Mesmos eleitores do primeiro turno, todos sem voto.
-        var eleitores = await _db.AssociacaoEleitores.AsNoTracking().Where(e => e.EleicaoId == eleicaoId).Select(e => e.TreinadorId).ToListAsync(ct);
-        _db.AssociacaoEleitores.AddRange(eleitores.Select(id => new EleicaoEleitor { EleicaoId = segundo.EleicaoId, TreinadorId = id }));
-
-        await _db.SaveChangesAsync(ct);
-        return (await GetAsync(segundo.EleicaoId, true, ct))!;
     }
 
     // ── Apoio ────────────────────────────────────────────────────────────────

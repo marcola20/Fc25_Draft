@@ -1126,6 +1126,9 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<DateTime?>("AbreEm")
                         .HasColumnType("timestamp without time zone");
 
+                    b.Property<Guid?>("AnteriorId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ChapaVencedoraId")
                         .HasColumnType("uuid");
 
@@ -1138,6 +1141,13 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<DateTime>("CriadaEm")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("DecisaoPresidencia")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("Desempate")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Edital")
                         .IsRequired()

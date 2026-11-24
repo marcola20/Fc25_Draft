@@ -65,6 +65,15 @@ public interface IAssociacaoService
     /// <summary>Homologa e publica. Devolve o que aconteceu (chapa eleita ou segundo turno).</summary>
     Task<string> PublicarResultadoAsync(Guid eleicaoId, CancellationToken ct);
 
-    /// <summary>Segundo turno com as duas chapas mais votadas e os mesmos eleitores, em rascunho.</summary>
-    Task<EleicaoDto> CriarSegundoTurnoAsync(Guid eleicaoId, CancellationToken ct);
+    /// <summary>
+    /// Cria a etapa que o resultado pede (Art. 10): 2º turno com as duas classificadas ou votação de desempate só
+    /// com as empatadas. Em rascunho, com os mesmos eleitores.
+    /// </summary>
+    Task<EleicaoDto> CriarProximaEtapaAsync(Guid eleicaoId, CancellationToken ct);
+
+    /// <summary>
+    /// O desempate empatou de novo (Art. 10, VI e VII): a Presidência escolhe entre as empatadas. No 1º turno já
+    /// cria o 2º turno com as escolhidas; no 2º, a escolhida é a eleita. Devolve o que aconteceu.
+    /// </summary>
+    Task<string> DecidirPelaPresidenciaAsync(Guid eleicaoId, IReadOnlyCollection<Guid> chapas, CancellationToken ct);
 }

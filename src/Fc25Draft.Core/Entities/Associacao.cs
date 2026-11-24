@@ -40,6 +40,18 @@ public class EleicaoAssociacao
     /// <summary>1 ou 2. O segundo turno nasce do primeiro, com as duas chapas mais votadas.</summary>
     public int Turno { get; set; } = 1;
 
+    /// <summary>
+    /// Votação de desempate do turno (Art. 10, V e VII): só com as chapas empatadas. No 1º turno decide quem vai
+    /// ao 2º; no 2º, quem é eleita. Uma só: se empatar de novo, a Presidência da CBFV decide.
+    /// </summary>
+    public bool Desempate { get; set; }
+
+    /// <summary>A etapa de onde esta nasceu (2º turno ou desempate). Nulo no 1º turno.</summary>
+    public Guid? AnteriorId { get; set; }
+
+    /// <summary>Texto da decisão da Presidência quando o desempate empatou de novo. Nulo se não houve.</summary>
+    public string? DecisaoPresidencia { get; set; }
+
     public SituacaoEleicao Situacao { get; set; }
 
     /// <summary>Fim das inscrições de chapa (UTC). Só informativo: quem inscreve a chapa no site é o admin.</summary>

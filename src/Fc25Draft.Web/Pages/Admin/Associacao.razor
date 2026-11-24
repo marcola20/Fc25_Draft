@@ -33,7 +33,7 @@
                     @foreach (var x in _lista)
                     {
                         <option value="@x.EleicaoId" selected="@(x.EleicaoId == _eleicao?.EleicaoId)">
-                            @x.Titulo@(x.Turno > 1 ? $" · {x.Turno}º turno" : "") (@Situacao(x.Situacao))
+                            @x.Titulo · @x.Etapa (@Situacao(x.Situacao))
                         </option>
                     }
                 </select>
@@ -61,7 +61,7 @@
                     @if (e is not null)
                     {
                         <span class="badge bg-secondary">@Situacao(e.Situacao)</span>
-                        @if (e.Turno > 1) { <span class="badge bg-dark">@e.Turno º turno</span> }
+                        <span class="badge bg-dark">@e.Etapa</span>
                     }
                 </div>
                 <div class="card-body">
@@ -125,8 +125,11 @@
                                 <button class="btn btn-primary" @onclick="PublicarResultado" disabled="@_salvando">Homologar e publicar resultado</button>
                                 <button class="btn btn-outline-secondary" @onclick="Reabrir" disabled="@_salvando">Reabrir votação</button>
                                 break;
-                            case SituacaoEleicao.Resultado when e.ChapaVencedoraId is null && e.Chapas.Count >= 2:
-                                <button class="btn btn-primary" @onclick="SegundoTurno" disabled="@_salvando">Criar 2º turno</button>
+                            case SituacaoEleicao.Resultado when e.Desfecho?.Tipo == TipoDesfecho.SegundoTurno:
+                                <button class="btn btn-primary" @onclick="ProximaEtapa" disabled="@_salvando">Criar 2º turno</button>
+                                break;
+                            case SituacaoEleicao.Resultado when e.Desfecho?.Tipo == TipoDesfecho.Desempate:
+                                <button class="btn btn-primary" @onclick="ProximaEtapa" disabled="@_salvando">Criar votação de desempate</button>
                                 break;
                         }
                     }
@@ -154,6 +157,39 @@
                             @ap.Validos válidos · @ap.Brancos em branco · @ap.Abstencoes não votaram (de @e.Eleitores eleitores)
                         </div>
                     </div>
+
+                    @if (e.Desfecho is { } d)
+                    {
+                        <div class="alert @(d.Tipo == TipoDesfecho.Eleita ? "alert-success" : "alert-warning")">
+                            @if (e.Situacao == SituacaoEleicao.Apuracao)
+                            {
+                                <strong>Ao publicar: </strong>
+                            }
+                            @d.Texto
+                        </div>
+
+                        @if (e.Situacao == SituacaoEleicao.Resultado && d.Tipo == TipoDesfecho.DecisaoPresidencia)
+                        {
+                            <div class="card mb-3 border-warning">
+                                <div class="card-body">
+                                    <div class="fw-semibold mb-2">
+                                        Decisão da Presidência: escolha @(d.Vagas == 1 ? "1 chapa" : $"{d.Vagas} chapas")
+                                        @(e.Turno >= 2 ? "(a eleita)" : "(vai ao 2º turno)")
+                                    </div>
+                                    @foreach (var c in e.Chapas.Where(c => d.Empatadas.Contains(c.ChapaId)))
+                                    {
+                                        <label class="form-check" @key="c.ChapaId">
+                                            <input type="checkbox" class="form-check-input" checked="@_decisao.Contains(c.ChapaId)"
+                                                   @onchange="ev => MarcarDecisao(c.ChapaId, ev)" />
+                                            <span class="form-check-label">@c.Numero · @c.Nome</span>
+                                        </label>
+                                    }
+                                    <button class="btn btn-warning mt-2" @onclick="DecidirPelaPresidencia"
+                                            disabled="@(_salvando || _decisao.Count != d.Vagas)">Registrar decisão</button>
+                                </div>
+                            </div>
+                        }
+                    }
                 }
                 else if (e.Situacao == SituacaoEleicao.Votacao)
                 {
@@ -425,13 +461,35 @@
         });
     }
 
-    private async Task SegundoTurno() => await Executar(async () =>
+    private async Task ProximaEtapa() => await Executar(async () =>
     {
-        var segundo = await AssociacaoSvc.CriarSegundoTurnoAsync(_eleicao!.EleicaoId, CancellationToken.None);
+        var proxima = await AssociacaoSvc.CriarProximaEtapaAsync(_eleicao!.EleicaoId, CancellationToken.None);
         _lista = await AssociacaoSvc.ListAsync(CancellationToken.None);
-        await Carregar(segundo.EleicaoId);
-        return "2º turno criado em rascunho, com as duas mais votadas e os mesmos eleitores. Ajuste as datas e publique.";
+        await Carregar(proxima.EleicaoId);
+        return $"{char.ToUpper(proxima.Etapa[0])}{proxima.Etapa[1..]} criado em rascunho, com as chapas certas e os mesmos eleitores. Ajuste as datas, publique o edital e abra a votação.";
     });
+
+    // Chapas escolhidas pela Presidência quando o desempate empata de novo.
+    private readonly HashSet<Guid> _decisao = new();
+
+    private void MarcarDecisao(Guid chapaId, ChangeEventArgs ev)
+    {
+        if (ev.Value is true) _decisao.Add(chapaId);
+        else _decisao.Remove(chapaId);
+    }
+
+    private async Task DecidirPelaPresidencia()
+    {
+        if (_eleicao is null) return;
+        if (!await JS.InvokeAsync<bool>("confirm", "Registrar a decisão da Presidência? Ela aparece na página e não tem volta.")) return;
+        await Executar(async () =>
+        {
+            var msg = await AssociacaoSvc.DecidirPelaPresidenciaAsync(_eleicao.EleicaoId, _decisao.ToList(), CancellationToken.None);
+            _decisao.Clear();
+            await Recarregar();
+            return msg;
+        });
+    }
 
     private async Task Excluir()
     {

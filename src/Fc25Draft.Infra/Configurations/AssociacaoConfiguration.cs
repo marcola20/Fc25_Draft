@@ -13,6 +13,7 @@ public class EleicaoAssociacaoConfiguration : IEntityTypeConfiguration<EleicaoAs
         b.Property(x => x.Titulo).HasMaxLength(160).IsRequired();
         b.Property(x => x.Edital).IsRequired().HasDefaultValue("");
         b.Property(x => x.Comissao).HasMaxLength(500).IsRequired().HasDefaultValue("");
+        b.Property(x => x.DecisaoPresidencia).HasMaxLength(500);
         b.HasIndex(x => x.CriadaEm);
     }
 }
