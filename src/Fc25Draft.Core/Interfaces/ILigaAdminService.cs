@@ -121,6 +121,12 @@ public interface ILigaAdminService
     /// </summary>
     Task<CopaFaseDeLigaSorteioDto> SortearFaseDeLigaAsync(Guid ligaId, CancellationToken ct);
 
+    /// <summary>Troca dois times de pote (um de cada) antes do sorteio. Vale no próximo sorteio.</summary>
+    Task<CopaFaseDeLigaSorteioDto> TrocarPotesFaseDeLigaAsync(Guid ligaId, Guid timeA, Guid timeB, CancellationToken ct);
+
+    /// <summary>Desfaz as trocas de pote e volta aos potes do ranking (só antes do sorteio).</summary>
+    Task<CopaFaseDeLigaSorteioDto> RestaurarPotesFaseDeLigaAsync(Guid ligaId, CancellationToken ct);
+
     Task ConfigurarGruposCopaAsync(Guid ligaId, LigaConfigurarGruposRequest request, CancellationToken ct);
 
     // Times inscritos (Liga de pontos corridos)

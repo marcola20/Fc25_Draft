@@ -73,23 +73,65 @@ public partial class LigaAdminService
 
         var jaSorteada = jogos.Count > 0 && await _db.LigaGruposTimes.AnyAsync(g => g.LigaId == ligaId, ct);
 
-        // Depois do sorteio, os potes gravados valem (o ranking pode ter mudado se alguém trocou de time).
-        if (jaSorteada)
-        {
-            var potes = await _db.LigaCopaPotes.AsNoTracking().Where(p => p.LigaId == ligaId)
-                .ToDictionaryAsync(p => p.TimeId, p => p.Pote, ct);
+        // Potes gravados valem por cima do ranking: os do sorteio feito (o ranking pode ter mudado se
+        // alguém trocou de time) ou as trocas que o admin fez antes de sortear.
+        var potes = await _db.LigaCopaPotes.AsNoTracking().Where(p => p.LigaId == ligaId)
+            .ToDictionaryAsync(p => p.TimeId, p => p.Pote, ct);
+        if (potes.Count > 0)
             ranking = ranking.Select(r => r with { Pote = potes.GetValueOrDefault(r.TimeId, r.Pote) }).ToList();
-        }
 
+        var noPote1 = ranking.Count(r => r.Pote == 1);
         var impedimento =
             liga.Status != LigaStatus.Criada ? "A Copa já começou: o sorteio só vale antes de iniciar."
             : liga.Temporada is null ? "A Copa não tem temporada."
             : ranking.Count < 6 ? $"São {ranking.Count} times nas Séries A e B de {liga.Temporada}: a fase de liga precisa de pelo menos 6."
             : ranking.Count % 2 != 0 ? $"São {ranking.Count} times: a fase de liga precisa de um número par, para os dois potes ficarem iguais."
+            : noPote1 * 2 != ranking.Count ? $"Os potes ficaram desiguais ({noPote1} x {ranking.Count - noPote1}): volte aos potes do ranking."
             : null;
 
         return new CopaFaseDeLigaSorteioDto(
-            ligaId, (liga.Temporada ?? 0) - 1, jaSorteada, impedimento is null, impedimento, ranking, jogos);
+            ligaId, (liga.Temporada ?? 0) - 1, jaSorteada, impedimento is null, impedimento, ranking, jogos,
+            PotesAjustados: !jaSorteada && potes.Count > 0);
+    }
+
+    public async Task<CopaFaseDeLigaSorteioDto> TrocarPotesFaseDeLigaAsync(Guid ligaId, Guid timeA, Guid timeB, CancellationToken ct)
+    {
+        var atual = await GetSorteioFaseDeLigaAsync(ligaId, ct)
+            ?? throw new InvalidOperationException("Esta competição não é uma Copa em fase de liga.");
+        if (await _db.Ligas.AnyAsync(l => l.LigaId == ligaId && l.Status != LigaStatus.Criada, ct))
+            throw new InvalidOperationException("A Copa já começou: os potes não mudam mais.");
+
+        var a = atual.Ranking.FirstOrDefault(r => r.TimeId == timeA);
+        var b = atual.Ranking.FirstOrDefault(r => r.TimeId == timeB);
+        if (a is null || b is null)
+            throw new InvalidOperationException("Os dois times precisam estar na Copa.");
+        if (a.Pote == b.Pote)
+            throw new InvalidOperationException("Escolha um time de cada pote.");
+
+        var novos = atual.Ranking.ToDictionary(r => r.TimeId, r => r.Pote);
+        (novos[timeA], novos[timeB]) = (b.Pote, a.Pote);
+
+        _db.LigaCopaPotes.RemoveRange(await _db.LigaCopaPotes.Where(p => p.LigaId == ligaId).ToListAsync(ct));
+        foreach (var r in atual.Ranking)
+            _db.LigaCopaPotes.Add(new LigaCopaPote
+            {
+                Id = Guid.NewGuid(), LigaId = ligaId, TimeId = r.TimeId, Pote = novos[r.TimeId], Ranking = r.Ranking
+            });
+        await _db.SaveChangesAsync(ct);
+
+        return (await GetSorteioFaseDeLigaAsync(ligaId, ct))!;
+    }
+
+    public async Task<CopaFaseDeLigaSorteioDto> RestaurarPotesFaseDeLigaAsync(Guid ligaId, CancellationToken ct)
+    {
+        var atual = await GetSorteioFaseDeLigaAsync(ligaId, ct)
+            ?? throw new InvalidOperationException("Esta competição não é uma Copa em fase de liga.");
+        if (atual.JaSorteada)
+            throw new InvalidOperationException("Depois do sorteio os potes são os sorteados: troque times ou sorteie de novo.");
+
+        _db.LigaCopaPotes.RemoveRange(await _db.LigaCopaPotes.Where(p => p.LigaId == ligaId).ToListAsync(ct));
+        await _db.SaveChangesAsync(ct);
+        return (await GetSorteioFaseDeLigaAsync(ligaId, ct))!;
     }
 
     public async Task<CopaFaseDeLigaSorteioDto> SortearFaseDeLigaAsync(Guid ligaId, CancellationToken ct)
@@ -100,7 +142,8 @@ public partial class LigaAdminService
             throw new InvalidOperationException(atual.Impedimento ?? "Não dá para sortear agora.");
 
         var liga = await _db.Ligas.FirstAsync(x => x.LigaId == ligaId, ct);
-        var ranking = atual.Ranking.OrderBy(r => r.Ranking).Select(r => r.TimeId).ToList();
+        // O pote 1 vem primeiro (com as trocas do admin, um time pode estar fora da ordem do ranking).
+        var ranking = atual.Ranking.OrderBy(r => r.Pote).ThenBy(r => r.Ranking).Select(r => r.TimeId).ToList();
         var sorteio = SorteioFaseDeLiga.Sortear(ranking);
         var datas = await DatasDoCalendarioAsync(liga, ct);
 
@@ -213,7 +256,17 @@ public partial class LigaAdminService
             .ThenBy(t => t.TeamName)
             .ToList();
 
+        // O campeão da Copa anterior é sempre do pote 1: se o ranking o deixou no pote 2, ele fica
+        // com a última vaga do pote 1 e quem estava lá desce uma posição.
         var metade = ordenados.Count / 2;
+        var campeao = ordenados.FindIndex(t => fasesNaCopa.GetValueOrDefault(t.TimeId) == FasePremiacao.Campeao);
+        if (metade > 0 && campeao >= metade)
+        {
+            var time = ordenados[campeao];
+            ordenados.RemoveAt(campeao);
+            ordenados.Insert(metade - 1, time with { Origem = time.Origem + " (pote 1 garantido)" });
+        }
+
         return ordenados
             .Select((t, i) => new CopaRankingTimeDto(i + 1, t.TimeId, t.TeamName, t.Posicao, t.Origem, t.Bonus, i < metade ? 1 : 2))
             .ToList();

@@ -346,7 +346,8 @@ public record CopaFaseDeLigaSorteioDto(
     bool PodeSortear,
     string? Impedimento,
     IReadOnlyList<CopaRankingTimeDto> Ranking,
-    IReadOnlyList<CopaJogoSorteadoDto> Jogos)
+    IReadOnlyList<CopaJogoSorteadoDto> Jogos,
+    bool PotesAjustados = false)
 {
     /// <summary>Média da posição no ranking dos 4 adversários de cada time.</summary>
     public IReadOnlyDictionary<Guid, double> MediaDosAdversarios => Ranking.Count == 0 || Jogos.Count == 0

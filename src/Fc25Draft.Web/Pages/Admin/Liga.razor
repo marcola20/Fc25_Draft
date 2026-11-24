@@ -303,10 +303,35 @@
         @if (_sorteioLiga is not null)
         {
             var medias = _sorteioLiga.MediaDosAdversarios;
+            var podeTrocar = _ligaAtual.Status == LigaStatus.Criada && !SorteioAoVivo.EmAndamento;
+            var trocando = _sorteioLiga.Ranking.FirstOrDefault(r => r.TimeId == _trocarTimeId);
             <div class="row g-3">
                 <div class="col-12 col-xl-6">
                     <div class="card">
-                        <div class="card-header fw-bold">Ranking de @_sorteioLiga.TemporadaDoRanking e potes</div>
+                        <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                            <span class="fw-bold flex-grow-1">Ranking de @_sorteioLiga.TemporadaDoRanking e potes</span>
+                            @if (_sorteioLiga.PotesAjustados && podeTrocar)
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="RestaurarPotes" disabled="@_saving">Voltar aos potes do ranking</button>
+                            }
+                        </div>
+                        @if (podeTrocar)
+                        {
+                            <div class="small text-muted px-3 pt-2">
+                                @if (trocando is null)
+                                {
+                                    <span>Para mudar alguém de pote, clique em <strong>Trocar</strong> e depois no time do outro pote que vai no lugar dele.</span>
+                                }
+                                else
+                                {
+                                    <span>Escolha o time do <strong>pote @(trocando.Pote == 1 ? 2 : 1)</strong> que troca com <strong>@trocando.TimeNome</strong>.</span>
+                                }
+                                @if (_sorteioLiga.JaSorteada)
+                                {
+                                    <span> A troca só vale quando sortear de novo.</span>
+                                }
+                            </div>
+                        }
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>
@@ -315,6 +340,10 @@
                                         @if (medias.Count > 0)
                                         {
                                             <th class="text-end" title="Média da posição no ranking dos 4 adversários (menor = adversários mais fortes)">Adv.</th>
+                                        }
+                                        @if (podeTrocar)
+                                        {
+                                            <th></th>
                                         }
                                     </tr>
                                 </thead>
@@ -329,6 +358,23 @@
                                             @if (medias.Count > 0)
                                             {
                                                 <td class="text-end small">@(medias.TryGetValue(r.TimeId, out var m) ? m.ToString("0.0") : "—")</td>
+                                            }
+                                            @if (podeTrocar)
+                                            {
+                                                <td class="text-end">
+                                                    @if (trocando is null)
+                                                    {
+                                                        <button class="btn btn-outline-secondary btn-sm py-0" @onclick="() => _trocarTimeId = r.TimeId" disabled="@_saving">Trocar</button>
+                                                    }
+                                                    else if (trocando.TimeId == r.TimeId)
+                                                    {
+                                                        <button class="btn btn-secondary btn-sm py-0" @onclick="() => _trocarTimeId = null">Cancelar</button>
+                                                    }
+                                                    else if (trocando.Pote != r.Pote)
+                                                    {
+                                                        <button class="btn btn-primary btn-sm py-0" @onclick="() => TrocarPotes(trocando.TimeId, r.TimeId)" disabled="@_saving">↔ Trocar com @trocando.TimeNome</button>
+                                                    }
+                                                </td>
                                             }
                                         </tr>
                                     }
@@ -1938,6 +1984,33 @@
         }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
+    }
+
+    private Guid? _trocarTimeId;
+
+    private async Task TrocarPotes(Guid timeA, Guid timeB)
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            _sorteioLiga = await AdminSvc.TrocarPotesFaseDeLigaAsync(_ligaAtual!.LigaId, timeA, timeB, CancellationToken.None);
+            var nomes = _sorteioLiga.Ranking.ToDictionary(r => r.TimeId, r => r.TimeNome);
+            _ok = $"{nomes[timeA]} e {nomes[timeB]} trocaram de pote." + (_sorteioLiga.JaSorteada ? " Sorteie de novo para valer." : "");
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; _trocarTimeId = null; }
+    }
+
+    private async Task RestaurarPotes()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            _sorteioLiga = await AdminSvc.RestaurarPotesFaseDeLigaAsync(_ligaAtual!.LigaId, CancellationToken.None);
+            _ok = "Os potes voltaram a ser os do ranking.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; _trocarTimeId = null; }
     }
 
     private async Task MudarFormatoCopa(FormatoCopa formato)
