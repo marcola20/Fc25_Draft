@@ -16,6 +16,13 @@ public class HallOfFameEntry
     /// <summary>Treinador cadastrado, quando o campeão foi dirigido por alguém da liga. Nulo para nomes soltos.</summary>
     public Guid? TreinadorId { get; set; }
 
+    /// <summary>Quem perdeu a final (ou ficou em 2º na liga). Nulo quando não se sabe.</summary>
+    public string? TimeVice { get; set; }
+    public string? TecnicoVice { get; set; }
+
+    /// <summary>Treinador cadastrado do vice, para a conta de vices por treinador.</summary>
+    public Guid? TreinadorViceId { get; set; }
+
     /// <summary>Competição de onde a entrada saiu sozinha ao ser encerrada. Nulo nas entradas lançadas à mão.</summary>
     public Guid? LigaId { get; set; }
     public int? Ano { get; set; }

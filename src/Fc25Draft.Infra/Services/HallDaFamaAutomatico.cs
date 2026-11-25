@@ -10,6 +10,7 @@ namespace Fc25Draft.Infra.Services;
 /// vale para qualquer jeito de encerrar (liga com líder isolado, jogo decisivo, mini liga, final da Copa,
 /// Supercopa). A entrada fica ligada à competição: se o campeão mudar (resultado corrigido) ela é
 /// atualizada, e se a competição for reaberta ela sai. Descrição, ano e temporada editados à mão ficam.
+/// O vice (com o técnico dele) entra junto, para a conta de finais por treinador.
 /// </summary>
 internal static class HallDaFamaAutomatico
 {
@@ -55,9 +56,11 @@ internal static class HallDaFamaAutomatico
                 .Select(p => new { p.TreinadorId, p.Treinador.Nome })
                 .FirstOrDefaultAsync(ct);
 
+            var campeaoMudou = entrada is not null && entrada.TimeCampeao != time.TeamName;
+
             if (entrada is null)
             {
-                db.HallOfFame.Add(new HallOfFameEntry
+                entrada = new HallOfFameEntry
                 {
                     HallOfFameId = Guid.NewGuid(),
                     LigaId = liga.LigaId,
@@ -71,14 +74,27 @@ internal static class HallDaFamaAutomatico
                     Temporada = liga.Temporada is int ano ? (ano - AnoAntesDaPrimeiraTemporada).ToString() : null,
                     CriadoEm = agora,
                     AtualizadoEm = agora
-                });
+                };
+                db.HallOfFame.Add(entrada);
             }
-            else if (entrada.TimeCampeao != time.TeamName)
+            else if (campeaoMudou)
             {
                 entrada.TimeCampeao = time.TeamName;
                 entrada.Tecnico = tecnico?.Nome;
                 entrada.TreinadorId = tecnico?.TreinadorId;
                 entrada.AtualizadoEm = agora;
+            }
+
+            // O vice só é refeito quando ainda não tem ou quando o campeão mudou; o resto fica como o admin deixou.
+            if (entrada.TimeVice is null || campeaoMudou)
+            {
+                var vice = await ViceDaCompeticao.CalcularAsync(db, liga.LigaId, campeaoId, ct);
+                if (vice is not null)
+                {
+                    entrada.TimeVice = vice.Time;
+                    entrada.TecnicoVice = vice.Tecnico;
+                    entrada.TreinadorViceId = vice.TreinadorId;
+                }
             }
         }
     }

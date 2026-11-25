@@ -6,8 +6,6 @@
 @using Fc25Draft.Web.Services
 @inject IHallOfFameService HallOfFameService
 @inject EscudoService EscudoService
-@inject IAlbumService AlbumSvc
-@inject IAposentadoriaService AposentadoriaSvc
 
 <PageTitle>Hall da Fama - Campeões</PageTitle>
 
@@ -22,135 +20,156 @@
     }
     else
     {
-        @if (!_entradas.Any())
-        {
-            <div class="alert alert-info text-center">Nenhum campeão registrado ainda.</div>
-        }
-        else
-        {
-            @foreach (var tipo in _ordemTipos)
-            {
-                var doTipo = _entradas.Where(e => e.Tipo == tipo).ToList();
-                if (!doTipo.Any()) { continue; }
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+                <button class="nav-link @(_aba == Aba.Titulos ? "active" : "")" @onclick="() => _aba = Aba.Titulos">Títulos</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_aba == Aba.Treinadores ? "active" : "")" @onclick="() => _aba = Aba.Treinadores">Por treinador</button>
+            </li>
+        </ul>
 
-                <div class="mb-4">
-                    <div class="secao-titulo"><h2>@TipoLabel(tipo) <span class="numero text-body-tertiary">@doTipo.Count</span></h2></div>
-                    <div class="row g-3">
-                        @foreach (var entrada in doTipo)
-                        {
-                            <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                                <div class="card h-100 text-center">
-                                    <div class="card-body">
-                                        <img src="@EscudoService.GetEscudo(entrada.TimeCampeao)"
-                                             alt="Escudo @entrada.TimeCampeao"
-                                             style="width:72px;height:72px;object-fit:contain;"
-                                             class="mb-2" />
-                                        <h3 class="h6 mb-1 fw-medium">@entrada.TimeCampeao</h3>
-                                        @if (!string.IsNullOrWhiteSpace(entrada.Tecnico))
-                                        {
-                                            <p class="small mb-1 text-body-secondary">
-                                                Técnico
-                                                @if (entrada.TreinadorId is { } treinadorId)
-                                                {
-                                                    <a href="/treinadores/@treinadorId" class="text-decoration-none">@entrada.Tecnico</a>
-                                                }
-                                                else
-                                                {
-                                                    @entrada.Tecnico
-                                                }
+        @if (_aba == Aba.Titulos)
+        {
+            @* Jogadores que a organização colocou no Hall da Fama: uma turma por temporada, 1º a 3º. *@
+            @if (_jogadores.Count > 0)
+            {
+                <div class="mb-4" id="jogadores">
+                    <div class="secao-titulo"><h2>Lendas da liga <span class="numero text-body-tertiary">@_jogadores.Count</span></h2></div>
+                    @foreach (var turma in _jogadores.GroupBy(j => j.Temporada))
+                    {
+                        <h3 class="h6 text-body-secondary mb-2 mt-3">Turma de <span class="numero">@turma.Key</span></h3>
+                        <div class="row g-3">
+                            @foreach (var j in turma.OrderBy(j => j.Colocacao))
+                            {
+                                <div class="col-12 col-sm-6 col-lg-4">
+                                    <div class="card h-100 text-center hof-jogador @(j.Colocacao == 1 ? "primeiro" : "")">
+                                        <div class="card-body">
+                                            <span class="hof-colocacao numero lugar-@j.Colocacao" title="@(j.Colocacao)º da turma de @turma.Key">@(j.Colocacao)º</span>
+                                            <FotoJogador PlayerId="@j.PlayerId" Tamanho="80" Alt="@j.Nome" />
+                                            <h4 class="h6 mb-1 mt-2">
+                                                <a href="@($"/players/details/{j.PlayerId}")" class="text-decoration-none">@j.Nome</a>
+                                            </h4>
+                                            <p class="text-muted small mb-2">
+                                                @j.Posicao@(j.Clube is null ? "" : j.Aposentado ? $" · encerrou a carreira no {j.Clube}" : $" · {j.Clube}")
                                             </p>
-                                        }
-                                        <p class="text-muted small mb-2">@entrada.Descricao</p>
-                                        <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
-                                            <span class="etiqueta acento">@LigaLabels.Competicao(entrada.Tipo, entrada.Divisao)</span>
-                                            @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
+                                            @if (!string.IsNullOrWhiteSpace(j.Motivo))
                                             {
-                                                <span class="etiqueta">@TemporadaLabel(entrada.Temporada)</span>
+                                                <p class="small fst-italic mb-2">@j.Motivo</p>
                                             }
-                                            else if (entrada.Ano.HasValue)
-                                            {
-                                                <span class="etiqueta numero">@entrada.Ano</span>
-                                            }
+                                            <div class="d-flex flex-wrap justify-content-center gap-2">
+                                                <span class="etiqueta"><span class="numero">@j.Jogos</span> jogos</span>
+                                                <span class="etiqueta"><span class="numero">@j.Gols</span> gols</span>
+                                                <span class="etiqueta"><span class="numero">@j.Assistencias</span> assist.</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            }
+                        </div>
+                    }
                 </div>
             }
-        }
 
-        @* Quem pendurou as chuteiras: vem da aposentadoria (virada de temporada). *@
-        @if (_lendas.Count > 0)
-        {
-            <div class="mb-4" id="lendas">
-                <div class="secao-titulo"><h2>Lendas aposentadas <span class="numero text-body-tertiary">@_lendas.Count</span></h2></div>
-                <div class="row g-3">
-                    @foreach (var l in _lendas)
-                    {
-                        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                            <div class="card h-100 text-center">
-                                <div class="card-body">
-                                    <FotoJogador PlayerId="@l.PlayerId" Tamanho="72" Alt="@l.Nome" />
-                                    <h3 class="h6 mb-1 mt-2">
-                                        <a href="@($"/players/details/{l.PlayerId}")" class="text-decoration-none">@l.Nome</a>
-                                    </h3>
-                                    <p class="text-muted small mb-2">
-                                        @l.Posicao · última temporada @l.UltimaTemporada@(l.UltimoClube is null ? "" : $" pelo {l.UltimoClube}")
-                                    </p>
-                                    <div class="d-flex flex-wrap justify-content-center gap-2">
-                                        <span class="etiqueta">OVR <span class="numero">@l.Overall</span></span>
-                                        @if (l.Jogos > 0) { <span class="etiqueta"><span class="numero">@l.Jogos</span> jogos</span> }
-                                        @if (l.Gols > 0) { <span class="etiqueta"><span class="numero">@l.Gols</span> gols</span> }
+            @if (!_entradas.Any())
+            {
+                <div class="alert alert-info text-center">Nenhum campeão registrado ainda.</div>
+            }
+            else
+            {
+                @foreach (var tipo in _ordemTipos)
+                {
+                    var doTipo = _entradas.Where(e => e.Tipo == tipo).ToList();
+                    if (!doTipo.Any()) { continue; }
+
+                    <div class="mb-4">
+                        <div class="secao-titulo"><h2>@TipoLabel(tipo) <span class="numero text-body-tertiary">@doTipo.Count</span></h2></div>
+                        <div class="row g-3">
+                            @foreach (var entrada in doTipo)
+                            {
+                                <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                                    <div class="card h-100 text-center">
+                                        <div class="card-body">
+                                            <img src="@EscudoService.GetEscudo(entrada.TimeCampeao)"
+                                                 alt="Escudo @entrada.TimeCampeao"
+                                                 style="width:72px;height:72px;object-fit:contain;"
+                                                 class="mb-2" />
+                                            <h3 class="h6 mb-1 fw-medium">@entrada.TimeCampeao</h3>
+                                            @if (!string.IsNullOrWhiteSpace(entrada.Tecnico))
+                                            {
+                                                <p class="small mb-1 text-body-secondary">
+                                                    Técnico
+                                                    @if (entrada.TreinadorId is { } treinadorId)
+                                                    {
+                                                        <a href="/treinadores/@treinadorId" class="text-decoration-none">@entrada.Tecnico</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        @entrada.Tecnico
+                                                    }
+                                                </p>
+                                            }
+                                            <p class="text-muted small mb-2">@entrada.Descricao</p>
+                                            @if (!string.IsNullOrWhiteSpace(entrada.TimeVice))
+                                            {
+                                                <p class="small mb-2 text-body-tertiary">
+                                                    Vice: @entrada.TimeVice@(string.IsNullOrWhiteSpace(entrada.TecnicoVice) ? "" : $" ({entrada.TecnicoVice})")
+                                                </p>
+                                            }
+                                            <div class="d-flex flex-wrap justify-content-center align-items-center gap-2">
+                                                <span class="etiqueta acento">@LigaLabels.Competicao(entrada.Tipo, entrada.Divisao)</span>
+                                                @if (!string.IsNullOrWhiteSpace(entrada.Temporada))
+                                                {
+                                                    <span class="etiqueta">@TemporadaLabel(entrada.Temporada)</span>
+                                                }
+                                                else if (entrada.Ano.HasValue)
+                                                {
+                                                    <span class="etiqueta numero">@entrada.Ano</span>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            }
                         </div>
-                    }
-                </div>
-            </div>
+                    </div>
+                }
+            }
         }
-
-        @* Quem completou o álbum de figurinhas: vem dos selos do álbum, não das competições. *@
-        @if (_colecionadores.Count > 0)
+        else
         {
-            <div class="mb-4" id="colecionadores">
-                <div class="secao-titulo"><h2>Colecionadores <span class="numero text-body-tertiary">@_colecionadores.Count</span></h2></div>
-                <div class="row g-3">
-                    @foreach (var c in _colecionadores)
-                    {
-                        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-                            <div class="card h-100 text-center">
-                                <div class="card-body">
-                                    <div class="hall-icone @(c.Ordem == 1 ? "primeiro" : "")"><Icone Nome="@(c.Ordem == 1 ? "trophy" : "images")" Tamanho="24" /></div>
-                                    <h3 class="h6 mb-1">
-                                        <a href="/treinadores/@c.TreinadorId" class="text-decoration-none">@c.Nome</a>
-                                    </h3>
-                                    <p class="text-muted small mb-2">
-                                        Completou o álbum em @BrazilTime.FormatDateTime(c.Em, "dd/MM/yyyy")
-                                        @(c.Ordem == 1 ? " — o primeiro!" : $" — {c.Ordem}º a completar")
-                                    </p>
-                                    <div class="d-flex flex-wrap justify-content-center gap-2">
-                                        <span class="etiqueta">@c.AlbumNome</span>
-                                        <span class="etiqueta numero">@c.Temporada</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    }
+            var campeoes = _treinadores.Where(t => t.Titulos.Count > 0)
+                .OrderByDescending(t => t.Titulos.Count).ThenBy(t => t.Vices.Count).ThenBy(t => t.Nome).ToList();
+            var vices = _treinadores.Where(t => t.Vices.Count > 0)
+                .OrderByDescending(t => t.Vices.Count).ThenByDescending(t => t.Titulos.Count).ThenBy(t => t.Nome).ToList();
+
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="secao-titulo"><h2>Maiores campeões</h2></div>
+                    @RankingDe(campeoes, t => t.Titulos, "Nenhum título com técnico registrado.")
+                </div>
+                <div class="col-lg-6">
+                    <div class="secao-titulo"><h2>Maiores vices</h2></div>
+                    @RankingDe(vices, t => t.Vices, "Nenhum vice registrado ainda.")
                 </div>
             </div>
+            <p class="small text-body-tertiary mt-3 mb-0">
+                Conta as finais de Série A, Série B, Copa e Supercopa (na liga de pontos corridos, o vice é o 2º colocado).
+                Nas temporadas antigas, o vice aparece quando a organização o registra.
+            </p>
         }
     }
 </div>
 
 @code {
+    private enum Aba { Titulos, Treinadores }
+
+    private Aba _aba = Aba.Titulos;
     private bool _loading = true;
     private string? _erro;
     private IReadOnlyList<HallOfFameEntryDto> _entradas = Array.Empty<HallOfFameEntryDto>();
-    private IReadOnlyList<AlbumCompletoDto> _colecionadores = Array.Empty<AlbumCompletoDto>();
-    private IReadOnlyList<LendaAposentadaDto> _lendas = Array.Empty<LendaAposentadaDto>();
+    private IReadOnlyList<HallDaFamaJogadorDto> _jogadores = Array.Empty<HallDaFamaJogadorDto>();
+    private IReadOnlyList<TreinadorNoHallDto> _treinadores = Array.Empty<TreinadorNoHallDto>();
 
     private static readonly TipoCompetition[] _ordemTipos =
         { TipoCompetition.Liga, TipoCompetition.Copa, TipoCompetition.Supercopa };
@@ -160,8 +179,8 @@
         try
         {
             _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
-            _colecionadores = await AlbumSvc.AlbunsCompletosAsync(CancellationToken.None);
-            try { _lendas = await AposentadoriaSvc.ListLendasAsync(CancellationToken.None); } catch { _lendas = Array.Empty<LendaAposentadaDto>(); }
+            _jogadores = await HallOfFameService.JogadoresAsync(CancellationToken.None);
+            _treinadores = await HallOfFameService.TreinadoresAsync(CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -172,6 +191,55 @@
             _loading = false;
         }
     }
+
+    /// <summary>Tabela com posição (empate divide o lugar), treinador, total e o que ganhou por competição.</summary>
+    private RenderFragment RankingDe(IReadOnlyList<TreinadorNoHallDto> lista, Func<TreinadorNoHallDto, IReadOnlyList<FinalDoTreinadorDto>> finais, string vazio) => __builder =>
+    {
+        if (lista.Count == 0)
+        {
+            <div class="alert alert-info small mb-0">@vazio</div>
+            return;
+        }
+
+        <div class="painel p-0">
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    @{
+                        var lugar = 0;
+                        var anterior = -1;
+                    }
+                    @for (var i = 0; i < lista.Count; i++)
+                    {
+                        var t = lista[i];
+                        var dele = finais(t);
+                        if (dele.Count != anterior) { lugar = i + 1; anterior = dele.Count; }
+                        <tr>
+                            <td class="text-body-tertiary numero text-end" style="width:2.5rem;">@lugar</td>
+                            <td>
+                                @if (t.TreinadorId is { } id)
+                                {
+                                    <a href="/treinadores/@id" class="text-decoration-none fw-medium">@t.Nome</a>
+                                }
+                                else
+                                {
+                                    <span class="fw-medium">@t.Nome</span>
+                                }
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    @foreach (var porCompeticao in dele.GroupBy(f => f.Competicao).OrderByDescending(g => g.Count()))
+                                    {
+                                        <span class="etiqueta" title="@string.Join("\n", porCompeticao.Select(f => $"{f.Quando} · {f.Time}"))">
+                                            <span class="numero">@porCompeticao.Count()</span>× @porCompeticao.Key
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+                            <td class="text-end numero fs-5 fw-semibold pe-3" style="width:3.5rem;">@dele.Count</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    };
 
     private static string TipoLabel(TipoCompetition tipo) => tipo switch
     {

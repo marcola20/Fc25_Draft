@@ -9,6 +9,7 @@
 @inject IHallOfFameService HallOfFameService
 @inject ITreinadorService TreinadorSvc
 @inject EscudoService EscudoService
+@inject IJSRuntime JS
 
 <PageTitle>Administração do Hall da Fama</PageTitle>
 
@@ -91,6 +92,21 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Vice (opcional)</label>
+                        <input class="form-control mb-2" @bind="_formTimeVice" maxlength="120" placeholder="Time que perdeu a final / 2º colocado" />
+                        <select class="form-select mb-2" value="@_formTreinadorViceId?.ToString()" @onchange="EscolherTreinadorVice">
+                            <option value="">Técnico do vice: nome solto (digitar abaixo)</option>
+                            @foreach (var t in _treinadores)
+                            {
+                                <option value="@t.TreinadorId">@t.Nome</option>
+                            }
+                        </select>
+                        <input class="form-control" @bind="_formTecnicoVice" maxlength="120" placeholder="Técnico do vice"
+                               disabled="@(_formTreinadorViceId is not null)" />
+                        <div class="form-text">Conta na aba "Por treinador" do Hall da Fama (maiores vices).</div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Descrição</label>
                         <input class="form-control" @bind="_formDescricao" maxlength="200"
                                placeholder="Ex.: Campeão do Brasileirão" />
@@ -132,6 +148,10 @@
             }
             else
             {
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="PreencherVices" disabled="@_saving">Buscar vices das competições do site</button>
+                    <span class="small text-muted">Preenche o vice dos títulos automáticos que ainda estão sem. Os antigos, à mão no formulário.</span>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle" style="font-size:0.875rem;">
                         <thead class="table-dark">
@@ -139,6 +159,7 @@
                                 <th style="width:56px;"></th>
                                 <th>Time</th>
                                 <th>Técnico</th>
+                                <th>Vice</th>
                                 <th>Descrição</th>
                                 <th class="text-center">Tipo</th>
                                 <th class="text-center">Temporada</th>
@@ -161,6 +182,20 @@
                                             @(entrada.Tecnico ?? "—")
                                         }
                                     </td>
+                                    <td class="text-muted small">
+                                        @if (string.IsNullOrWhiteSpace(entrada.TimeVice))
+                                        {
+                                            <span>—</span>
+                                        }
+                                        else
+                                        {
+                                            @entrada.TimeVice
+                                            @if (!string.IsNullOrWhiteSpace(entrada.TecnicoVice))
+                                            {
+                                                <div>@entrada.TecnicoVice</div>
+                                            }
+                                        }
+                                    </td>
                                     <td>
                                         @entrada.Descricao
                                         @if (entrada.Automatica)
@@ -173,6 +208,99 @@
                                     <td class="text-end">
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => Editar(entrada)" disabled="@_saving">Editar</button>
                                         <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarExcluir(entrada)" disabled="@_saving">Excluir</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="mt-5">
+    <h2 class="h4 mb-1">Hall da Fama — jogadores</h2>
+    <p class="text-muted small mb-3">
+        Quem entra aqui é escolha da organização: uma turma por temporada, com 1º, 2º e 3º (dá para fazer a cerimônia anual).
+        Cada jogador entra uma vez só. Aparece no topo da aba Títulos do Hall da Fama, com jogos, gols e assistências na liga.
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">Colocar no Hall da Fama</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Jogador</label>
+                        @if (_hofJogador is { } escolhido)
+                        {
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="etiqueta">@escolhido.Name · @escolhido.PositionName · @escolhido.Overall</span>
+                                <button class="btn btn-sm btn-link p-0" @onclick="() => _hofJogador = null">trocar</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <JogadorBusca Placeholder="Buscar jogador pelo nome" OnEscolhido="p => _hofJogador = p" />
+                        }
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Turma (temporada)</label>
+                            <input type="number" class="form-control" @bind="_hofTemporada" />
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">Colocação</label>
+                            <select class="form-select" @bind="_hofColocacao">
+                                <option value="1">1º</option>
+                                <option value="2">2º</option>
+                                <option value="3">3º</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo (opcional)</label>
+                        <input class="form-control" @bind="_hofMotivo" maxlength="300" placeholder="Ex.: artilheiro de três Brasileirões" />
+                    </div>
+                    <button class="btn btn-primary" @onclick="IncluirJogador" disabled="@(_saving || _hofJogador is null)">Colocar no Hall da Fama</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            @if (_hofJogadores.Count == 0)
+            {
+                <div class="alert alert-info">Nenhum jogador no Hall da Fama ainda.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="font-size:0.875rem;">
+                        <thead class="table-dark">
+                            <tr>
+                                <th class="text-center">Turma</th>
+                                <th class="text-center">Lugar</th>
+                                <th>Jogador</th>
+                                <th class="text-center">J / G / A</th>
+                                <th>Motivo</th>
+                                <th class="text-end"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in _hofJogadores)
+                            {
+                                <tr>
+                                    <td class="text-center">@j.Temporada</td>
+                                    <td class="text-center fw-bold">@(j.Colocacao)º</td>
+                                    <td>
+                                        <a href="/players/details/@j.PlayerId">@j.Nome</a>
+                                        <div class="small text-muted">@j.Posicao@(j.Aposentado ? " · aposentado" : "")@(j.Clube is null ? "" : $" · {j.Clube}")</div>
+                                    </td>
+                                    <td class="text-center text-muted">@j.Jogos / @j.Gols / @j.Assistencias</td>
+                                    <td class="small">@(j.Motivo ?? "—")</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoverJogador(j)" disabled="@_saving">Tirar</button>
                                     </td>
                                 </tr>
                             }
@@ -223,7 +351,17 @@
     private int? _formAno;
     private string _formTemporada = string.Empty;
 
+    private string _formTimeVice = string.Empty;
+    private string _formTecnicoVice = string.Empty;
+    private Guid? _formTreinadorViceId;
+
     private HallOfFameEntryDto? _entradaParaExcluir;
+
+    private IReadOnlyList<HallDaFamaJogadorDto> _hofJogadores = Array.Empty<HallDaFamaJogadorDto>();
+    private PlayerListItemDto? _hofJogador;
+    private int _hofTemporada;
+    private int _hofColocacao = 1;
+    private string _hofMotivo = string.Empty;
 
     protected override async Task OnInitializedAsync() => await CarregarDados();
 
@@ -234,6 +372,9 @@
         {
             _entradas = await HallOfFameService.GetAllAsync(CancellationToken.None);
             _treinadores = await TreinadorSvc.ListAsync(true, CancellationToken.None);
+            _hofJogadores = await HallOfFameService.JogadoresAsync(CancellationToken.None);
+            if (_hofTemporada == 0)
+                _hofTemporada = await HallOfFameService.UltimaTemporadaAsync(CancellationToken.None) ?? 2010;
         }
         catch (Exception ex)
         {
@@ -253,14 +394,16 @@
             if (_editandoId.HasValue)
             {
                 await HallOfFameService.UpdateAsync(_editandoId.Value,
-                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao),
+                    new HallOfFameUpdateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao,
+                        _formTimeVice, _formTecnicoVice, _formTreinadorViceId),
                     CancellationToken.None);
                 _ok = "Campeão atualizado.";
             }
             else
             {
                 await HallOfFameService.CreateAsync(
-                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao),
+                    new HallOfFameCreateRequest(_formDescricao, _formTipo, _formTime, _formTecnico, _formTreinadorId, _formAno, _formTemporada, _formDivisao,
+                        _formTimeVice, _formTecnicoVice, _formTreinadorViceId),
                     CancellationToken.None);
                 _ok = "Campeão adicionado.";
             }
@@ -288,6 +431,9 @@
         _formDivisao = entrada.Divisao;
         _formAno = entrada.Ano;
         _formTemporada = entrada.Temporada ?? string.Empty;
+        _formTimeVice = entrada.TimeVice ?? string.Empty;
+        _formTecnicoVice = entrada.TecnicoVice ?? string.Empty;
+        _formTreinadorViceId = entrada.TreinadorViceId;
         _erro = null; _ok = null;
     }
 
@@ -318,6 +464,67 @@
         _formDivisao = null;
         _formAno = null;
         _formTemporada = string.Empty;
+        _formTimeVice = string.Empty;
+        _formTecnicoVice = string.Empty;
+        _formTreinadorViceId = null;
+    }
+
+    private void EscolherTreinadorVice(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _formTreinadorViceId = id;
+            _formTecnicoVice = _treinadores.FirstOrDefault(t => t.TreinadorId == id)?.Nome ?? _formTecnicoVice;
+        }
+        else
+        {
+            _formTreinadorViceId = null;
+        }
+    }
+
+    private async Task PreencherVices()
+    {
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            var n = await HallOfFameService.PreencherVicesAsync(CancellationToken.None);
+            _ok = n == 0 ? "Nenhum vice novo para preencher." : $"{n} vice(s) preenchido(s).";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task IncluirJogador()
+    {
+        if (_hofJogador is null) return;
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            await HallOfFameService.IncluirJogadorAsync(
+                new HallDaFamaJogadorRequest(_hofJogador.PlayerId, _hofTemporada, _hofColocacao, _hofMotivo), CancellationToken.None);
+            _ok = $"{_hofJogador.Name} entrou no Hall da Fama ({_hofColocacao}º da turma de {_hofTemporada}).";
+            _hofJogador = null;
+            _hofMotivo = string.Empty;
+            _hofColocacao = Math.Min(3, _hofColocacao + 1);
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task RemoverJogador(HallDaFamaJogadorDto j)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Tirar {j.Nome} do Hall da Fama?")) return;
+        _erro = null; _ok = null; _saving = true;
+        try
+        {
+            await HallOfFameService.RemoverJogadorAsync(j.Id, CancellationToken.None);
+            _ok = $"{j.Nome} saiu do Hall da Fama.";
+            await CarregarDados();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _saving = false; }
     }
 
     private void ConfirmarExcluir(HallOfFameEntryDto entrada) => _entradaParaExcluir = entrada;

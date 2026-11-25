@@ -1555,6 +1555,39 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("FotosJogadores", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.HallDaFamaJogador", b =>
+                {
+                    b.Property<Guid>("HallDaFamaJogadorId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Colocacao")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Temporada")
+                        .HasColumnType("integer");
+
+                    b.HasKey("HallDaFamaJogadorId");
+
+                    b.HasIndex("PlayerId")
+                        .IsUnique();
+
+                    b.HasIndex("Temporada", "Colocacao")
+                        .IsUnique();
+
+                    b.ToTable("HallDaFamaJogadores", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.HallOfFameEntry", b =>
                 {
                     b.Property<Guid>("HallOfFameId")
@@ -1585,12 +1618,20 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("TecnicoVice")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Temporada")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
 
                     b.Property<string>("TimeCampeao")
                         .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("TimeVice")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
@@ -1602,12 +1643,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.Property<Guid?>("TreinadorId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("TreinadorViceId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("HallOfFameId");
 
                     b.HasIndex("LigaId")
                         .IsUnique();
 
                     b.HasIndex("TreinadorId");
+
+                    b.HasIndex("TreinadorViceId");
 
                     b.ToTable("HallOfFame");
                 });
@@ -5188,6 +5234,17 @@ namespace Fc25Draft.Infra.Migrations
                     b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
                         .WithOne()
                         .HasForeignKey("Fc25Draft.Core.Entities.FotoJogador", "PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.HallDaFamaJogador", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

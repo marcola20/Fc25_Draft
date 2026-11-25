@@ -16,6 +16,9 @@ public class HallOfFameEntryConfiguration : IEntityTypeConfiguration<HallOfFameE
         e.Property(x => x.TimeCampeao).IsRequired().HasMaxLength(120);
         e.Property(x => x.Tecnico).HasMaxLength(120);
         e.HasIndex(x => x.TreinadorId);
+        e.Property(x => x.TimeVice).HasMaxLength(120);
+        e.Property(x => x.TecnicoVice).HasMaxLength(120);
+        e.HasIndex(x => x.TreinadorViceId);
         e.HasIndex(x => x.LigaId).IsUnique();
         e.HasOne<Liga>().WithMany().HasForeignKey(x => x.LigaId).OnDelete(DeleteBehavior.SetNull);
         e.Property(x => x.Temporada).HasMaxLength(60);
