@@ -46,6 +46,12 @@ public interface IResultadoPesService
     Task DescartarAsync(Guid pendenteId, CancellationToken ct);
 
     /// <summary>
+    /// O que o resultado segurado traz (lances, números, registros de cada jogador com a nota da liga, avisos do
+    /// extrator), sem liberar nem gravar nada.
+    /// </summary>
+    Task<PendenteDetalhesDto> DetalhesDoPendenteAsync(Guid pendenteId, CancellationToken ct);
+
+    /// <summary>
     /// Tira as notas dos JSONs já importados e grava por jogador. Com <paramref name="somenteSemNotas"/>,
     /// só as partidas que ainda não têm nenhuma nota gravada. Retorna quantas notas foram gravadas.
     /// </summary>

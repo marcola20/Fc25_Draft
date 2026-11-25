@@ -2,6 +2,7 @@
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
 @using Fc25Draft.Core.Utilities
+@using Fc25Draft.Web.Components.Liga
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject IResultadoPesService ResultadoSvc
@@ -75,15 +76,21 @@
                     {
                         <li class="list-group-item">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <span class="fw-semibold">@p.Casa</span>
-                                <span class="badge bg-dark fs-6">@p.GolsCasa x @p.GolsFora</span>
-                                <span class="fw-semibold">@p.Fora</span>
+                                <button type="button" class="btn btn-link p-0 text-reset text-decoration-none d-flex align-items-center gap-2"
+                                        title="Ver o que o envio trouxe" @onclick="() => AlternarDetalhes(p)">
+                                    <span class="fw-semibold">@p.Casa</span>
+                                    <span class="badge bg-dark fs-6">@p.GolsCasa x @p.GolsFora</span>
+                                    <span class="fw-semibold">@p.Fora</span>
+                                </button>
                                 @if (p.DataHora is DateTime quando)
                                 {
                                     <span class="text-muted small">@quando.ToString("dd/MM HH:mm")</span>
                                 }
                                 <span class="text-muted small" title="@p.Video">enviado @Brasilia(p.EnviadoEm).ToString("dd/MM HH:mm")</span>
                                 <div class="ms-auto d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => AlternarDetalhes(p)">
+                                        @(_abertos.ContainsKey(p.Id) ? "Fechar" : "Ver jogo")
+                                    </button>
                                     @if (p.Erro is not null)
                                     {
                                         <button class="btn btn-sm btn-outline-secondary" disabled="@_ocupado" @onclick="() => Revalidar(p)">Validar de novo</button>
@@ -108,6 +115,17 @@
                                     </ul>
                                 </details>
                             }
+                            @if (_abertos.TryGetValue(p.Id, out var detalhes))
+                            {
+                                @if (detalhes is null)
+                                {
+                                    <div class="text-center py-2"><div class="spinner-border spinner-border-sm" role="status"></div></div>
+                                }
+                                else
+                                {
+                                    <PendenteDetalhes Dados="detalhes" />
+                                }
+                            }
                         </li>
                     }
                 </ul>
@@ -121,6 +139,9 @@
     private string? _erro;
     private readonly List<string> _ok = new();
     private IReadOnlyList<ResultadoPesPendenteDto> _pendentes = Array.Empty<ResultadoPesPendenteDto>();
+
+    // Pendentes abertos na tela: null enquanto carrega o que o envio trouxe.
+    private readonly Dictionary<Guid, PendenteDetalhesDto?> _abertos = new();
 
     private sealed record Grupo(string Titulo, List<ResultadoPesPendenteDto> Itens);
 
@@ -140,7 +161,27 @@
         finally { _carregando = false; }
     }
 
-    private async Task Carregar() => _pendentes = await ResultadoSvc.PendentesAsync(CancellationToken.None);
+    private async Task Carregar()
+    {
+        _pendentes = await ResultadoSvc.PendentesAsync(CancellationToken.None);
+        // Reenvio ou revalidação mudam o pendente: o que estava aberto é lido de novo quando reabrir.
+        _abertos.Clear();
+    }
+
+    private async Task AlternarDetalhes(ResultadoPesPendenteDto p)
+    {
+        if (_abertos.Remove(p.Id)) return;
+        _abertos[p.Id] = null;
+        try
+        {
+            _abertos[p.Id] = await ResultadoSvc.DetalhesDoPendenteAsync(p.Id, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _abertos.Remove(p.Id);
+            _erro = $"{p.Casa} x {p.Fora}: não deu para abrir o envio ({ex.Message})";
+        }
+    }
 
     /// <summary>Por competição e rodada, na ordem de liberação (a do primeiro jogo de cada grupo).</summary>
     private List<Grupo> Grupos() => _pendentes

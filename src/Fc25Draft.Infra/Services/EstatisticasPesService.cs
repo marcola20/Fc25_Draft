@@ -199,6 +199,14 @@ public class EstatisticasPesService : IEstatisticasPesService
             .Where(i => i.PartidaId == partidaId)
             .Select(i => i.Json)
             .FirstOrDefaultAsync(ct);
+        return DoJson(json);
+    }
+
+    public IReadOnlyList<NumeroDaPartidaDto> DoJson(string? json) => NumerosDoJson(json);
+
+    /// <summary>Números dos times no JSON do PES, na ordem de exibição; vazio quando não tem.</summary>
+    public static IReadOnlyList<NumeroDaPartidaDto> NumerosDoJson(string? json)
+    {
         var numeros = Ler(json);
         if (numeros.Count == 0) return Array.Empty<NumeroDaPartidaDto>();
 

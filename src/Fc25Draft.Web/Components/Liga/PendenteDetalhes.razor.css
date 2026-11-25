@@ -1,0 +1,20 @@
+.pendente-detalhes {
+    border-top: 1px solid var(--bs-border-color);
+    padding-top: 0.5rem;
+}
+
+.pendente-lances li {
+    padding: 0.15rem 0;
+    font-size: 0.875rem;
+}
+
+.pendente-lances .minuto {
+    min-width: 2.2rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pendente-lances .tipo { min-width: 1.4rem; }
+
+.lado-casa { color: var(--cbfv-azul); }
+.lado-fora { color: var(--cbfv-laranja); }

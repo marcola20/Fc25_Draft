@@ -1,0 +1,123 @@
+@using Fc25Draft.Core.DTOs
+
+@* O que um resultado segurado traz, antes de liberar: lances (como vieram do PES), números dos times, registros de
+   cada jogador com a nota da liga e os avisos do extrator. Só leitura: nada é gravado. *@
+@if (Dados is not null)
+{
+    var abas = Abas();
+    var atual = _aba is Aba escolhida && abas.Contains(escolhida) ? escolhida : abas[0];
+
+    <div class="pendente-detalhes mt-2">
+        @if (!Dados.ComElenco)
+        {
+            <div class="alert alert-warning small py-2 mb-2">
+                O jogo do site ainda não foi achado: os nomes aparecem como vieram do PES, sem ligar ao cadastro, e a nota
+                conta os gols sofridos pelo placar final.
+            </div>
+        }
+
+        <ul class="nav nav-tabs mb-2">
+            @foreach (var aba in abas)
+            {
+                var esta = aba;
+                <li class="nav-item">
+                    <button type="button" class="nav-link py-1 px-2 small @(esta == atual ? "active" : "")" @onclick="() => _aba = esta">@Nome(esta)</button>
+                </li>
+            }
+        </ul>
+
+        @switch (atual)
+        {
+            case Aba.Lances:
+                @if (Dados.Eventos.Count == 0)
+                {
+                    <div class="text-muted small">O envio não tem lances.</div>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0 pendente-lances">
+                        @foreach (var e in Dados.Eventos.OrderBy(e => e.Minuto ?? int.MaxValue))
+                        {
+                            <li class="d-flex align-items-baseline gap-2">
+                                <span class="minuto text-muted">@(e.Minuto is int m ? $"{m}'" : "–")</span>
+                                <span class="tipo">@Simbolo(e.Tipo)</span>
+                                <span class="@(e.Lado == "casa" ? "lado-casa" : "lado-fora") small fw-semibold">@(e.Lado == "casa" ? Dados.Casa : Dados.Fora)</span>
+                                <span>@Texto(e)</span>
+                                @if (!e.Identificado)
+                                {
+                                    <span class="badge bg-warning text-dark" title="O nome não casou com o elenco: a liberação não grava este lance">não identificado</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                break;
+            case Aba.Numeros:
+                <PartidaNumeros Numeros="Dados.Numeros" CasaNome="@Dados.Casa" ForaNome="@Dados.Fora" />
+                break;
+            case Aba.Jogadores:
+                @if (Dados.Jogadores is null)
+                {
+                    <div class="text-muted small">
+                        Este envio não trouxe o registro individual dos jogadores (o vídeo não tem as fotos): depois de liberado,
+                        o jogo fica com a nota do PES.
+                    </div>
+                }
+                else
+                {
+                    <PartidaJogadores Dados="Dados.Jogadores" CasaNome="@Dados.Casa" ForaNome="@Dados.Fora" />
+                }
+                break;
+            case Aba.Avisos:
+                <ul class="small mb-0">
+                    @foreach (var a in Dados.AvisosDoExtrator)
+                    {
+                        <li>@a</li>
+                    }
+                </ul>
+                break;
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public PendenteDetalhesDto? Dados { get; set; }
+
+    private enum Aba { Lances, Numeros, Jogadores, Avisos }
+    private Aba? _aba;
+
+    private List<Aba> Abas()
+    {
+        var abas = new List<Aba> { Aba.Lances };
+        if (Dados!.Numeros.Count > 0) abas.Add(Aba.Numeros);
+        abas.Add(Aba.Jogadores);
+        if (Dados.AvisosDoExtrator.Count > 0) abas.Add(Aba.Avisos);
+        return abas;
+    }
+
+    private string Nome(Aba aba) => aba switch
+    {
+        Aba.Lances => $"Lances ({Dados!.Eventos.Count})",
+        Aba.Numeros => "Números",
+        Aba.Jogadores => Dados!.Jogadores is null ? "Jogadores (sem registro)" : "Jogadores e nota",
+        _ => $"Avisos do extrator ({Dados!.AvisosDoExtrator.Count})"
+    };
+
+    private static string Simbolo(string tipo) => tipo switch
+    {
+        "gol" => "⚽",
+        "gol_contra" => "⚽ (contra)",
+        "cartao_amarelo" => "🟨",
+        "cartao_vermelho" => "🟥",
+        "substituicao" => "⇄",
+        _ => tipo
+    };
+
+    private static string Texto(PendenteEventoDto e) => e.Tipo switch
+    {
+        "gol" => e.Assistencia is null ? e.Jogador ?? "(sem autor)" : $"{e.Jogador ?? "(sem autor)"} · assistência de {e.Assistencia}",
+        "gol_contra" => $"{e.Jogador ?? "(sem autor)"} (gol contra)",
+        "substituicao" => $"entra {e.Entrou ?? "?"}{(e.Saiu is null ? "" : $", sai {e.Saiu}")}",
+        _ => e.Jogador ?? "?"
+    };
+}

@@ -86,6 +86,9 @@ public interface IEstatisticasPesService
     /// <summary>Números da partida, na ordem de exibição; vazio quando ela não veio do PES.</summary>
     Task<IReadOnlyList<NumeroDaPartidaDto>> DaPartidaAsync(Guid partidaId, CancellationToken ct);
 
+    /// <summary>Os mesmos números, lidos de um JSON do PES (ex.: resultado ainda pendente).</summary>
+    IReadOnlyList<NumeroDaPartidaDto> DoJson(string? json);
+
     /// <summary>
     /// Números de cada jogador e a nota da liga (<see cref="NotaDaLiga"/>), com o placar e os cartões da partida.
     /// Nulo quando a partida não tem os números por jogador.

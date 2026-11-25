@@ -1,7 +1,10 @@
 using System.Text.Json;
 using Fc25Draft.Core.DTOs;
 using Fc25Draft.Core.Entities;
+using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Exceptions;
+using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fc25Draft.Infra.Services;
@@ -115,6 +118,127 @@ public partial class ResultadoPesService
 
     public async Task DescartarAsync(Guid pendenteId, CancellationToken ct) =>
         await _db.ResultadosPesPendentes.Where(x => x.Id == pendenteId).ExecuteDeleteAsync(ct);
+
+    public async Task<PendenteDetalhesDto> DetalhesDoPendenteAsync(Guid pendenteId, CancellationToken ct)
+    {
+        var p = await AcharPendenteAsync(pendenteId, ct);
+        var json = p.Json;
+        var r = Ler(json);
+
+        // Times do jogo achado na validação: a partida, ou o jogo do mata-mata que ainda não tem partida.
+        (Guid Casa, Guid Fora, Guid LigaId)? jogo = null;
+        if (p.PartidaId is Guid partidaId
+            && await _db.LigaPartidas.AsNoTracking().Where(x => x.PartidaId == partidaId)
+                .Select(x => new { x.TimeCasaId, x.TimeForaId, x.Rodada.LigaId }).FirstOrDefaultAsync(ct) is { } partida)
+            jogo = (partida.TimeCasaId, partida.TimeForaId, partida.LigaId);
+        else if (p.KnockoutJogoId is Guid koId
+                 && await _db.LigaKnockoutJogos.AsNoTracking().Where(k => k.KnockoutJogoId == koId)
+                     .Select(k => new { k.TimeCasaId, k.TimeForaId, k.LigaId }).FirstOrDefaultAsync(ct) is
+                     { TimeCasaId: Guid kc, TimeForaId: Guid kf } ko)
+            jogo = (kc, kf, ko.LigaId);
+
+        // Playoff de acesso simulado com o mando trocado: a importação inverte os lados; aqui também.
+        if (jogo is { } j0)
+        {
+            var nomeCasa = await _db.Teams.AsNoTracking().Where(t => t.TeamId == j0.Casa).Select(t => t.TeamName).FirstAsync(ct);
+            if (!NomesPes.MesmoTime(r.Casa?.Time, nomeCasa) && NomesPes.MesmoTime(r.Fora?.Time, nomeCasa))
+            {
+                json = InverterMando(json);
+                r = Ler(json);
+            }
+        }
+
+        var elenco = new Dictionary<string, List<NomesPes.Candidato>>
+        {
+            [Casa] = jogo is { } jc ? await CandidatosAsync(jc.Casa, jc.LigaId, ct) : [],
+            [Fora] = jogo is { } jf ? await CandidatosAsync(jf.Fora, jf.LigaId, ct) : [],
+        };
+        // Sem jogo achado, ids só para separar os lados (nada é gravado).
+        var timeDoLado = new Dictionary<string, Guid>
+        {
+            [Casa] = jogo?.Casa ?? Guid.NewGuid(),
+            [Fora] = jogo?.Fora ?? Guid.NewGuid(),
+        };
+        int? IdDe(string lado, string? nome) => nome is null ? null : NomesPes.Casar(nome, elenco[lado]).Id;
+
+        // Lances como vieram do PES; os que casam com o elenco também entram na conta da nota, como na liberação.
+        var eventos = new List<PendenteEventoDto>();
+        var paraNota = new List<EventoParaNota>();
+        foreach (var e in r.Eventos ?? Array.Empty<ResultadoPesEvento>())
+        {
+            if (e.Lado is not (Casa or Fora) || e.Tipo is null) continue;
+            var lado = e.Lado;
+            int? minuto = e.Minuto is >= 1 and <= 130 ? e.Minuto : null;
+            var principal = e.Tipo switch
+            {
+                "gol_contra" => IdDe(lado == Casa ? Fora : Casa, e.Jogador),
+                "substituicao" => IdDe(lado, e.Entrou),
+                _ => IdDe(lado, e.Jogador)
+            };
+            eventos.Add(new PendenteEventoDto(minuto, lado, e.Tipo, e.Jogador, e.Assistencia, e.Entrou, e.Saiu, principal is not null));
+
+            TipoEvento? tipo = e.Tipo switch
+            {
+                "gol" => TipoEvento.Gol,
+                "gol_contra" => TipoEvento.GolContra,
+                "cartao_amarelo" => TipoEvento.CartaoAmarelo,
+                "cartao_vermelho" => TipoEvento.CartaoVermelho,
+                "substituicao" => TipoEvento.Substituicao,
+                _ => null
+            };
+            if (principal is int id && tipo is TipoEvento t)
+            {
+                var saiu = t == TipoEvento.Substituicao ? IdDe(lado, e.Saiu) : null;
+                paraNota.Add(new EventoParaNota(t, timeDoLado[lado], id, saiu == id ? null : saiu, minuto));
+            }
+        }
+
+        JogadoresDaPartidaDto? jogadores = null;
+        if (r.Jogadores is not null)
+        {
+            var golsCasa = r.Casa?.Gols ?? p.GolsCasa;
+            var golsFora = r.Fora?.Gols ?? p.GolsFora;
+            var calculadas = CasarEstatisticas(p.PartidaId ?? Guid.Empty, r, elenco, timeDoLado)
+                .Select(linha =>
+                {
+                    var lado = linha.TimeId == timeDoLado[Casa] ? Casa : Fora;
+                    var contexto = NotaDaLiga.ContextoDaPartida(linha,
+                        lado == Casa ? golsCasa : golsFora, lado == Casa ? golsFora : golsCasa, paraNota);
+                    var nome = linha.JogadorId is int jid
+                        ? elenco[lado].FirstOrDefault(c => c.Id == jid)?.Nome ?? linha.NomePes
+                        : linha.NomePes;
+                    return new NotasOficiais.NotaCalculada(linha, nome, NotaDaLiga.Calcular(linha, contexto));
+                })
+                .ToList();
+            var melhores = NotasOficiais.MelhoresEmCampo(calculadas);
+            List<DesempenhoJogadorDto> Lado(string lado) => calculadas
+                .Where(c => c.Numeros.TimeId == timeDoLado[lado])
+                .OrderBy(c => c.Numeros.Ordem)
+                .Select(c => new DesempenhoJogadorDto(c.Numeros.JogadorId, c.Nome, c.Nota, c.Numeros, melhores.Contains(c.Numeros.Id)))
+                .ToList();
+            jogadores = new JogadoresDaPartidaDto(Lado(Casa), Lado(Fora));
+        }
+
+        return new PendenteDetalhesDto(
+            p.Id, p.Casa, p.Fora, p.GolsCasa, p.GolsFora,
+            eventos, EstatisticasPesService.NumerosDoJson(json), jogadores, AvisosDoExtrator(json), jogo is not null);
+    }
+
+    /// <summary>"avisos" do JSON (o que o extrator do Auto_PES21 anotou), um texto por aviso.</summary>
+    private static IReadOnlyList<string> AvisosDoExtrator(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("avisos", out var avisos) || avisos.ValueKind != JsonValueKind.Array)
+                return [];
+            return avisos.EnumerateArray()
+                .Select(a => a.ValueKind == JsonValueKind.String ? a.GetString() ?? "" : a.GetRawText())
+                .Where(a => a.Length > 0)
+                .ToList();
+        }
+        catch (JsonException) { return []; }
+    }
 
     // ── Apoio ─────────────────────────────────────────────────────────────────
 

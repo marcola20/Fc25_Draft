@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Fc25Draft.Core.Interfaces;
 
 namespace Fc25Draft.Core.DTOs;
 
@@ -130,6 +131,32 @@ public record ResultadoPesPendenteDto(
     IReadOnlyList<string> Avisos,
     string? Erro,
     DateTime EnviadoEm);
+
+/// <summary>
+/// Um lance do JSON pendente, com os nomes como vieram do PES. <c>Identificado</c>: o nome principal (autor,
+/// punido, quem entrou) casou com o elenco — sem isso, a liberação não grava o lance.
+/// </summary>
+public record PendenteEventoDto(
+    int? Minuto, string Lado, string Tipo, string? Jogador, string? Assistencia, string? Entrou, string? Saiu,
+    bool Identificado);
+
+/// <summary>
+/// O que um resultado segurado traz, para conferir antes de liberar: lances, números dos times, registros de cada
+/// jogador com a nota da liga (como ficaria depois de liberar) e os avisos do extrator. Nada é gravado.
+/// <c>Jogadores</c> nulo = o JSON não trouxe o registro individual.
+/// </summary>
+public record PendenteDetalhesDto(
+    Guid Id,
+    string Casa,
+    string Fora,
+    int GolsCasa,
+    int GolsFora,
+    IReadOnlyList<PendenteEventoDto> Eventos,
+    IReadOnlyList<NumeroDaPartidaDto> Numeros,
+    JogadoresDaPartidaDto? Jogadores,
+    IReadOnlyList<string> AvisosDoExtrator,
+    // false = o jogo do site não foi achado: nomes sem casar com o elenco e gols sofridos pelo placar.
+    bool ComElenco);
 
 // ── Vídeo do jogo no YouTube (botão "Atribuir" do painel do Auto_PES21) ─────
 
