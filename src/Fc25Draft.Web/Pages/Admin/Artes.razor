@@ -27,7 +27,7 @@
         as escolhas de 5 em 5 (4 a 8, 9 a 13...), cada bloco quando a última dele sai; e a seleção da rodada (4-3-3 pela nota do PES) de cada rodada da Série A
         e da Série B, quando o último jogo dela encerra; a aposentadoria de cada jogador (na virada); todo hat-trick; o
         campeão de cada competição; quem sobe e quem cai (com tudo decidido); e o artilheiro e o garçom de cada competição,
-        quando os prêmios de estatística são pagos. O <strong>Artista CBFV</strong>, no seu PC, busca a fila a
+        quando os prêmios de estatística são pagos; e cada jogador que entra no Hall da Fama. O <strong>Artista CBFV</strong>, no seu PC, busca a fila a
         cada 15 minutos (com o token de admin), faz o vídeo e a imagem e manda no seu Telegram. Com o PC desligado,
         o pedido espera aqui.
     </p>
@@ -84,7 +84,7 @@
                             <div class="list-group-item d-flex align-items-center gap-2 flex-wrap">
                                 <span class="etiqueta">@(p.Tipo switch { TipoPedidoArte.Premio => "prêmio", TipoPedidoArte.Contratacao => "contratação", TipoPedidoArte.SelecaoRodada => "seleção", TipoPedidoArte.Aposentadoria => "aposentadoria",
                                     TipoPedidoArte.HatTrick => "hat-trick", TipoPedidoArte.Campeao => "campeão",
-                                    TipoPedidoArte.Acesso => "acesso", TipoPedidoArte.Artilharia => "artilharia", _ => "draft" })</span>
+                                    TipoPedidoArte.Acesso => "acesso", TipoPedidoArte.Artilharia => "artilharia", TipoPedidoArte.HallDaFama => "hall da fama", _ => "draft" })</span>
                                 <span class="flex-grow-1">
                                     @p.Titulo
                                     @if (p.Erro is not null)

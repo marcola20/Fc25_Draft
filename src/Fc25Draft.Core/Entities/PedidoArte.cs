@@ -21,7 +21,9 @@ public enum TipoPedidoArte
     /// <summary>Quem sobe e quem cai entre Série A e B, com tudo decidido. ReferenciaId = LigaId da Série A.</summary>
     Acesso = 10,
     /// <summary>Artilheiro e garçom (top 3) de uma competição, quando os prêmios de estatística são pagos. ReferenciaId = LigaId.</summary>
-    Artilharia = 11
+    Artilharia = 11,
+    /// <summary>Jogador que a organização colocou no Hall da Fama. ReferenciaId = HallDaFamaJogadorId.</summary>
+    HallDaFama = 12
 }
 
 public enum SituacaoPedidoArte

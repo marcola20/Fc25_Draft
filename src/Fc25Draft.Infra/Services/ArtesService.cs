@@ -67,6 +67,7 @@ public class ArtesService : IArtesService
                 TipoPedidoArte.Campeao => await MontarCampeaoAsync(pedido, ct),
                 TipoPedidoArte.Acesso => await MontarAcessoAsync(pedido, ct),
                 TipoPedidoArte.Artilharia => await MontarArtilhariaAsync(pedido, ct),
+                TipoPedidoArte.HallDaFama => await MontarHallDaFamaAsync(pedido, ct),
                 _ => await MontarDraftAsync(pedido, ct)
             };
             if (dto is null)
@@ -505,6 +506,15 @@ public class ArtesService : IArtesService
             .ToListAsync(ct);
         foreach (var p in pagos)
             Pedir(TipoPedidoArte.Artilharia, $"artilharia:{p.LigaId}", p.LigaId, $"Artilheiro e garçom · {p.Liga}");
+
+        // Hall da Fama: jogador que a organização colocou lá depois de ligar (a turma sai em ordem: 3º, 2º, 1º).
+        var hof = await _db.Set<HallDaFamaJogador>().AsNoTracking()
+            .Where(h => h.CriadoEm >= desde)
+            .Select(h => new { h.HallDaFamaJogadorId, h.Player.Name, h.Temporada, h.Colocacao })
+            .ToListAsync(ct);
+        foreach (var h in hof.OrderBy(h => h.Temporada).ThenByDescending(h => h.Colocacao))
+            Pedir(TipoPedidoArte.HallDaFama, $"halldafama:{h.HallDaFamaJogadorId}", h.HallDaFamaJogadorId,
+                $"Hall da Fama · {h.Name} ({h.Colocacao}º da turma de {h.Temporada})");
     }
 
     private async Task<string?> FotoAsync(int playerId, CancellationToken ct) =>
@@ -539,6 +549,36 @@ public class ArtesService : IArtesService
             await FotoAsync(p.PlayerId, ct), p.AposentadoNaTemporada ?? 0,
             idoloDe.Select(i => i.TeamName).ToList(), camisa);
         return new PedidoArteDto(pedido.PedidoArteId, "aposentadoria", pedido.Titulo, null, null, Aposentadoria: dto);
+    }
+
+    private async Task<PedidoArteDto?> MontarHallDaFamaAsync(PedidoArte pedido, CancellationToken ct)
+    {
+        var h = await _db.Set<HallDaFamaJogador>().AsNoTracking()
+            .Where(x => x.HallDaFamaJogadorId == pedido.ReferenciaId)
+            .Select(x => new
+            {
+                x.PlayerId, x.Player.Name, x.Temporada, x.Colocacao, x.Motivo,
+                Aposentado = x.Player.AposentadoNaTemporada != null,
+                Time = x.Player.AposentadoNaTemporada != null ? x.Player.TimeAoSeAposentar : x.Player.CurrentTeamId,
+                x.Player.NumeroAoSeAposentar
+            })
+            .FirstOrDefaultAsync(ct);
+        if (h is null) return null;
+
+        var carreira = await new LigaPublicService(_db).GetCarreiraJogadorAsync(h.PlayerId, ct);
+        var est = carreira?.Estatisticas;
+        var competicoes = est?.Competicoes ?? [];
+        var clubes = competicoes.OrderBy(c => c.Temporada ?? 0).Select(c => c.TimeNome).Where(n => !string.IsNullOrWhiteSpace(n)).Distinct().ToList();
+        var clube = await NomeDoTimeAsync(h.Time, ct) ?? clubes.LastOrDefault();
+        if (clube is not null && !clubes.Contains(clube)) clubes.Add(clube);
+        var titulos = (est?.Titulos ?? []).Select(t => t.Competicao).Distinct().ToList();
+        int? numero = h.Aposentado ? h.NumeroAoSeAposentar : h.Time is Guid timeId ? await NumeroAsync(h.PlayerId, timeId, ct) : null;
+
+        var dto = new HallDaFamaArteDto(h.Name, clube, h.Temporada, h.Colocacao, h.Motivo, h.Aposentado,
+            competicoes.Select(c => c.Temporada).Where(t => t != null).Distinct().Count(),
+            est?.Jogos ?? 0, est?.Gols ?? 0, est?.Assistencias ?? 0, clubes, titulos, numero,
+            await FotoAsync(h.PlayerId, ct));
+        return new PedidoArteDto(pedido.PedidoArteId, "halldafama", pedido.Titulo, null, null, HallDaFama: dto);
     }
 
     private async Task<PedidoArteDto?> MontarHatTrickAsync(PedidoArte pedido, CancellationToken ct)

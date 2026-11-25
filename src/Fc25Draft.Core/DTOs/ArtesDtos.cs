@@ -15,7 +15,8 @@ public record PedidoArteDto(
     HatTrickArteDto? HatTrick = null,
     CampeaoArteDto? Campeao = null,
     AcessoArteDto? Acesso = null,
-    ArtilhariaArteDto? Artilharia = null);
+    ArtilhariaArteDto? Artilharia = null,
+    HallDaFamaArteDto? HallDaFama = null);
 
 public record PremioArteDto(
     string Sigla,         // "MVP"
@@ -79,6 +80,12 @@ public record AposentadoriaArteDto(
     string Nome, string? Clube, int? Idade, int Temporadas, int Jogos, int Gols, int Assistencias,
     IReadOnlyList<string> Clubes, IReadOnlyList<string> Titulos, string? FotoUrl, int Temporada,
     IReadOnlyList<string>? LendaDe = null, short? CamisaAposentada = null);
+
+/// <summary>Entrada no Hall da Fama: a turma, a colocação nela (1 a 3), o motivo e a carreira na CBFV.</summary>
+public record HallDaFamaArteDto(
+    string Nome, string? Clube, int Turma, int Colocacao, string? Motivo, bool Aposentado, int Temporadas,
+    int Jogos, int Gols, int Assistencias, IReadOnlyList<string> Clubes, IReadOnlyList<string> Titulos,
+    int? Numero, string? FotoUrl);
 
 public record HatTrickArteDto(
     string Nome, string Clube, int Gols, IReadOnlyList<int?> Minutos, string Casa, string Fora, int GolsCasa,
