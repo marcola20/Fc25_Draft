@@ -1,8 +1,12 @@
+@using System.Globalization
 @using Fc25Draft.Core.DTOs
 @using Fc25Draft.Core.Interfaces
+@using Fc25Draft.Core.Utilities
 @inject IJogadorHistoricoService Historico
+@inject IEstatisticasPesService Estatisticas
 
-@* Jogo a jogo do jogador, com a nota do PES. *@
+@* Jogo a jogo do jogador, com a nota oficial e, nos jogos com o registro individual do PES, os números dele.
+   Tocar num jogo com registro abre a conta da nota da liga e os números que não têm coluna. *@
 @if (_dados is null)
 {
     <div class="text-center py-4"><div class="spinner-border" role="status"></div></div>
@@ -41,6 +45,33 @@ else
         </div>
     </div>
 
+    @if (_registros.Count > 0)
+    {
+        var r = _registros.Values.Select(d => d.Numeros).ToList();
+        var jogos = r.Count;
+        int Soma(Func<Core.Entities.LigaEstatisticaJogador, int?> campo) => r.Sum(x => campo(x) ?? 0);
+        var goleiro = r.Any(x => x.Defesas is not null);
+
+        <div class="small fw-semibold text-muted mb-1">Registros do jogo · @jogos jogo@(jogos == 1 ? "" : "s") com registro</div>
+        <div class="row g-2 mb-3 registros-resumo">
+            @Cartao("Minutos", Soma(x => x.Minutos).ToString(Br), null)
+            @Cartao("Passes certos", Soma(x => x.PassesCertos).ToString(Br), Porcento(Soma(x => x.PassesCertos), Soma(x => x.Passes)))
+            @Cartao("Chutes a gol", Soma(x => x.ChutesAGol).ToString(Br), $"de {Soma(x => x.Chutes)} chutes")
+            @Cartao("Desarmes certos", Soma(x => x.DesarmesCertos).ToString(Br), $"de {Soma(x => x.Desarmes)}")
+            @Cartao("Interceptações", Soma(x => x.Interceptacoes).ToString(Br), PorJogo(Soma(x => x.Interceptacoes), jogos))
+            @Cartao("Afastamentos", Soma(x => x.Afastamentos).ToString(Br), PorJogo(Soma(x => x.Afastamentos), jogos))
+            @if (goleiro)
+            {
+                @Cartao("Defesas", Soma(x => x.Defesas).ToString(Br), PorJogo(Soma(x => x.Defesas), r.Count(x => x.Defesas is not null)))
+            }
+            else
+            {
+                @Cartao("Toques", Soma(x => x.Toques).ToString(Br), PorJogo(Soma(x => x.Toques), jogos))
+            }
+            @Cartao("Faltas", Soma(x => x.Faltas).ToString(Br), PorJogo(Soma(x => x.Faltas), jogos))
+        </div>
+    }
+
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle" style="font-size:0.875rem;">
             <thead class="table-dark">
@@ -48,20 +79,29 @@ else
                     <th>Data</th>
                     <th>Jogo</th>
                     <th class="text-center">Placar</th>
-                    <th class="text-center">Nota</th>
+                    <th class="text-center" title="Nota da liga nos jogos com registro; nos antigos, a do PES">Nota</th>
                     <th class="text-center" title="Gols">G</th>
                     <th class="text-center" title="Assistências">A</th>
+                    @if (_registros.Count > 0)
+                    {
+                        <th class="text-center d-none d-sm-table-cell" title="Minutos">Min</th>
+                        <th class="text-center d-none d-md-table-cell" title="Chutes a gol / chutes">Chutes</th>
+                        <th class="text-center d-none d-md-table-cell" title="Passes certos / passes">Passes</th>
+                        <th class="text-center d-none d-lg-table-cell" title="Desarmes certos / desarmes">Desarmes</th>
+                    }
                     <th class="text-center d-none d-md-table-cell">Cartões</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var j in _dados.Jogos)
                 {
-                    <tr>
+                    var reg = _registros.GetValueOrDefault(j.PartidaId);
+                    var aberto = reg is not null && _abertos.Contains(j.PartidaId);
+                    <tr class="@(reg is not null ? "jogo-com-registro" : "")" @onclick="() => Alternar(j.PartidaId, reg)">
                         <td class="text-muted small text-nowrap">@(j.Quando?.ToString("dd/MM/yy") ?? "—")</td>
                         <td>
                             <div>
-                                @(j.EmCasa ? "x" : "@") <a href="/teams/details/@j.AdversarioId">@j.AdversarioNome</a>
+                                @(j.EmCasa ? "x" : "@") <a href="/teams/details/@j.AdversarioId" @onclick:stopPropagation="true">@j.AdversarioNome</a>
                                 @if (j.Titular == false)
                                 {
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1" title="Entrou durante o jogo">reserva</span>
@@ -88,25 +128,103 @@ else
                         </td>
                         <td class="text-center">@(j.Gols > 0 ? j.Gols.ToString() : "")</td>
                         <td class="text-center">@(j.Assistencias > 0 ? j.Assistencias.ToString() : "")</td>
+                        @if (_registros.Count > 0)
+                        {
+                            var n = reg?.Numeros;
+                            <td class="text-center text-muted d-none d-sm-table-cell">@Num(n?.Minutos)</td>
+                            <td class="text-center d-none d-md-table-cell">@(n is null ? "" : Par(n.ChutesAGol, n.Chutes))</td>
+                            <td class="text-center d-none d-md-table-cell">@(n is null ? "" : Par(n.PassesCertos, n.Passes))</td>
+                            <td class="text-center d-none d-lg-table-cell">@(n is null ? "" : Par(n.DesarmesCertos, n.Desarmes))</td>
+                        }
                         <td class="text-center d-none d-md-table-cell">
                             @for (var i = 0; i < j.Amarelos; i++) { <span class="cartao-icone amarelo me-1" title="Amarelo"></span> }
                             @for (var i = 0; i < j.Vermelhos; i++) { <span class="cartao-icone vermelho me-1" title="Vermelho"></span> }
                         </td>
                     </tr>
+                    @if (aberto)
+                    {
+                        <tr class="jogo-detalhe">
+                            <td colspan="11">
+                                <div class="d-flex flex-wrap gap-2">
+                                    <span>base @NotaPes.Texto(NotaDaLiga.Pesos.Base)</span>
+                                    @foreach (var p in reg!.NotaLiga.Parcelas)
+                                    {
+                                        <span class="@(p.Valor < 0 ? "text-danger" : "text-success")">@NotaDaLiga.TextoParcela(p.Valor) @p.Descricao</span>
+                                    }
+                                    <span class="fw-bold">= @NotaPes.Texto(reg.NotaLiga.Nota)</span>
+                                </div>
+                                <div class="text-muted mt-1">@Outros(reg.Numeros)</div>
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>
     </div>
-    <p class="small text-muted mb-0">A nota é a do PES, que só avalia os titulares.</p>
+    <p class="small text-muted mb-0">
+        A nota é a da liga, calculada pelos registros do jogo (toque no jogo para ver a conta). Nos jogos antigos, sem
+        registro, vale a nota do PES.
+    </p>
 }
 
 @code {
     [Parameter, EditorRequired] public int PlayerId { get; set; }
 
-    private JogadorJogosDto? _dados;
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
 
-    protected override async Task OnParametersSetAsync() =>
+    private JogadorJogosDto? _dados;
+    private IReadOnlyDictionary<Guid, DesempenhoJogadorDto> _registros = new Dictionary<Guid, DesempenhoJogadorDto>();
+    private readonly HashSet<Guid> _abertos = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
         _dados = await Historico.JogosAsync(PlayerId, CancellationToken.None);
+        _registros = await Estatisticas.RegistrosDoJogadorAsync(PlayerId, CancellationToken.None);
+    }
+
+    private void Alternar(Guid partidaId, DesempenhoJogadorDto? reg)
+    {
+        if (reg is null) return;
+        if (!_abertos.Remove(partidaId)) _abertos.Add(partidaId);
+    }
+
+    private static RenderFragment Cartao(string titulo, string valor, string? detalhe) => __builder =>
+    {
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100"><div class="card-body py-2">
+                <div class="small text-muted">@titulo</div>
+                <h5 class="mb-0">@valor</h5>
+                @if (detalhe is not null)
+                {
+                    <div class="small text-muted">@detalhe</div>
+                }
+            </div></div>
+        </div>
+    };
+
+    private static string Num(int? v) => v?.ToString(Br) ?? "–";
+    private static string Par(int? certos, int? total) => certos is null && total is null ? "–" : $"{Num(certos)}/{Num(total)}";
+    private static string? Porcento(int parte, int total) => total > 0 ? $"{Math.Round(parte * 100m / total):0}% de {total}" : null;
+    private static string PorJogo(int total, int jogos) => jogos > 0 ? $"{((decimal)total / jogos).ToString("0.0", Br)} por jogo" : "";
+
+    /// <summary>Os números que não têm coluna, para a linha aberta.</summary>
+    private static string Outros(Core.Entities.LigaEstatisticaJogador n)
+    {
+        var partes = new List<string>();
+        void Add(string rotulo, int? v) { if (v is int x) partes.Add($"{rotulo} {x}"); }
+        if (n.Posicao is not null) partes.Add(n.Posicao);
+        Add("interceptações", n.Interceptacoes);
+        Add("afastamentos", n.Afastamentos);
+        Add("defesas", n.Defesas);
+        Add("faltas", n.Faltas);
+        Add("impedimentos", n.Impedimentos);
+        Add("cruzamentos", n.Cruzamentos);
+        Add("toques", n.Toques);
+        if (n.DistanciaDeDrible is decimal d) partes.Add($"drible {d.ToString("0.#", Br)} m");
+        if (n.VelocidadeMedia is decimal v) partes.Add($"velocidade média {v.ToString("0.#", Br)} km/h");
+        if (n.NotaPes is decimal pes) partes.Add($"nota do PES {NotaPes.Texto(pes)}");
+        return string.Join(" · ", partes);
+    }
 
     private static string CorDoResultado(string? r) => r switch
     {
@@ -116,7 +234,7 @@ else
         _ => "resultado"
     };
 
-    // Mesma leitura do PES: 7+ muito bom, 6 regular, abaixo de 5,5 ruim.
+    // 7+ muito bom, 6 regular, abaixo de 5,5 ruim.
     private static string CorDaNota(decimal nota) => nota switch
     {
         >= 7.0m => "text-success",

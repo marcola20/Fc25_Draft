@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Fc25Draft.Core.Entities;
 using Fc25Draft.Core.Enums;
 using Fc25Draft.Core.Interfaces;
+using Fc25Draft.Core.Utilities;
 using Fc25Draft.Infra.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -109,6 +110,87 @@ public class EstatisticasPesService : IEstatisticasPesService
         importacao.Json = raiz.ToJsonString();
         importacao.AtualizadoEm = agora;
         await _db.SaveChangesAsync(ct);
+    }
+
+    // Rodada sentinela do playoff de acesso: guardado na Série A, mas é entre times das duas séries.
+    private const int NumeroPlayoffAcesso = -2;
+
+    public async Task<IReadOnlyList<RegistroDoJogadorDto>> RegistrosDaCompeticaoAsync(Guid ligaId, CancellationToken ct)
+    {
+        var calculadas = await NotasOficiais.CalcularAsync(_db,
+            x => x.JogadorId != null
+                 && x.Partida.Rodada.LigaId == ligaId
+                 && x.Partida.Rodada.Numero != NumeroPlayoffAcesso
+                 && x.Partida.Status == PartidaStatus.Encerrada, ct);
+        if (calculadas.Count == 0) return Array.Empty<RegistroDoJogadorDto>();
+
+        var partidas = calculadas.Select(c => c.Numeros.PartidaId).Distinct().ToList();
+        var quando = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => partidas.Contains(p.PartidaId))
+            .Select(p => new { p.PartidaId, Quando = p.EncerradaEm ?? p.IniciadaEm })
+            .ToDictionaryAsync(p => p.PartidaId, p => p.Quando, ct);
+        var times = await _db.Teams.AsNoTracking().Select(t => new { t.TeamId, t.TeamName }).ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
+
+        return calculadas
+            .GroupBy(x => x.Numeros.JogadorId!.Value)
+            .Select(g =>
+            {
+                var ultimo = g.OrderByDescending(x => quando.GetValueOrDefault(x.Numeros.PartidaId)).First();
+                int Soma(Func<LigaEstatisticaJogador, int?> campo) => g.Sum(x => campo(x.Numeros) ?? 0);
+                var noGol = g.Where(x => NotaDaLiga.GrupoDe(x.Numeros.Grupo, x.Numeros.Posicao) == NotaDaLiga.Goleiro).ToList();
+                return new RegistroDoJogadorDto(
+                    g.Key, ultimo.Nome, ultimo.Numeros.Posicao, ultimo.Numeros.TimeId,
+                    times.GetValueOrDefault(ultimo.Numeros.TimeId, ""),
+                    g.Count(), Soma(x => x.Minutos),
+                    Math.Round(g.Average(x => x.Nota.Nota), 2), g.Max(x => x.Nota.Nota),
+                    Soma(x => x.Gols), Soma(x => x.Assistencias),
+                    Soma(x => x.Chutes), Soma(x => x.ChutesAGol),
+                    Soma(x => x.Passes), Soma(x => x.PassesCertos),
+                    Soma(x => x.Desarmes), Soma(x => x.DesarmesCertos),
+                    Soma(x => x.Interceptacoes), Soma(x => x.Afastamentos),
+                    Soma(x => x.Cruzamentos), Soma(x => x.Toques), Soma(x => x.Faltas),
+                    g.Sum(x => x.Numeros.DistanciaDeDrible ?? 0),
+                    noGol.Count > 0 ? noGol.Sum(x => x.Numeros.Defesas ?? 0) : null,
+                    noGol.Count > 0 ? noGol.Count : null);
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, DesempenhoJogadorDto>> RegistrosDoJogadorAsync(int playerId, CancellationToken ct)
+    {
+        // A partida inteira entra no cálculo só para achar o melhor em campo; devolve a linha do jogador.
+        var partidas = await _db.LigaEstatisticasJogadores.AsNoTracking()
+            .Where(x => x.JogadorId == playerId)
+            .Select(x => x.PartidaId)
+            .ToListAsync(ct);
+        if (partidas.Count == 0) return new Dictionary<Guid, DesempenhoJogadorDto>();
+
+        var calculadas = await NotasOficiais.CalcularAsync(_db, x => partidas.Contains(x.PartidaId), ct);
+        var melhores = NotasOficiais.MelhoresEmCampo(calculadas);
+        return calculadas
+            .Where(c => c.Numeros.JogadorId == playerId)
+            .GroupBy(c => c.Numeros.PartidaId)
+            .ToDictionary(g => g.Key, g => Desempenho(g.First(), melhores));
+    }
+
+    private static DesempenhoJogadorDto Desempenho(NotasOficiais.NotaCalculada c, HashSet<Guid> melhores) =>
+        new(c.Numeros.JogadorId, c.Nome, c.Nota, c.Numeros, melhores.Contains(c.Numeros.Id));
+
+    public async Task<JogadoresDaPartidaDto?> JogadoresDaPartidaAsync(Guid partidaId, CancellationToken ct)
+    {
+        var calculadas = await NotasOficiais.CalcularAsync(_db, x => x.PartidaId == partidaId, ct);
+        if (calculadas.Count == 0) return null;
+
+        var casaId = await _db.LigaPartidas.AsNoTracking()
+            .Where(p => p.PartidaId == partidaId)
+            .Select(p => p.TimeCasaId)
+            .FirstAsync(ct);
+        var melhores = NotasOficiais.MelhoresEmCampo(calculadas);
+        var ordenadas = calculadas.OrderBy(c => c.Numeros.Ordem).ToList();
+
+        return new JogadoresDaPartidaDto(
+            ordenadas.Where(c => c.Numeros.TimeId == casaId).Select(c => Desempenho(c, melhores)).ToList(),
+            ordenadas.Where(c => c.Numeros.TimeId != casaId).Select(c => Desempenho(c, melhores)).ToList());
     }
 
     public async Task<IReadOnlyList<NumeroDaPartidaDto>> DaPartidaAsync(Guid partidaId, CancellationToken ct)

@@ -1,0 +1,13 @@
+/* Muitas sub-abas: rolam de lado no celular em vez de quebrar em várias linhas. */
+.registros-abas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+.registros-abas .nav-link {
+    white-space: nowrap;
+    font-size: 0.875rem;
+    padding: 0.35rem 0.7rem;
+}

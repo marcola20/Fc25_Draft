@@ -1,0 +1,189 @@
+@using System.Globalization
+@inject EscudoService Escudos
+
+@* Líderes da competição pelos registros do jogo (registro individual do PES de cada partida): uma sub-aba por
+   número. Média e percentual pedem um mínimo de jogos (metade dos jogos de quem mais jogou), como as notas. *@
+@if (Registros.Count == 0)
+{
+    <div class="alert alert-info">Nenhum jogo desta competição tem o registro individual dos jogadores.</div>
+}
+else
+{
+    var cat = Atual;
+    var minimo = MinimoDeJogos;
+    var lista = Lideres(cat, minimo);
+
+    <ul class="nav nav-tabs mb-2 registros-abas">
+        @foreach (var c in Categorias)
+        {
+            var esta = c;
+            <li class="nav-item">
+                <button type="button" class="nav-link @(esta.Chave == cat.Chave ? "active" : "")" @onclick="() => _chave = esta.Chave">@esta.Aba</button>
+            </li>
+        }
+    </ul>
+
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted">
+        <span>@cat.Explicacao</span>
+        @if (cat.PedeMinimo)
+        {
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="registrosTodos" @bind="_todos" />
+                <label class="form-check-label" for="registrosTodos">
+                    Mostrar todos (sem o mínimo de @minimo jogo@(minimo == 1 ? "" : "s"))
+                </label>
+            </div>
+        }
+    </div>
+
+    @if (lista.Count == 0)
+    {
+        <div class="text-muted small">Ninguém com esse registro ainda.</div>
+    }
+    else
+    {
+        <div class="table-responsive painel mb-3">
+            <table class="table table-hover align-middle tabela-liga">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:35px;">#</th>
+                        <th>Jogador</th>
+                        <th class="d-none d-md-table-cell">Time</th>
+                        <th class="text-center" style="width:45px;" title="Jogos com registro">J</th>
+                        <th class="text-center" style="width:75px;">@cat.Coluna</th>
+                        @if (cat.Extra is not null)
+                        {
+                            <th class="text-center d-none d-sm-table-cell" style="width:75px;" title="@cat.Extra.Dica">@cat.Extra.Titulo</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < lista.Count; i++)
+                    {
+                        var r = lista[i];
+                        <tr style="height:40px;">
+                            <td class="numero text-body-tertiary">@(i + 1)</td>
+                            <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                <FotoJogador PlayerId="@r.JogadorId" Tamanho="28" Classe="me-2" />
+                                <a href="/players/details/@r.JogadorId" class="text-body">@r.Nome</a> <span class="text-muted small">@r.Posicao</span>
+                            </td>
+                            <td class="d-none d-md-table-cell text-muted small" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                <img src="@Escudos.GetEscudo(r.TimeNome)" alt="" width="18" height="18" class="me-1" style="object-fit:contain" onerror="this.src='/images/escudos/escudo.png'" />
+                                @r.TimeNome
+                            </td>
+                            <td class="text-center">@(cat.Jogos?.Invoke(r) ?? r.Jogos)</td>
+                            <td class="text-center fw-semibold">
+                                @if (cat.Chave == "nota")
+                                {
+                                    <span class="badge @NotaPes.Cor(r.NotaMedia)">@NotaPes.Media(r.NotaMedia)</span>
+                                }
+                                else
+                                {
+                                    @cat.Texto(cat.Valor(r)!.Value)
+                                }
+                            </td>
+                            @if (cat.Extra is not null)
+                            {
+                                <td class="text-center text-muted d-none d-sm-table-cell">@cat.Extra.Texto(r)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public IReadOnlyList<RegistroDoJogadorDto> Registros { get; set; } = Array.Empty<RegistroDoJogadorDto>();
+
+    private const int Limite = 50;
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private string _chave = "nota";
+    private bool _todos;
+
+    private sealed record Extra(string Titulo, string Dica, Func<RegistroDoJogadorDto, string> Texto);
+
+    /// <param name="Valor">Nulo = o jogador não entra nessa lista (ex.: defesas de quem não é goleiro).</param>
+    /// <param name="PedeMinimo">Média ou percentual: só quem tem o mínimo de jogos, salvo "mostrar todos".</param>
+    /// <param name="Jogos">Jogos que contam (ex.: só os jogos no gol); nulo = todos.</param>
+    private sealed record Categoria(
+        string Chave, string Aba, string Coluna, string Explicacao,
+        Func<RegistroDoJogadorDto, decimal?> Valor, Func<decimal, string> Texto,
+        bool PedeMinimo = false, Extra? Extra = null, Func<RegistroDoJogadorDto, int>? Jogos = null);
+
+    private static string Inteiro(decimal v) => v.ToString("0", Br);
+    private static string Uma(decimal v) => v.ToString("0.0", Br);
+    private static string Pct(decimal v) => v.ToString("0", Br) + "%";
+    private static decimal? Porcento(int parte, int total) => total > 0 ? Math.Round(parte * 100m / total, 1) : null;
+    private static string PorJogo(int total, int jogos) => jogos > 0 ? Uma((decimal)total / jogos) : "–";
+
+    private static readonly Categoria[] Categorias =
+    [
+        new("nota", "Nota da liga", "Média",
+            "Média da nota da liga nos jogos com registro.",
+            r => r.NotaMedia, v => v.ToString("0.00", Br), PedeMinimo: true,
+            Extra: new("Máx.", "Melhor nota", r => NotaPes.Texto(r.MelhorNota))),
+        new("passes", "Passes", "Certos",
+            "Passes certos na competição.",
+            r => r.PassesCertos, Inteiro,
+            Extra: new("Acerto", "Passes certos sobre passes", r => Porcento(r.PassesCertos, r.Passes) is decimal p ? Pct(p) : "–")),
+        new("acerto", "Acerto de passe", "Acerto",
+            "Passes certos sobre passes (com pelo menos 20 passes).",
+            r => r.Passes >= 20 ? Porcento(r.PassesCertos, r.Passes) : null, Pct, PedeMinimo: true,
+            Extra: new("Passes", "Passes certos / passes", r => $"{r.PassesCertos}/{r.Passes}")),
+        new("chutes", "Chutes a gol", "A gol",
+            "Chutes no alvo na competição.",
+            r => r.ChutesAGol, Inteiro,
+            Extra: new("Chutes", "Chutes a gol / chutes", r => $"{r.ChutesAGol}/{r.Chutes}")),
+        new("desarmes", "Desarmes", "Certos",
+            "Desarmes certos na competição.",
+            r => r.DesarmesCertos, Inteiro,
+            Extra: new("Tentados", "Desarmes certos / desarmes", r => $"{r.DesarmesCertos}/{r.Desarmes}")),
+        new("interceptacoes", "Interceptações", "Total",
+            "Interceptações na competição.",
+            r => r.Interceptacoes, Inteiro,
+            Extra: new("Por jogo", "Média por jogo", r => PorJogo(r.Interceptacoes, r.Jogos))),
+        new("afastamentos", "Afastamentos", "Total",
+            "Bolas afastadas na competição.",
+            r => r.Afastamentos, Inteiro,
+            Extra: new("Por jogo", "Média por jogo", r => PorJogo(r.Afastamentos, r.Jogos))),
+        new("defesas", "Defesas", "Total",
+            "Defesas dos goleiros (só os jogos no gol).",
+            r => r.Defesas, Inteiro,
+            Extra: new("Por jogo", "Média por jogo no gol", r => PorJogo(r.Defesas ?? 0, r.JogosNoGol ?? 0)),
+            Jogos: r => r.JogosNoGol ?? 0),
+        new("cruzamentos", "Cruzamentos", "Total",
+            "Cruzamentos na competição.",
+            r => r.Cruzamentos, Inteiro,
+            Extra: new("Por jogo", "Média por jogo", r => PorJogo(r.Cruzamentos, r.Jogos))),
+        new("toques", "Toques", "Total",
+            "Toques na bola na competição.",
+            r => r.Toques, Inteiro,
+            Extra: new("Por jogo", "Média por jogo", r => PorJogo(r.Toques, r.Jogos))),
+        new("drible", "Drible", "Metros",
+            "Distância percorrida driblando, em metros.",
+            r => r.DistanciaDeDrible, v => v.ToString("0", Br),
+            Extra: new("Por jogo", "Média por jogo, em metros", r => r.Jogos > 0 ? (r.DistanciaDeDrible / r.Jogos).ToString("0", Br) : "–")),
+        new("faltas", "Faltas", "Cometidas",
+            "Faltas cometidas na competição.",
+            r => r.Faltas, Inteiro,
+            Extra: new("Por jogo", "Média por jogo", r => PorJogo(r.Faltas, r.Jogos))),
+    ];
+
+    private Categoria Atual => Categorias.FirstOrDefault(c => c.Chave == _chave) ?? Categorias[0];
+
+    /// <summary>Metade dos jogos de quem mais jogou com registro (arredondando para cima).</summary>
+    private int MinimoDeJogos => Registros.Count == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(Registros.Max(r => r.Jogos) / 2.0));
+
+    private List<RegistroDoJogadorDto> Lideres(Categoria cat, int minimo) =>
+        Registros
+            .Where(r => cat.Valor(r) is decimal v && v > 0)
+            .Where(r => !cat.PedeMinimo || _todos || r.Jogos >= minimo)
+            .OrderByDescending(r => cat.Valor(r))
+            .ThenBy(r => cat.Jogos?.Invoke(r) ?? r.Jogos)
+            .ThenBy(r => r.Nome)
+            .Take(Limite)
+            .ToList();
+}

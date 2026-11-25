@@ -1,0 +1,139 @@
+@using System.Globalization
+@using Fc25Draft.Core.Utilities
+@inject EscudoService Escudos
+
+@* Números de cada jogador no PES (registro individual de jogo) e a nota da liga calculada com eles.
+   Tocar na linha abre a conta da nota. Nada quando a partida não tem esses números. *@
+@if (Dados is not null)
+{
+    <div class="small text-muted mb-2">
+        Nota da liga: calculada pelo site com os números do PES, os eventos e o placar. Toque no jogador para ver a conta.
+    </div>
+
+    @foreach (var (nome, jogadores, cor) in new[] { (CasaNome, Dados.Casa, "casa"), (ForaNome, Dados.Fora, "fora") })
+    {
+        if (jogadores.Count == 0) continue;
+        var temGoleiro = jogadores.Any(j => j.Numeros.Defesas is not null);
+
+        <div class="d-flex align-items-center gap-1 fw-bold mb-1 mt-2 jogadores-time-@cor">
+            <img src="@Escudos.GetEscudo(nome)" alt="" width="20" height="20" style="object-fit:contain;flex-shrink:0" />
+            <span class="text-truncate">@nome</span>
+        </div>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-hover align-middle mb-0 jogadores-tabela">
+                <thead>
+                    <tr class="text-muted small">
+                        <th>Jogador</th>
+                        <th class="text-center" title="Minutos jogados">Min</th>
+                        <th class="text-center" title="Nota da liga (a oficial)">Nota</th>
+                        <th class="text-center d-none d-sm-table-cell" title="Nota do PES">PES</th>
+                        <th class="text-center" title="Gols">G</th>
+                        <th class="text-center" title="Assistências">A</th>
+                        <th class="text-center" title="Chutes a gol / chutes">Chutes</th>
+                        <th class="text-center" title="Passes certos / passes">Passes</th>
+                        <th class="text-center d-none d-sm-table-cell" title="Desarmes certos / desarmes">Desarmes</th>
+                        <th class="text-center d-none d-md-table-cell" title="Interceptações">Int</th>
+                        <th class="text-center d-none d-md-table-cell" title="Afastamentos">Afast</th>
+                        @if (temGoleiro)
+                        {
+                            <th class="text-center d-none d-md-table-cell" title="Defesas do goleiro">Def</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var j in jogadores)
+                    {
+                        var n = j.Numeros;
+                        var aberto = _abertos.Contains(n.Id);
+                        <tr class="jogadores-linha" @onclick="() => Alternar(n.Id)">
+                            <td class="jogadores-nome">
+                                @if (j.JogadorId is int id)
+                                {
+                                    <a href="/players/details/@id" class="text-body" @onclick:stopPropagation="true">@j.Nome</a>
+                                }
+                                else
+                                {
+                                    <span title="Nome do PES sem jogador ligado no cadastro">@j.Nome</span>
+                                }
+                                <span class="text-muted small ms-1">@n.Posicao</span>
+                                @if (j.MelhorEmCampo)
+                                {
+                                    <span class="ms-1" title="Melhor em campo (maior nota da liga)"><Icone Nome="star" Tamanho="12" /></span>
+                                }
+                            </td>
+                            <td class="text-center text-muted">@Num(n.Minutos)</td>
+                            <td class="text-center"><span class="badge @NotaPes.Cor(j.NotaLiga.Nota)">@NotaPes.Texto(j.NotaLiga.Nota)</span></td>
+                            <td class="text-center text-muted d-none d-sm-table-cell">@(n.NotaPes is decimal pes ? NotaPes.Texto(pes) : "–")</td>
+                            <td class="text-center @(n.Gols > 0 ? "fw-bold" : "")">@Num(n.Gols)</td>
+                            <td class="text-center @(n.Assistencias > 0 ? "fw-bold" : "")">@Num(n.Assistencias)</td>
+                            <td class="text-center">@Par(n.ChutesAGol, n.Chutes)</td>
+                            <td class="text-center">@Par(n.PassesCertos, n.Passes)</td>
+                            <td class="text-center d-none d-sm-table-cell">@Par(n.DesarmesCertos, n.Desarmes)</td>
+                            <td class="text-center d-none d-md-table-cell">@Num(n.Interceptacoes)</td>
+                            <td class="text-center d-none d-md-table-cell">@Num(n.Afastamentos)</td>
+                            @if (temGoleiro)
+                            {
+                                <td class="text-center d-none d-md-table-cell">@Num(n.Defesas)</td>
+                            }
+                        </tr>
+                        @if (aberto)
+                        {
+                            <tr class="jogadores-detalhe">
+                                <td colspan="@(temGoleiro ? 12 : 11)">
+                                    <div class="jogadores-conta">
+                                        <span class="jogadores-parcela">base @NotaPes.Texto(NotaDaLiga.Pesos.Base)</span>
+                                        @foreach (var p in j.NotaLiga.Parcelas)
+                                        {
+                                            <span class="jogadores-parcela @(p.Valor < 0 ? "negativa" : "positiva")">@NotaDaLiga.TextoParcela(p.Valor) @p.Descricao</span>
+                                        }
+                                        <span class="jogadores-parcela fw-bold">= @NotaPes.Texto(j.NotaLiga.Nota)</span>
+                                    </div>
+                                    <div class="text-muted mt-1">@Outros(n)</div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public JogadoresDaPartidaDto? Dados { get; set; }
+    [Parameter] public string CasaNome { get; set; } = "";
+    [Parameter] public string ForaNome { get; set; } = "";
+
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+    private readonly HashSet<Guid> _abertos = new();
+
+    private void Alternar(Guid id)
+    {
+        if (!_abertos.Remove(id)) _abertos.Add(id);
+    }
+
+    private static string Num(int? v) => v?.ToString(Br) ?? "–";
+
+    private static string Par(int? certos, int? total) =>
+        certos is null && total is null ? "–" : $"{Num(certos)}/{Num(total)}";
+
+    /// <summary>Os números que não têm coluna, para a linha aberta.</summary>
+    private static string Outros(Core.Entities.LigaEstatisticaJogador n)
+    {
+        var partes = new List<string>();
+        void Add(string rotulo, int? v) { if (v is int x) partes.Add($"{rotulo} {x}"); }
+        Add("faltas", n.Faltas);
+        Add("impedimentos", n.Impedimentos);
+        Add("cruzamentos", n.Cruzamentos);
+        Add("toques", n.Toques);
+        Add("cobranças de falta", n.CobrancasDeFalta);
+        Add("escanteios", n.Escanteios);
+        if (n.ChutesSofridos is not null || n.ChutesSofridosAGol is not null)
+            partes.Add($"chutes sofridos {Par(n.ChutesSofridosAGol, n.ChutesSofridos)} a gol");
+        if (n.Gols > 0 && (n.GolsDePenalti > 0 || n.GolsDeFalta > 0))
+            partes.Add($"gols de pênalti {Num(n.GolsDePenalti)}, de falta {Num(n.GolsDeFalta)}");
+        if (n.DistanciaDeDrible is decimal d) partes.Add($"drible {d.ToString("0.#", Br)} m");
+        if (n.VelocidadeMedia is decimal v) partes.Add($"velocidade média {v.ToString("0.#", Br)} km/h");
+        return string.Join(" · ", partes);
+    }
+}

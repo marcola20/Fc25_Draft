@@ -50,4 +50,19 @@ public interface IResultadoPesService
     /// só as partidas que ainda não têm nenhuma nota gravada. Retorna quantas notas foram gravadas.
     /// </summary>
     Task<int> ReprocessarNotasAsync(bool somenteSemNotas, CancellationToken ct);
+
+    /// <summary>
+    /// Tira os números de cada jogador ("jogadores") dos JSONs já importados e grava por partida (ex.: JSON
+    /// enviado antes de o site guardar esses números, ou para religar nomes ao cadastro). Com
+    /// <paramref name="somenteSemEstatisticas"/>, só as partidas que ainda não têm nenhum número gravado.
+    /// Retorna quantas linhas de jogador foram gravadas.
+    /// </summary>
+    Task<int> ReprocessarEstatisticasAsync(bool somenteSemEstatisticas, CancellationToken ct);
+
+    /// <summary>
+    /// Recalcula a nota oficial (nota da liga) de todas as partidas com registro individual, com os pesos em uso,
+    /// e grava no lugar da nota do PES. Roda na subida do site: mudar um peso vale para o histórico todo.
+    /// Retorna quantas notas gravou.
+    /// </summary>
+    Task<int> AtualizarNotasOficiaisAsync(CancellationToken ct);
 }

@@ -1,0 +1,36 @@
+.jogadores-time-casa { color: var(--cbfv-azul); }
+.jogadores-time-fora { color: var(--cbfv-laranja); }
+
+.jogadores-tabela {
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.jogadores-tabela th {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.jogadores-linha { cursor: pointer; }
+
+.jogadores-nome {
+    white-space: nowrap;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jogadores-detalhe td {
+    font-size: 0.8rem;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.jogadores-conta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.5rem;
+}
+
+.jogadores-parcela { white-space: nowrap; }
+.jogadores-parcela.positiva { color: var(--cbfv-vitoria); }
+.jogadores-parcela.negativa { color: var(--cbfv-derrota); }

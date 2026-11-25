@@ -97,6 +97,32 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogError(ex, "Falha ao extrair as notas dos JSONs já importados");
     }
 
+    // Números por jogador dos JSONs já importados que ainda não estão na tabela (enviados antes de ela existir).
+    try
+    {
+        var linhas = await scope.ServiceProvider.GetRequiredService<IResultadoPesService>()
+            .ReprocessarEstatisticasAsync(somenteSemEstatisticas: true, CancellationToken.None);
+        if (linhas > 0)
+            app.Logger.LogInformation("Números por jogador extraídos dos JSONs já importados: {Linhas}", linhas);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao extrair os números por jogador dos JSONs já importados");
+    }
+
+    // Nota oficial = nota da liga, recalculada com os pesos atuais (NotaDaLiga) em todas as partidas com registro.
+    try
+    {
+        var oficiais = await scope.ServiceProvider.GetRequiredService<IResultadoPesService>()
+            .AtualizarNotasOficiaisAsync(CancellationToken.None);
+        if (oficiais > 0)
+            app.Logger.LogInformation("Notas da liga recalculadas: {Notas}", oficiais);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Falha ao recalcular as notas da liga");
+    }
+
     // Jogos do mata-mata já definidos antes de a partida nascer agendada: ganham a partida, e o bolão os vê.
     try
     {

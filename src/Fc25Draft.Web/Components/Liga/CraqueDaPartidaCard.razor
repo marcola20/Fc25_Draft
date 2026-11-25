@@ -2,7 +2,7 @@
 @using Fc25Draft.Core.Utilities
 @inject EscudoService Escudos
 
-@* O craque do jogo encerrado: foto em pé, nota do PES, gols e assistências. Fica dentro do FimDeJogoCard,
+@* O craque do jogo encerrado: foto em pé, nota, gols e assistências. Fica dentro do FimDeJogoCard,
    que põe o placar em cima e compartilha os dois juntos. Não aparece em jogo sem nota (sem importação do PES). *@
 @if (_craque is { } c)
 {
@@ -21,7 +21,7 @@
             <div class="numeros">
                 @if (c.Jogador.Nota is decimal nota)
                 {
-                    <span class="nota badge @NotaPes.Cor(nota)" title="Nota do PES">@NotaPes.Texto(nota)</span>
+                    <span class="nota badge @NotaPes.Cor(nota)" title="Nota">@NotaPes.Texto(nota)</span>
                 }
                 @if (c.Gols > 0)
                 {

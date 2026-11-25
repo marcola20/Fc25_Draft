@@ -482,7 +482,7 @@
                             <div class="card">
                                 <div class="card-header fw-semibold">
                                     Seleção da rodada
-                                    <span class="text-muted small fw-normal">· 4-3-3 pelas notas do PES</span>
+                                    <span class="text-muted small fw-normal">· 4-3-3 pelas notas</span>
                                 </div>
                                 <ul class="list-group list-group-flush">
                                     @foreach (var j in selecao)
@@ -625,6 +625,9 @@
                     <button class="nav-link @(_statsTab == "notas" ? "active" : "")" @onclick='() => _statsTab = "notas"'>Notas</button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link @(_statsTab == "registros" ? "active" : "")" @onclick='() => _statsTab = "registros"'>Registros do jogo</button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link @(_statsTab == "momentos" ? "active" : "")" @onclick='() => _statsTab = "momentos"'>Momentos</button>
                 </li>
                 <li class="nav-item">
@@ -634,6 +637,11 @@
                     <button class="nav-link @(_statsTab == "times" ? "active" : "")" @onclick='() => _statsTab = "times"'>Times</button>
                 </li>
             </ul>
+
+            @if (_statsTab == "registros")
+            {
+                <RegistrosDoJogo @key="_ligaId" Registros="_registros" />
+            }
 
             @if (_statsTab == "duplas")
             {
@@ -905,7 +913,7 @@
                 var notas = _notas.Where(n => _todasAsNotas || n.Jogos >= minimo).ToList();
                 @if (!_notas.Any())
                 {
-                    <div class="text-muted">Sem notas do PES nesta competição.</div>
+                    <div class="text-muted">Sem notas nesta competição.</div>
                 }
                 else
                 {
@@ -1367,6 +1375,7 @@
 
     // ── Números do PES por time (aba Estatísticas › Times) ──
     private IReadOnlyList<NumerosDoTimeDto> _numerosTimes = Array.Empty<NumerosDoTimeDto>();
+    private IReadOnlyList<RegistroDoJogadorDto> _registros = Array.Empty<RegistroDoJogadorDto>();
 
     // ── Momentos (aba Estatísticas › Momentos): decisivos, viradas e gols por período ──
     private MomentosDosGolsDto? _momentos;
@@ -1620,6 +1629,7 @@
         _cleanSheets = await LigaService.GetCleanSheetsAsync(ligaId, CancellationToken.None);
         _cartoes = await LigaService.GetCartoesEstatAsync(ligaId, CancellationToken.None);
         _numerosTimes = await EstatisticasPes.DosTimesAsync(ligaId, CancellationToken.None);
+        _registros = await EstatisticasPes.RegistrosDaCompeticaoAsync(ligaId, CancellationToken.None);
         _momentos = await LigaService.GetMomentosDosGolsAsync(ligaId, CancellationToken.None);
         _decisivoAberto = null;
         _viradaAberta = null;

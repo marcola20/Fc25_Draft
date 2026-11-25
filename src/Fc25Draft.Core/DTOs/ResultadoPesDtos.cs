@@ -15,7 +15,9 @@ public record ResultadoPesRequest(
     [property: JsonPropertyName("notas")] ResultadoPesNotas? Notas,
     [property: JsonPropertyName("status")] string? Status,
     // Quando o vídeo foi gravado (data do arquivo): identifica o vídeo mesmo com o nome repetido.
-    [property: JsonPropertyName("gravado_em")] string? GravadoEm = null);
+    [property: JsonPropertyName("gravado_em")] string? GravadoEm = null,
+    // Registro individual de jogo de cada jogador; null quando o vídeo não tem as fotos.
+    [property: JsonPropertyName("jogadores")] ResultadoPesJogadores? Jogadores = null);
 
 public record ResultadoPesTime(
     [property: JsonPropertyName("time")] string? Time,
@@ -43,6 +45,46 @@ public record ResultadoPesNota(
     [property: JsonPropertyName("jogador")] string? Jogador,
     [property: JsonPropertyName("nota")] double? Nota,
     [property: JsonPropertyName("melhor_em_campo")] bool? MelhorEmCampo);
+
+public record ResultadoPesJogadores(
+    [property: JsonPropertyName("casa")] IReadOnlyList<ResultadoPesJogador>? Casa,
+    [property: JsonPropertyName("fora")] IReadOnlyList<ResultadoPesJogador>? Fora);
+
+/// <summary>
+/// Números de um jogador no "Registro individual de jogo" do PES. Qualquer número pode vir nulo (ilegível).
+/// Os contadores vêm como double para aceitar "12" e "12.0"; a importação arredonda.
+/// </summary>
+public record ResultadoPesJogador(
+    [property: JsonPropertyName("jogador")] string? Jogador,
+    [property: JsonPropertyName("posicao")] string? Posicao,
+    // goleiro | defesa | meio | ataque
+    [property: JsonPropertyName("grupo")] string? Grupo,
+    [property: JsonPropertyName("nota")] double? Nota,
+    [property: JsonPropertyName("melhor_em_campo")] bool? MelhorEmCampo,
+    [property: JsonPropertyName("minutos")] double? Minutos,
+    [property: JsonPropertyName("gols")] double? Gols,
+    [property: JsonPropertyName("gols_de_penalti")] double? GolsDePenalti,
+    [property: JsonPropertyName("gols_de_falta")] double? GolsDeFalta,
+    [property: JsonPropertyName("assistencias")] double? Assistencias,
+    [property: JsonPropertyName("chutes")] double? Chutes,
+    [property: JsonPropertyName("chutes_a_gol")] double? ChutesAGol,
+    [property: JsonPropertyName("passes")] double? Passes,
+    [property: JsonPropertyName("passes_certos")] double? PassesCertos,
+    [property: JsonPropertyName("cruzamentos")] double? Cruzamentos,
+    [property: JsonPropertyName("faltas")] double? Faltas,
+    [property: JsonPropertyName("impedimentos")] double? Impedimentos,
+    [property: JsonPropertyName("cobrancas_de_falta")] double? CobrancasDeFalta,
+    [property: JsonPropertyName("escanteios")] double? Escanteios,
+    [property: JsonPropertyName("interceptacoes")] double? Interceptacoes,
+    [property: JsonPropertyName("toques")] double? Toques,
+    [property: JsonPropertyName("distancia_de_drible")] double? DistanciaDeDrible,
+    [property: JsonPropertyName("velocidade_media")] double? VelocidadeMedia,
+    [property: JsonPropertyName("desarmes")] double? Desarmes,
+    [property: JsonPropertyName("desarmes_certos")] double? DesarmesCertos,
+    [property: JsonPropertyName("afastamentos")] double? Afastamentos,
+    [property: JsonPropertyName("chutes_sofridos")] double? ChutesSofridos,
+    [property: JsonPropertyName("chutes_sofridos_a_gol")] double? ChutesSofridosAGol,
+    [property: JsonPropertyName("defesas")] double? Defesas);
 
 // ── Saída ────────────────────────────────────────────────────────────────────
 

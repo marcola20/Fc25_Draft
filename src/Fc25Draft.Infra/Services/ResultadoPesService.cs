@@ -93,7 +93,7 @@ public partial class ResultadoPesService : IResultadoPesService
         return playoffs.Any(p => NomesPes.MesmoTime(r.Fora!.Time!, p.Casa) && NomesPes.MesmoTime(r.Casa!.Time!, p.Fora));
     }
 
-    /// <summary>Troca casa e fora no JSON do PES: placar, lado dos eventos, notas e estatísticas.</summary>
+    /// <summary>Troca casa e fora no JSON do PES: placar, lado dos eventos, notas, estatísticas e jogadores.</summary>
     internal static string InverterMando(string json)
     {
         var raiz = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
@@ -114,6 +114,8 @@ public partial class ResultadoPesService : IResultadoPesService
                 e["lado"] = (string?)e["lado"] switch { Casa => Fora, Fora => Casa, var outro => outro };
         if (raiz["notas"] is System.Text.Json.Nodes.JsonObject notas)
             Trocar(notas);
+        if (raiz["jogadores"] is System.Text.Json.Nodes.JsonObject jogadores)
+            Trocar(jogadores);
         if (raiz["estatisticas"] is System.Text.Json.Nodes.JsonObject estatisticas)
             foreach (var (_, valor) in estatisticas)
                 if (valor is System.Text.Json.Nodes.JsonObject numeros) Trocar(numeros);
@@ -585,6 +587,27 @@ public partial class ResultadoPesService : IResultadoPesService
             new Dictionary<string, Guid> { [Casa] = partida.TimeCasaId, [Fora] = partida.TimeForaId });
         _db.LigaNotasJogadores.AddRange(notasDoJogo);
 
+        // Números de cada jogador (registro individual do PES): substituem os que havia. JSON sem
+        // "jogadores" (vídeo sem as fotos) apaga, como faz com as notas: o envio é a verdade do jogo.
+        _db.LigaEstatisticasJogadores.RemoveRange(
+            await _db.LigaEstatisticasJogadores.Where(x => x.PartidaId == partidaId).ToListAsync(ct));
+        var numerosDoJogo = CasarEstatisticas(partidaId, r, elenco,
+            new Dictionary<string, Guid> { [Casa] = partida.TimeCasaId, [Fora] = partida.TimeForaId });
+        _db.LigaEstatisticasJogadores.AddRange(numerosDoJogo);
+        foreach (var lado in new[] { Casa, Fora })
+        {
+            var timeId = timeDoLado[lado].TeamId;
+            foreach (var semDono in numerosDoJogo.Where(x => x.TimeId == timeId && x.JogadorId is null))
+            {
+                // O mesmo nome já pode ter sido avisado pelos eventos ou pelas notas.
+                var chave = NomesPes.Normalizar(semDono.NomePes);
+                if (naoIdentificados.Any(n => n.Lado == lado && NomesPes.Normalizar(n.Nome) == chave)) continue;
+                var motivo = NomesPes.Casar(semDono.NomePes, elenco[lado]).Motivo ?? "aparece duas vezes na lista de jogadores";
+                naoIdentificados.Add(new ResultadoPesNaoIdentificadoDto(
+                    lado, timeDoLado[lado].TeamName, semDono.NomePes, "estatisticas", null, motivo));
+            }
+        }
+
         var emCampo = notasDoJogo.Select(n => n.JogadorId).Concat(novos.Select(e => e.JogadorId)).ToHashSet();
         foreach (var s in suspensosNoJogo.Where(s => emCampo.Contains(s.JogadorId)))
             avisos.Add($"{s.JogadorNome} ({s.TimeNome}) estava suspenso para este jogo ({s.Motivo} em {s.JogoDoCartao}) e entrou em campo.");
@@ -647,6 +670,11 @@ public partial class ResultadoPesService : IResultadoPesService
         importacao.AtualizadoEm = agora;
 
         await _db.SaveChangesAsync(ct);
+
+        // Com o registro individual, a nota oficial é a da liga (substitui a do PES gravada acima).
+        if (numerosDoJogo.Count > 0)
+            await NotasOficiais.AtualizarAsync(_db, x => x.PartidaId == partidaId, ct);
+
         await _ligaAdmin.RecalcularClassificacaoAsync(partida.RodadaId, ct);
 
         if (partida.Status == PartidaStatus.Encerrada)
@@ -675,6 +703,8 @@ public partial class ResultadoPesService : IResultadoPesService
     {
         var importacoes = await _db.LigaPartidaImportacoes.AsNoTracking()
             .Where(i => !somenteSemNotas || !_db.LigaNotasJogadores.Any(n => n.PartidaId == i.PartidaId))
+            // Com o registro individual a nota oficial é a da liga (NotasOficiais): a do PES não volta.
+            .Where(i => !_db.LigaEstatisticasJogadores.Any(x => x.PartidaId == i.PartidaId))
             .Select(i => new { i.PartidaId, i.Json, i.Partida.TimeCasaId, i.Partida.TimeForaId, i.Partida.Rodada.LigaId })
             .ToListAsync(ct);
 
@@ -701,6 +731,117 @@ public partial class ResultadoPesService : IResultadoPesService
         }
 
         return gravadas;
+    }
+
+    public async Task<int> ReprocessarEstatisticasAsync(bool somenteSemEstatisticas, CancellationToken ct)
+    {
+        // Só as importações cujo JSON tem a lista de jogadores (o jsonb deixa o Postgres filtrar).
+        var importacoes = await _db.LigaPartidaImportacoes
+            .FromSql($"""SELECT * FROM "LigaPartidaImportacoes" WHERE jsonb_typeof("Json" -> 'jogadores') = 'object'""")
+            .AsNoTracking()
+            .Where(i => !somenteSemEstatisticas || !_db.LigaEstatisticasJogadores.Any(n => n.PartidaId == i.PartidaId))
+            .Select(i => new { i.PartidaId, i.Json, i.Partida.TimeCasaId, i.Partida.TimeForaId, i.Partida.Rodada.LigaId })
+            .ToListAsync(ct);
+
+        var gravadas = 0;
+        foreach (var imp in importacoes)
+        {
+            ResultadoPesRequest? r;
+            try { r = System.Text.Json.JsonSerializer.Deserialize<ResultadoPesRequest>(imp.Json); }
+            catch (System.Text.Json.JsonException) { continue; }
+            if (r?.Jogadores is null) continue;
+
+            var elenco = new Dictionary<string, List<NomesPes.Candidato>>
+            {
+                [Casa] = await CandidatosAsync(imp.TimeCasaId, imp.LigaId, ct),
+                [Fora] = await CandidatosAsync(imp.TimeForaId, imp.LigaId, ct),
+            };
+            var numeros = CasarEstatisticas(imp.PartidaId, r, elenco,
+                new Dictionary<string, Guid> { [Casa] = imp.TimeCasaId, [Fora] = imp.TimeForaId });
+
+            _db.LigaEstatisticasJogadores.RemoveRange(
+                await _db.LigaEstatisticasJogadores.Where(x => x.PartidaId == imp.PartidaId).ToListAsync(ct));
+            _db.LigaEstatisticasJogadores.AddRange(numeros);
+            await _db.SaveChangesAsync(ct);
+            await NotasOficiais.AtualizarAsync(_db, x => x.PartidaId == imp.PartidaId, ct);
+            gravadas += numeros.Count;
+        }
+
+        return gravadas;
+    }
+
+    public Task<int> AtualizarNotasOficiaisAsync(CancellationToken ct) =>
+        NotasOficiais.AtualizarAsync(_db, x => true, ct);
+
+    /// <summary>
+    /// Números de cada jogador do JSON ("jogadores"), casados com o cadastro como as notas. Quem não casa
+    /// (ou casa com alguém que já apareceu na lista) fica sem <c>JogadorId</c>, mas com o nome do PES:
+    /// o número continua servindo para calibrar a nota.
+    /// </summary>
+    internal static List<LigaEstatisticaJogador> CasarEstatisticas(
+        Guid partidaId, ResultadoPesRequest r,
+        IReadOnlyDictionary<string, List<NomesPes.Candidato>> elenco,
+        IReadOnlyDictionary<string, Guid> timeDoLado)
+    {
+        static int? Inteiro(double? v) => v is double d && d >= 0 && d < 100_000 ? (int)Math.Round(d) : null;
+        static decimal? Decimal1(double? v, decimal maximo) =>
+            v is double d && d >= 0 && d <= (double)maximo ? Math.Round((decimal)d, 1) : null;
+        static string? Curto(string? texto, int max)
+        {
+            var t = texto?.Trim();
+            return string.IsNullOrEmpty(t) ? null : t.Length > max ? t[..max] : t;
+        }
+
+        var lista = new List<LigaEstatisticaJogador>();
+        foreach (var lado in new[] { Casa, Fora })
+        {
+            var ordem = 0;
+            var usados = new HashSet<int>();
+            foreach (var j in (lado == Casa ? r.Jogadores?.Casa : r.Jogadores?.Fora) ?? Array.Empty<ResultadoPesJogador>())
+            {
+                if (j is null || Curto(j.Jogador, 100) is not string nome) continue;
+                int? jogadorId = NomesPes.Casar(nome, elenco[lado]).Id is int id && usados.Add(id) ? id : null;
+
+                lista.Add(new LigaEstatisticaJogador
+                {
+                    Id = Guid.NewGuid(),
+                    PartidaId = partidaId,
+                    TimeId = timeDoLado[lado],
+                    JogadorId = jogadorId,
+                    NomePes = nome,
+                    Ordem = ordem++,
+                    Posicao = Curto(j.Posicao, 5)?.ToUpperInvariant(),
+                    Grupo = Curto(j.Grupo, 10)?.ToLowerInvariant(),
+                    NotaPes = Decimal1(j.Nota, 10m),
+                    MelhorEmCampo = j.MelhorEmCampo == true,
+                    Minutos = Inteiro(j.Minutos),
+                    Gols = Inteiro(j.Gols),
+                    GolsDePenalti = Inteiro(j.GolsDePenalti),
+                    GolsDeFalta = Inteiro(j.GolsDeFalta),
+                    Assistencias = Inteiro(j.Assistencias),
+                    Chutes = Inteiro(j.Chutes),
+                    ChutesAGol = Inteiro(j.ChutesAGol),
+                    Passes = Inteiro(j.Passes),
+                    PassesCertos = Inteiro(j.PassesCertos),
+                    Cruzamentos = Inteiro(j.Cruzamentos),
+                    Faltas = Inteiro(j.Faltas),
+                    Impedimentos = Inteiro(j.Impedimentos),
+                    CobrancasDeFalta = Inteiro(j.CobrancasDeFalta),
+                    Escanteios = Inteiro(j.Escanteios),
+                    Interceptacoes = Inteiro(j.Interceptacoes),
+                    Toques = Inteiro(j.Toques),
+                    DistanciaDeDrible = Decimal1(j.DistanciaDeDrible, 999_999m),
+                    VelocidadeMedia = Decimal1(j.VelocidadeMedia, 999m),
+                    Desarmes = Inteiro(j.Desarmes),
+                    DesarmesCertos = Inteiro(j.DesarmesCertos),
+                    Afastamentos = Inteiro(j.Afastamentos),
+                    ChutesSofridos = Inteiro(j.ChutesSofridos),
+                    ChutesSofridosAGol = Inteiro(j.ChutesSofridosAGol),
+                    Defesas = Inteiro(j.Defesas),
+                });
+            }
+        }
+        return lista;
     }
 
     /// <summary>

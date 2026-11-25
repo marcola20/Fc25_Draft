@@ -1989,6 +1989,130 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("LigaEscalacoesPartida", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaEstatisticaJogador", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Afastamentos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Assistencias")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Chutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ChutesAGol")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ChutesSofridos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ChutesSofridosAGol")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CobrancasDeFalta")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Cruzamentos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Defesas")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Desarmes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DesarmesCertos")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("DistanciaDeDrible")
+                        .HasPrecision(7, 1)
+                        .HasColumnType("numeric(7,1)");
+
+                    b.Property<int?>("Escanteios")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Faltas")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Gols")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GolsDeFalta")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GolsDePenalti")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Grupo")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<int?>("Impedimentos")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Interceptacoes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("JogadorId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("MelhorEmCampo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("Minutos")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NomePes")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("NotaPes")
+                        .HasPrecision(3, 1)
+                        .HasColumnType("numeric(3,1)");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PartidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Passes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PassesCertos")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Posicao")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Toques")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("VelocidadeMedia")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("numeric(4,1)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JogadorId");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("PartidaId", "JogadorId")
+                        .IsUnique();
+
+                    b.ToTable("LigaEstatisticasJogadores", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.LigaEventoPartida", b =>
                 {
                     b.Property<Guid>("EventoId")
@@ -2190,6 +2314,9 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<int>("JogadorId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("DaLiga")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("MelhorEmCampo")
                         .HasColumnType("boolean");
@@ -5374,6 +5501,32 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
                         .WithMany("Escalacoes")
+                        .HasForeignKey("PartidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Jogador");
+
+                    b.Navigation("Partida");
+
+                    b.Navigation("Time");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.LigaEstatisticaJogador", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Jogador")
+                        .WithMany()
+                        .HasForeignKey("JogadorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
+                        .WithMany()
                         .HasForeignKey("PartidaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

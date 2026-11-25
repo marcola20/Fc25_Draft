@@ -4,7 +4,7 @@
 @inject EscudoService Escudos
 
 @* Os titulares dos dois times no campo, com rosto: mandante embaixo, visitante em cima, como na TV. Embaixo de
-   cada um, o nome curto e o que fez no jogo (gol, cartão, saiu, nota do PES). Compacto: a versão do telão. *@
+   cada um, o nome curto e o que fez no jogo (gol, cartão, saiu, nota). Compacto: a versão do telão. *@
 @if (Dados is not null && (!Dados.Casa.Vazia || !Dados.Fora.Vazia))
 {
     <div class="campo @(Compacto ? "compacto" : "")">

@@ -619,10 +619,31 @@ public class PremiosService : IPremiosService
         .GroupBy(p => p.TreinadorId)
         .ToDictionary(g => g.Key, g => (g.First().TimeId, g.First().TeamName));
 
-    /// <summary>A temporada de um jogador: jogos com nota do PES, média, gols, assistências e jogos sem sofrer gol.</summary>
+    /// <summary>
+    /// A temporada de um jogador: jogos com nota oficial, média, gols, assistências, jogos sem sofrer gol e os
+    /// registros do jogo somados (só nos jogos com o registro individual do PES).
+    /// </summary>
     private sealed record Linha(
         int PlayerId, string Nome, short PositionId, int Overall, Guid? TimeId,
-        int Jogos, decimal Media, int MelhorEmCampo, int Gols, int Assistencias, int SemSofrer);
+        int Jogos, decimal Media, int MelhorEmCampo, int Gols, int Assistencias, int SemSofrer,
+        Registros Registros)
+    {
+        public TemporadaDoJogador Temporada => new(
+            (PositionType)PositionId, Jogos, Media, Gols, Assistencias, SemSofrer,
+            Registros.Jogos, Registros.DesarmesCertos, Registros.Interceptacoes, Registros.Afastamentos,
+            Registros.PassesCertos, Registros.ChutesAGol, Registros.Defesas, Registros.JogosNoGol);
+
+        /// <summary>Pontuação da sugestão: média + contribuição da posição (<see cref="PontuacaoDosPremios"/>).</summary>
+        public decimal Pontos => PontuacaoDosPremios.Pontos(Temporada);
+    }
+
+    /// <summary>Registros do jogo somados na temporada (jogos com o registro individual do PES).</summary>
+    private sealed record Registros(
+        int Jogos, int DesarmesCertos, int Interceptacoes, int Afastamentos, int PassesCertos, int ChutesAGol,
+        int Defesas, int JogosNoGol)
+    {
+        public static readonly Registros Nenhum = new(0, 0, 0, 0, 0, 0, 0, 0);
+    }
 
     /// <summary>
     /// <see cref="TemNotas"/>: a temporada tem as notas do PES (desde 2010). Sem elas só há gols e assistências, e a
@@ -635,13 +656,15 @@ public class PremiosService : IPremiosService
         HashSet<int> Estreantes,
         int MinimoDeJogos,
         bool TemNotas,
-        IReadOnlyDictionary<Guid, (int Sofridos, int Jogos)> Defesas);
+        IReadOnlyDictionary<Guid, (int Sofridos, int Jogos)> Defesas,
+        // As notas são as da liga (a temporada tem registro individual); senão, as do PES.
+        bool NotasDaLiga = false);
 
     /// <summary>
     /// A temporada anterior de um jogador, base do MIP. <see cref="Jogos"/> soma os com nota e os anotados à mão
     /// (competições sem contador); média e jogos sem sofrer gol só existem nos jogos com nota.
     /// </summary>
-    private sealed record Base(int Jogos, int JogosComNota, decimal Media, int GolsEAssistencias, int SemSofrer);
+    private sealed record Base(int Jogos, int JogosComNota, decimal Media, int GolsEAssistencias, int SemSofrer, bool NotasDaLiga);
 
     /// <summary>Quanto o jogador melhorou da temporada anterior para esta.</summary>
     private sealed record Evolucao(decimal Pontos, decimal? NotaAntes, decimal? NotaAgora, decimal? TaxaAntes, decimal? TaxaAgora, bool Defensor);
@@ -664,10 +687,31 @@ public class PremiosService : IPremiosService
             .SelectMany(p => new[] { (p.PartidaId, Time: p.TimeCasaId, Gols: p.GolsFora), (p.PartidaId, Time: p.TimeForaId, Gols: p.GolsCasa) })
             .ToDictionary(x => (x.PartidaId, x.Time), x => x.Gols);
 
-        var notas = await _db.LigaNotasJogadores.AsNoTracking()
+        var todasAsNotas = await _db.LigaNotasJogadores.AsNoTracking()
             .Where(n => ids.Contains(n.PartidaId))
-            .Select(n => new { n.PartidaId, n.JogadorId, n.TimeId, n.Nota, n.MelhorEmCampo })
+            .Select(n => new { n.PartidaId, n.JogadorId, n.TimeId, n.Nota, n.MelhorEmCampo, n.DaLiga })
             .ToListAsync(ct);
+        // A nota oficial é a da liga: com ela na temporada, a do PES (jogos sem registro) não entra na média.
+        var notasDaLiga = todasAsNotas.Any(n => n.DaLiga);
+        var notas = notasDaLiga ? todasAsNotas.Where(n => n.DaLiga).ToList() : todasAsNotas;
+
+        var registros = (await _db.LigaEstatisticasJogadores.AsNoTracking()
+                .Where(x => x.JogadorId != null && ids.Contains(x.PartidaId))
+                .Select(x => new
+                {
+                    JogadorId = x.JogadorId!.Value, x.Posicao, x.Grupo, x.DesarmesCertos, x.Interceptacoes,
+                    x.Afastamentos, x.PassesCertos, x.ChutesAGol, x.Defesas
+                })
+                .ToListAsync(ct))
+            .GroupBy(x => x.JogadorId)
+            .ToDictionary(g => g.Key, g =>
+            {
+                var noGol = g.Where(x => NotaDaLiga.GrupoDe(x.Grupo, x.Posicao) == NotaDaLiga.Goleiro).ToList();
+                return new Registros(
+                    g.Count(), g.Sum(x => x.DesarmesCertos ?? 0), g.Sum(x => x.Interceptacoes ?? 0),
+                    g.Sum(x => x.Afastamentos ?? 0), g.Sum(x => x.PassesCertos ?? 0), g.Sum(x => x.ChutesAGol ?? 0),
+                    noGol.Sum(x => x.Defesas ?? 0), noGol.Count);
+            });
 
         var gols = await _db.LigaEventos.AsNoTracking()
             .Where(e => ids.Contains(e.PartidaId) && e.Tipo == TipoEvento.Gol)
@@ -701,7 +745,8 @@ public class PremiosService : IPremiosService
                     id, j.Name, j.PositionId, j.Overall, clube,
                     dele.Count, dele.Count == 0 ? 0 : Math.Round(dele.Average(n => n.Nota), 2), dele.Count(n => n.MelhorEmCampo),
                     golsPorJogador.GetValueOrDefault(id), assistPorJogador.GetValueOrDefault(id),
-                    dele.Count(n => sofreu.GetValueOrDefault((n.PartidaId, n.TimeId), 1) == 0));
+                    dele.Count(n => sofreu.GetValueOrDefault((n.PartidaId, n.TimeId), 1) == 0),
+                    registros.GetValueOrDefault(id) ?? Registros.Nenhum);
             })
             .ToDictionary(l => l.PlayerId);
 
@@ -742,7 +787,7 @@ public class PremiosService : IPremiosService
                 var l = antes.Jogadores.GetValueOrDefault(id);
                 anterior[id] = new Base(
                     (l?.Jogos ?? 0) + anotados.GetValueOrDefault(id), l?.Jogos ?? 0, l?.Media ?? 0,
-                    (l?.Gols ?? 0) + (l?.Assistencias ?? 0), l?.SemSofrer ?? 0);
+                    (l?.Gols ?? 0) + (l?.Assistencias ?? 0), l?.SemSofrer ?? 0, antes.NotasDaLiga);
             }
         }
 
@@ -752,7 +797,8 @@ public class PremiosService : IPremiosService
 
         var temNotas = notas.Count > 0;
         var maisJogos = linhas.Count == 0 ? 0 : linhas.Values.Max(l => l.Jogos);
-        return new Numeros(temporada, linhas, anterior, estreantes, temNotas ? Math.Max(3, (int)Math.Ceiling(maisJogos * 0.4)) : 0, temNotas, defesas);
+        return new Numeros(temporada, linhas, anterior, estreantes, temNotas ? Math.Max(3, (int)Math.Ceiling(maisJogos * 0.4)) : 0, temNotas, defesas,
+            notasDaLiga);
     }
 
     private async Task<IReadOnlyList<PremioCandidato>> SugerirAsync(int temporada, CategoriaPremio categoria, Numeros n, CancellationToken ct)
@@ -767,20 +813,22 @@ public class PremiosService : IPremiosService
 
         IEnumerable<Linha> escolhidos = categoria switch
         {
-            // Os de melhor nota e os que mais participaram de gol.
-            CategoriaPremio.MVP => comJogos.OrderByDescending(l => l.Media).Take(3)
-                .Concat(comJogos.OrderByDescending(l => l.Gols + l.Assistencias).ThenByDescending(l => l.Media).Take(3))
+            // Nota + o que a posição de cada um soma (PontuacaoDosPremios); e os que mais participaram de gol.
+            CategoriaPremio.MVP => comJogos.OrderByDescending(l => l.Pontos).Take(3)
+                .Concat(comJogos.OrderByDescending(l => l.Gols + l.Assistencias).ThenByDescending(l => l.Pontos).Take(3))
                 .DistinctBy(l => l.PlayerId).Take(quantos),
             CategoriaPremio.ROY => n.Jogadores.Values
                 .Where(l => n.Estreantes.Contains(l.PlayerId) && l.Overall <= PremiosTemporada.OverallMaximoRoy && l.Jogos >= n.MinimoDeJogos / 2)
-                .OrderByDescending(l => l.Media).Take(quantos),
+                .OrderByDescending(l => l.Pontos).Take(quantos),
             CategoriaPremio.MIP => SugerirMip(comJogos, n).Take(quantos),
+            // Defensor: nota + desarmes, interceptações, afastamentos e jogos sem sofrer gol (gol e assistência contam menos).
             CategoriaPremio.DPOY => comJogos
                 .Where(l => (PositionType)l.PositionId is PositionType.Zagueiro or PositionType.LateralEsquerdo or PositionType.LateralDireito)
-                .OrderByDescending(l => l.Media).ThenByDescending(l => l.SemSofrer).Take(quantos),
+                .OrderByDescending(l => l.Pontos).ThenByDescending(l => l.SemSofrer).Take(quantos),
+            // Goleiro: nota + defesas e jogos sem sofrer gol.
             CategoriaPremio.GKOY => comJogos
                 .Where(l => (PositionType)l.PositionId == PositionType.Goleiro)
-                .OrderByDescending(l => l.Media).ThenByDescending(l => l.SemSofrer).Take(quantos),
+                .OrderByDescending(l => l.Pontos).ThenByDescending(l => l.SemSofrer).Take(quantos),
             _ => Enumerable.Empty<Linha>()
         };
 
@@ -931,8 +979,10 @@ public class PremiosService : IPremiosService
         if (l.Jogos == 0 || !n.Anterior.TryGetValue(l.PlayerId, out var b) || b.Jogos < JogosMinimosDaBase) return null;
 
         var comNota = b.JogosComNota >= JogosMinimosDaBase;
-        decimal? notaAntes = comNota ? b.Media : null;
-        decimal? notaAgora = comNota ? l.Media : null;
+        // Nota da liga e nota do PES têm escalas diferentes: a diferença de nota só vale entre as do mesmo tipo.
+        var mesmaNota = comNota && b.NotasDaLiga == n.NotasDaLiga;
+        decimal? notaAntes = mesmaNota ? b.Media : null;
+        decimal? notaAgora = mesmaNota ? l.Media : null;
 
         var defensor = Defensor(l);
         decimal? taxaAntes, taxaAgora;
@@ -960,10 +1010,41 @@ public class PremiosService : IPremiosService
         var nota = $"nota {l.Media.ToString("0.0", Br)} · {l.Jogos} jogos";
         return categoria switch
         {
-            CategoriaPremio.GKOY or CategoriaPremio.DPOY => $"{nota} · {l.SemSofrer} sem sofrer gol",
             CategoriaPremio.MIP => ResumoMip(l, n),
-            _ => $"{nota} · {l.Gols} G · {l.Assistencias} A{Cs(l)}"
+            _ => $"{nota}{DaPosicao(l)}"
         };
+    }
+
+    /// <summary>
+    /// Os números que contam para a posição (os mesmos da <see cref="PontuacaoDosPremios"/>): " · 30 desarmes · 25
+    /// interceptações · 40 afastamentos · 5 sem sofrer gol · 1 G · 0 A". Registros só quando a temporada os tem.
+    /// </summary>
+    private static string DaPosicao(Linha l)
+    {
+        var r = l.Registros;
+        var partes = new List<string>();
+        switch (PontuacaoDosPremios.SetorDe((PositionType)l.PositionId))
+        {
+            case PontuacaoDosPremios.Setor.Goleiro:
+                if (r.JogosNoGol > 0) partes.Add($"{r.Defesas} defesas");
+                partes.Add($"{l.SemSofrer} sem sofrer gol");
+                break;
+            case PontuacaoDosPremios.Setor.Defesa:
+                if (r.Jogos > 0)
+                    partes.AddRange([$"{r.DesarmesCertos} desarmes", $"{r.Interceptacoes} interceptações", $"{r.Afastamentos} afastamentos"]);
+                partes.AddRange([$"{l.SemSofrer} sem sofrer gol", $"{l.Gols} G", $"{l.Assistencias} A"]);
+                break;
+            case PontuacaoDosPremios.Setor.Meio:
+                partes.AddRange([$"{l.Gols} G", $"{l.Assistencias} A"]);
+                if (r.Jogos > 0)
+                    partes.AddRange([$"{r.PassesCertos} passes certos", $"{r.DesarmesCertos} desarmes", $"{r.Interceptacoes} interceptações"]);
+                break;
+            default:
+                partes.AddRange([$"{l.Gols} G", $"{l.Assistencias} A"]);
+                if (r.Jogos > 0) partes.Add($"{r.ChutesAGol} chutes a gol");
+                break;
+        }
+        return " · " + string.Join(" · ", partes);
     }
 
     /// <summary>Goleiro e defensor também mostram os jogos sem sofrer gol: " · 4 CS".</summary>

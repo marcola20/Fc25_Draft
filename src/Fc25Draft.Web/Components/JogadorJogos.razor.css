@@ -1,0 +1,8 @@
+.jogo-com-registro { cursor: pointer; }
+
+.jogo-detalhe td {
+    font-size: 0.8rem;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.registros-resumo h5 { font-variant-numeric: tabular-nums; }
