@@ -34,9 +34,12 @@
                         <th class="text-center d-none d-sm-table-cell" title="Desarmes certos / desarmes">Desarmes</th>
                         <th class="text-center d-none d-md-table-cell" title="Interceptações">Int</th>
                         <th class="text-center d-none d-md-table-cell" title="Afastamentos">Afast</th>
+                        <th class="text-center d-none d-md-table-cell" title="Cruzamentos">Cruz</th>
+                        <th class="text-center d-none d-sm-table-cell" title="Faltas cometidas (impedimentos)">Faltas</th>
                         @if (temGoleiro)
                         {
                             <th class="text-center d-none d-md-table-cell" title="Defesas do goleiro">Def</th>
+                            <th class="text-center d-none d-md-table-cell" title="Chutes sofridos pelo goleiro: a gol / total">Sofridos</th>
                         }
                     </tr>
                 </thead>
@@ -71,15 +74,18 @@
                             <td class="text-center d-none d-sm-table-cell">@Par(n.DesarmesCertos, n.Desarmes)</td>
                             <td class="text-center d-none d-md-table-cell">@Num(n.Interceptacoes)</td>
                             <td class="text-center d-none d-md-table-cell">@Num(n.Afastamentos)</td>
+                            <td class="text-center d-none d-md-table-cell">@Num(n.Cruzamentos)</td>
+                            <td class="text-center d-none d-sm-table-cell">@FaltasEImpedimentos(n)</td>
                             @if (temGoleiro)
                             {
                                 <td class="text-center d-none d-md-table-cell">@Num(n.Defesas)</td>
+                                <td class="text-center d-none d-md-table-cell">@Par(n.ChutesSofridosAGol, n.ChutesSofridos)</td>
                             }
                         </tr>
                         @if (aberto)
                         {
                             <tr class="jogadores-detalhe">
-                                <td colspan="@(temGoleiro ? 12 : 11)">
+                                <td colspan="@(temGoleiro ? 15 : 13)">
                                     <div class="jogadores-conta">
                                         <span class="jogadores-parcela">base @NotaPes.Texto(NotaDaLiga.Pesos.Base)</span>
                                         @foreach (var p in j.NotaLiga.Parcelas)
@@ -89,6 +95,7 @@
                                         <span class="jogadores-parcela fw-bold">= @NotaPes.Texto(j.NotaLiga.Nota)</span>
                                     </div>
                                     <div class="text-muted mt-1">@Outros(n)</div>
+                                    <div class="text-muted mt-1 d-md-none">@SoNoCelular(n)</div>
                                 </td>
                             </tr>
                         }
@@ -117,23 +124,40 @@
     private static string Par(int? certos, int? total) =>
         certos is null && total is null ? "–" : $"{Num(certos)}/{Num(total)}";
 
-    /// <summary>Os números que não têm coluna, para a linha aberta.</summary>
+    /// <summary>"2 (1)": faltas cometidas e, entre parênteses, impedimentos.</summary>
+    private static string FaltasEImpedimentos(Core.Entities.LigaEstatisticaJogador n) =>
+        n.Faltas is null && n.Impedimentos is null ? "–" : $"{Num(n.Faltas)} ({Num(n.Impedimentos)})";
+
+    /// <summary>Os números que não têm coluna (e os das colunas que o celular esconde), para a linha aberta.</summary>
     private static string Outros(Core.Entities.LigaEstatisticaJogador n)
     {
         var partes = new List<string>();
         void Add(string rotulo, int? v) { if (v is int x) partes.Add($"{rotulo} {x}"); }
-        Add("faltas", n.Faltas);
-        Add("impedimentos", n.Impedimentos);
-        Add("cruzamentos", n.Cruzamentos);
+        if (string.IsNullOrEmpty(n.Posicao)) partes.Add("posição não lida");
         Add("toques", n.Toques);
         Add("cobranças de falta", n.CobrancasDeFalta);
         Add("escanteios", n.Escanteios);
-        if (n.ChutesSofridos is not null || n.ChutesSofridosAGol is not null)
-            partes.Add($"chutes sofridos {Par(n.ChutesSofridosAGol, n.ChutesSofridos)} a gol");
         if (n.Gols > 0 && (n.GolsDePenalti > 0 || n.GolsDeFalta > 0))
             partes.Add($"gols de pênalti {Num(n.GolsDePenalti)}, de falta {Num(n.GolsDeFalta)}");
         if (n.DistanciaDeDrible is decimal d) partes.Add($"drible {d.ToString("0.#", Br)} m");
         if (n.VelocidadeMedia is decimal v) partes.Add($"velocidade média {v.ToString("0.#", Br)} km/h");
+        return string.Join(" · ", partes);
+    }
+
+    /// <summary>As colunas que o celular esconde, repetidas na linha aberta (só aparece em tela estreita).</summary>
+    private static string SoNoCelular(Core.Entities.LigaEstatisticaJogador n)
+    {
+        var partes = new List<string>();
+        void Add(string rotulo, int? v) { if (v is int x) partes.Add($"{rotulo} {x}"); }
+        if (n.NotaPes is decimal pes) partes.Add($"nota do PES {NotaPes.Texto(pes)}");
+        if (n.Desarmes is not null) partes.Add($"desarmes {Par(n.DesarmesCertos, n.Desarmes)}");
+        Add("interceptações", n.Interceptacoes);
+        Add("afastamentos", n.Afastamentos);
+        Add("cruzamentos", n.Cruzamentos);
+        if (n.Faltas is not null || n.Impedimentos is not null) partes.Add($"faltas (impedimentos) {FaltasEImpedimentos(n)}");
+        Add("defesas", n.Defesas);
+        if (n.ChutesSofridos is not null || n.ChutesSofridosAGol is not null)
+            partes.Add($"chutes sofridos {Par(n.ChutesSofridosAGol, n.ChutesSofridos)} a gol");
         return string.Join(" · ", partes);
     }
 }
