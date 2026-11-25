@@ -49,6 +49,9 @@ public class TransferConfig
     /// </summary>
     public DateTime? PapelNoElencoDesde { get; set; }
 
+    /// <summary>Quanto o clube do vencedor de um clássico entre treinadores rivais recebe. 0 = clássico sem prêmio.</summary>
+    public decimal PremioClassico { get; set; } = 3_000_000m;
+
     public DateTime AtualizadoEm { get; set; }
 
     /// <summary>Mínimo de elenco que vale para o time: o temporário dele, se houver, senão o geral.</summary>

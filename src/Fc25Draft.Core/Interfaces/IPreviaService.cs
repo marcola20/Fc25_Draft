@@ -54,7 +54,10 @@ public record PreviaDto(
     PreviaTimeDto Fora,
     PreviaConfrontoDto Confronto,
     // Nulo quando algum dos dois clubes está sem técnico.
-    PreviaTreinadoresDto? Treinadores = null)
+    PreviaTreinadoresDto? Treinadores = null,
+    // Jogo entre treinadores rivais, e quanto vale para quem vencer (0 = sem prêmio).
+    ClassicoDaPartidaDto? Classico = null,
+    decimal PremioClassico = 0m)
 {
     public bool TemTabela => Casa.Jogos is not null && Fora.Jogos is not null;
 }

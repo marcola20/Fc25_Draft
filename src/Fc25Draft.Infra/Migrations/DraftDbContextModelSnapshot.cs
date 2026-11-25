@@ -596,6 +596,44 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("ChavesPush", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ClassicoPremio", b =>
+                {
+                    b.Property<Guid>("PremioId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("PagoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("PartidaId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RivalidadeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TreinadorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Valor")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("PremioId");
+
+                    b.HasIndex("PartidaId")
+                        .IsUnique();
+
+                    b.HasIndex("RivalidadeId");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("TreinadorId");
+
+                    b.ToTable("ClassicoPremios", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.ClausulaRevenda", b =>
                 {
                     b.Property<Guid>("ClausulaId")
@@ -3572,6 +3610,35 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("ResultadosPesPendentes", (string)null);
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Rivalidade", b =>
+                {
+                    b.Property<Guid>("RivalidadeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CriadaEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Nome")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("TreinadorAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TreinadorBId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RivalidadeId");
+
+                    b.HasIndex("TreinadorBId");
+
+                    b.HasIndex("TreinadorAId", "TreinadorBId")
+                        .IsUnique();
+
+                    b.ToTable("Rivalidades", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.Team", b =>
                 {
                     b.Property<Guid>("TeamId")
@@ -3969,6 +4036,11 @@ namespace Fc25Draft.Infra.Migrations
 
                     b.Property<DateTime?>("PedidoDeSaidaDesde")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<decimal>("PremioClassico")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(3000000m);
 
                     b.Property<bool>("QuickSellBloqueado")
                         .ValueGeneratedOnAdd()
@@ -4592,6 +4664,38 @@ namespace Fc25Draft.Infra.Migrations
                         .IsRequired();
 
                     b.Navigation("Chapa");
+
+                    b.Navigation("Treinador");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.ClassicoPremio", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.LigaPartida", "Partida")
+                        .WithMany()
+                        .HasForeignKey("PartidaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Rivalidade", "Rivalidade")
+                        .WithMany()
+                        .HasForeignKey("RivalidadeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "Treinador")
+                        .WithMany()
+                        .HasForeignKey("TreinadorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Partida");
+
+                    b.Navigation("Rivalidade");
+
+                    b.Navigation("Time");
 
                     b.Navigation("Treinador");
                 });
@@ -5796,6 +5900,25 @@ namespace Fc25Draft.Infra.Migrations
                     b.Navigation("Candidato");
 
                     b.Navigation("Eleitor");
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Rivalidade", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "TreinadorA")
+                        .WithMany()
+                        .HasForeignKey("TreinadorAId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Treinador", "TreinadorB")
+                        .WithMany()
+                        .HasForeignKey("TreinadorBId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TreinadorA");
+
+                    b.Navigation("TreinadorB");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.TeamLineup", b =>

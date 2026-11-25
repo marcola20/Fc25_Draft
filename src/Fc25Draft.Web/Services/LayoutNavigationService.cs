@@ -50,6 +50,7 @@ public class LayoutNavigationService
             new("Jogadores", "/players", "user"),
             new("Comparar Jogadores", "/jogadores/comparar", "arrow-left-right"),
             new("Treinadores", "/treinadores", "briefcase"),
+            new("Clássicos", "/classicos", "flame"),
             new("Associação de Treinadores", "/associacao", "landmark"),
             new("Valor de Elenco", "/times/caixa", "banknote"),
             new("Virada de Temporada", "/virada", "refresh-cw"),
@@ -99,6 +100,7 @@ public class LayoutNavigationService
             new("Gerenciar Premiação", "/admin/premiacao", "banknote"),
             new("Metas da Diretoria", "/admin/diretoria", "briefcase"),
             new("Treino da Semana", "/admin/treinos", "activity"),
+            new("Clássicos", "/admin/classicos", "flame"),
             new("Prêmios da Temporada", "/admin/premios", "star"),
             new("Gerenciar Regulamento", "/admin/regulamento", "file-text"),
             new("Anúncios", "/admin/anuncios", "megaphone"),
@@ -763,6 +765,30 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Admin"),
                 new("Jogos Anotados")
+            }
+        },
+        ["/classicos"] = new PageDefinition
+        {
+            Route = "/classicos",
+            Title = "Clássicos",
+            Subtitle = "Os treinadores rivais e o retrospecto de cada duelo",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Clubes e Jogadores"),
+                new("Clássicos")
+            }
+        },
+        ["/admin/classicos"] = new PageDefinition
+        {
+            Route = "/admin/classicos",
+            Title = "Clássicos",
+            Subtitle = "Treinadores rivais e o prêmio do clássico — Admin",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Admin"),
+                new("Clássicos")
             }
         },
         ["/admin/treinos"] = new PageDefinition

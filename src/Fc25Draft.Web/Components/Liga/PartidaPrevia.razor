@@ -4,6 +4,20 @@
 @* Raio-x antes do jogo: chance de cada resultado, os dois times lado a lado e o confronto direto. *@
 @if (Previa is { } pv)
 {
+    @if (pv.Classico is { } classico)
+    {
+        <a href="/classicos" class="previa-classico d-flex align-items-center gap-2 mb-2 text-reset text-decoration-none">
+            <Icone Nome="flame" Tamanho="18" Classe="previa-classico-chama" />
+            <span class="flex-grow-1" style="min-width: 0;">
+                <strong>Clássico</strong> · <span class="text-truncate">@classico.Titulo</span>
+            </span>
+            @if (pv.PremioClassico > 0)
+            {
+                <span class="small text-nowrap" title="Vai para o caixa de quem vencer">vale @Fc25Draft.Core.Utilities.Classicos.Rotulo(pv.PremioClassico)</span>
+            }
+        </a>
+    }
+
     @if (pv.TemTabela)
     {
         <FavoritoJogo PontosCasa="pv.Casa.Pontos!.Value" JogosCasa="pv.Casa.Jogos!.Value"

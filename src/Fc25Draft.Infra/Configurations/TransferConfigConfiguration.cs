@@ -14,5 +14,6 @@ public class TransferConfigConfiguration : IEntityTypeConfiguration<TransferConf
         // O padrão é bloqueado: a venda rápida só vale quando o admin libera.
         e.Property(x => x.QuickSellBloqueado).HasDefaultValue(true);
         e.Property(x => x.MaxLoans).HasDefaultValue(3);
+        e.Property(x => x.PremioClassico).HasColumnType("numeric(18,2)").HasDefaultValue(3_000_000m);
     }
 }

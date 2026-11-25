@@ -1,0 +1,208 @@
+@page "/classicos"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@inject IClassicoService ClassicoSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Clássicos</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar os clássicos:</strong> @_erro</div>
+    }
+    else if (_rivalidades is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_rivalidades.Count == 0)
+    {
+        <div class="alert alert-info">Ainda não há treinadores rivais cadastrados.</div>
+    }
+    else
+    {
+        <p class="text-body-secondary small mb-3">
+            A rivalidade é entre os treinadores, não entre os clubes: vale com qualquer time que os dois estejam comandando
+            (os dois como técnico principal).
+            @if (_premio > 0)
+            {
+                <span>Quem vence o clássico leva <strong class="text-body-emphasis">@Fc25Draft.Core.Utilities.Classicos.Rotulo(_premio)</strong> para o caixa. Empate, pênaltis e W.O. não pagam.</span>
+            }
+        </p>
+
+        <div class="row g-3">
+            @foreach (var r in _rivalidades)
+            {
+                var rt = r.Retrospecto;
+                <div class="col-xl-6">
+                    <div class="painel classico h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                <Icone Nome="flame" Tamanho="16" Classe="classico-chama" />
+                                <span class="fw-medium text-body-emphasis text-truncate">@r.Titulo</span>
+                                @if (r.Proximo is not null)
+                                {
+                                    <span class="etiqueta aviso ms-auto text-nowrap">Vem aí</span>
+                                }
+                            </div>
+
+                            <div class="classico-duelo text-center">
+                                @Lado(r.A, r.TimeA, r.PremiosA)
+                                <div class="align-self-center">
+                                    <div class="classico-placar">
+                                        <div><div class="valor lado-a">@rt.Vitorias</div><div class="small text-body-tertiary">vitórias</div></div>
+                                        <div><div class="valor">@rt.Empates</div><div class="small text-body-tertiary">empates</div></div>
+                                        <div><div class="valor lado-b">@rt.Derrotas</div><div class="small text-body-tertiary">vitórias</div></div>
+                                    </div>
+                                </div>
+                                @Lado(r.B, r.TimeB, r.PremiosB)
+                            </div>
+
+                            @if (rt.Jogos > 0)
+                            {
+                                <div class="classico-barra my-3" role="img" aria-label="@rt.Vitorias vitórias de @r.A.NomeCurto, @rt.Empates empates, @rt.Derrotas vitórias de @r.B.NomeCurto">
+                                    @if (rt.Vitorias > 0) { <span class="lado-a" style="flex: @rt.Vitorias"></span> }
+                                    @if (rt.Empates > 0) { <span class="empate" style="flex: @rt.Empates"></span> }
+                                    @if (rt.Derrotas > 0) { <span class="lado-b" style="flex: @rt.Derrotas"></span> }
+                                </div>
+                                <div class="d-flex justify-content-center flex-wrap gap-3 small text-body-secondary mb-2">
+                                    <span><strong class="text-body-emphasis fw-medium numero">@rt.Jogos</strong> clássico@(rt.Jogos == 1 ? "" : "s")</span>
+                                    <span>gols <strong class="text-body-emphasis fw-medium placar">@rt.GolsPro x @rt.GolsContra</strong></span>
+                                    @if (Lider(r) is { } lider)
+                                    {
+                                        <span><strong class="text-body-emphasis fw-medium">@lider</strong> manda no duelo</span>
+                                    }
+                                    else
+                                    {
+                                        <span>duelo empatado</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-center small text-body-tertiary my-3">Ainda não se enfrentaram como técnicos.</div>
+                            }
+
+                            @if (r.Proximo is { } p)
+                            {
+                                <a href="/liga?liga=@p.LigaId" class="classico-proximo d-flex align-items-center gap-2 small text-reset text-decoration-none mt-3">
+                                    <Icone Nome="calendar" Tamanho="14" />
+                                    <span class="flex-grow-1 text-truncate"><strong>@p.CasaNome x @p.ForaNome</strong> · @p.Competicao</span>
+                                    @if (p.Quando is DateTime quando)
+                                    {
+                                        <span class="text-body-tertiary text-nowrap">@quando.ToString("dd/MM HH'h'mm", Br)</span>
+                                    }
+                                </a>
+                            }
+
+                            @if (r.Jogos.Count > 0)
+                            {
+                                <ul class="list-unstyled small mb-0 mt-3">
+                                    @foreach (var j in r.Jogos.Take(_abertos.Contains(r.RivalidadeId) ? int.MaxValue : 5))
+                                    {
+                                        <li class="d-flex align-items-center gap-2 py-2 border-top classico-jogo">
+                                            <span class="badge @CorDoVencedor(j)" style="min-width: 1.5rem;" title="@QuemVenceu(r, j)">@Inicial(r, j)</span>
+                                            <div class="flex-grow-1" style="min-width: 0;">
+                                                <div class="text-truncate">
+                                                    @if (j.EmCasa)
+                                                    {
+                                                        <span>@j.TimeNome <strong class="placar">@j.GolsPro x @j.GolsContra</strong> @j.AdversarioTimeNome</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>@j.AdversarioTimeNome <strong class="placar">@j.GolsContra x @j.GolsPro</strong> @j.TimeNome</span>
+                                                    }
+                                                    @if (j.IsWO) { <span class="etiqueta ms-1">W.O.</span> }
+                                                </div>
+                                                <div class="text-body-tertiary text-truncate">@j.Data.ToString("dd/MM/yy", Br) · @j.Competicao</div>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                                @if (r.Jogos.Count > 5)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm p-0 mt-1" @onclick="() => Alternar(r.RivalidadeId)">
+                                        @(_abertos.Contains(r.RivalidadeId) ? "Mostrar menos" : $"Ver os {r.Jogos.Count} clássicos")
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<RivalidadeDto>? _rivalidades;
+    private decimal _premio;
+    private string? _erro;
+    private readonly HashSet<Guid> _abertos = new();
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/classicos"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _premio = await ClassicoSvc.PremioAsync(CancellationToken.None);
+            _rivalidades = await ClassicoSvc.ListarAsync(CancellationToken.None);
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private void Alternar(Guid id)
+    {
+        if (!_abertos.Remove(id)) _abertos.Add(id);
+    }
+
+    /// <summary>Quem está na frente no duelo (mais vitórias), pelo nome curto.</summary>
+    private static string? Lider(RivalidadeDto r) =>
+        r.Retrospecto.Vitorias > r.Retrospecto.Derrotas ? r.A.NomeCurto
+        : r.Retrospecto.Derrotas > r.Retrospecto.Vitorias ? r.B.NomeCurto
+        : null;
+
+    // Os jogos vêm do lado de A: V = A venceu, D = B venceu.
+    private static string Inicial(RivalidadeDto r, TreinadorConfrontoJogoDto j) => j.Resultado switch
+    {
+        "V" => Primeira(r.A.NomeCurto),
+        "D" => Primeira(r.B.NomeCurto),
+        _ => "E"
+    };
+
+    private static string QuemVenceu(RivalidadeDto r, TreinadorConfrontoJogoDto j) => j.Resultado switch
+    {
+        "V" => $"{r.A.NomeCurto} venceu",
+        "D" => $"{r.B.NomeCurto} venceu",
+        _ => "Empate"
+    };
+
+    private static string Primeira(string nome) => string.IsNullOrWhiteSpace(nome) ? "?" : nome.Trim()[..1].ToUpperInvariant();
+
+    private static string CorDoVencedor(TreinadorConfrontoJogoDto j) => j.Resultado switch
+    {
+        "V" => "classico-a",
+        "D" => "classico-b",
+        _ => "resultado-e"
+    };
+
+    private RenderFragment Lado(PerfilTreinadorDto perfil, string? time, decimal premios) => @<div>
+        <a href="/treinadores/@perfil.TreinadorId" class="text-reset text-decoration-none">
+            <FotoTreinador TreinadorId="@perfil.TreinadorId" Tamanho="64" Versao="@perfil.VersaoFoto" Alt="@perfil.Nome" Classe="classico-foto" />
+            <div class="fw-medium mt-1 classico-nome"><NomeTreinador Perfil="perfil" /></div>
+        </a>
+        <div class="small text-body-tertiary text-truncate">@(time ?? "sem time")</div>
+        @if (premios > 0)
+        {
+            <div class="small texto-vitoria text-nowrap" title="Prêmios ganhos em clássicos">+@Fc25Draft.Core.Utilities.Classicos.Rotulo(premios)</div>
+        }
+    </div>;
+}

@@ -7,6 +7,7 @@
 @using Fc25Draft.Web.Components.Liga
 @using Fc25Draft.Web.Utilities
 @inject ILigaPublicService LigaService
+@inject IClassicoService ClassicoSvc
 @inject IEstatisticasPesService EstatisticasPes
 @inject AdminAuthService AdminAuth
 @inject ILigaAdminService AdminSvc
@@ -437,6 +438,10 @@
                                 </div>
                                 <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
                                     <span class="@StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
+                                    @if (_classicos.TryGetValue(p.PartidaId, out var classico))
+                                    {
+                                        <span class="etiqueta aviso text-nowrap" title="Clássico: @classico.Titulo"><Icone Nome="flame" Tamanho="12" /><span class="d-none d-sm-inline"> Clássico</span></span>
+                                    }
                                     @if (p.TemPenaltis) { <span class="etiqueta" title="Decidido nos pênaltis">Pên.</span> }
                                     @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span class="text-body-tertiary" title="Tem vídeo no telão"><Icone Nome="tv" Tamanho="14" /></span> }
                                 </div>
@@ -1308,6 +1313,8 @@
     private IReadOnlyList<LigaDto>? _ligas;
     private IReadOnlyList<LigaClassificacaoItemDto> _classif = Array.Empty<LigaClassificacaoItemDto>();
     private IReadOnlyList<LigaRodadaComPartidasDto> _rodadas = Array.Empty<LigaRodadaComPartidasDto>();
+    // Jogos entre treinadores rivais (selo "Clássico").
+    private IReadOnlyDictionary<Guid, ClassicoDaPartidaDto> _classicos = new Dictionary<Guid, ClassicoDaPartidaDto>();
 
     // Forma recente (últimos 5) de cada time — geral, em casa e fora —, recalculada quando as rodadas mudam.
     private Dictionary<Mando, IReadOnlyDictionary<Guid, IReadOnlyList<ResultadoForma>>> _forma = new();
@@ -1584,6 +1591,8 @@
         // Mini liga, decisão do título e playoff de acesso vêm depois das rodadas, com nome próprio.
         var extras = await LigaService.GetJogosExtrasAsync(ligaId, CancellationToken.None);
         _rodadas = rodadas.Where(r => r.Numero > 0).Concat(extras).ToArray();
+        _classicos = await ClassicoSvc.DasPartidasAsync(
+            _rodadas.SelectMany(r => r.Partidas).Select(p => p.PartidaId).ToList(), CancellationToken.None);
         // O jogo decisivo da Copa aparece como rodada normal, mas não soma pontos:
         // o que ele resolve é a ordem entre os empatados.
         _decisivos = LigaDesempate.DosJogos(rodadas.Where(r => r.Desempate).SelectMany(r => r.Partidas));

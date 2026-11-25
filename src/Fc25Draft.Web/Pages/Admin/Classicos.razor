@@ -1,0 +1,198 @@
+@page "/admin/classicos"
+@using System.Globalization
+@using Fc25Draft.Core.DTOs
+@using Fc25Draft.Core.Utilities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject IClassicoService ClassicoSvc
+@inject ITreinadorService TreinadorSvc
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Clássicos — Admin</PageTitle>
+
+<div>
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger alert-dismissible">@_erro<button type="button" class="btn-close" @onclick="() => _erro = null"></button></div>
+    }
+    @if (_ok is not null)
+    {
+        <div class="alert alert-success alert-dismissible">@_ok<button type="button" class="btn-close" @onclick="() => _ok = null"></button></div>
+    }
+
+    <p class="text-muted small mb-3">
+        Clássico é o jogo entre dois treinadores rivais, cada um como técnico principal de um dos times (auxiliar não conta),
+        com qualquer clube. O vencedor leva o prêmio para o caixa do clube que comandava no jogo, sozinho, logo depois que
+        o resultado é encerrado. Empate, pênaltis e W.O. não pagam. Só ganham prêmio os jogos que começaram depois que a
+        rivalidade foi cadastrada; o retrospecto conta a história toda.
+    </p>
+
+    @if (_rivalidades is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else
+    {
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header fw-medium"><Icone Nome="flame" Tamanho="16" /> Rivais (@_rivalidades.Count)</div>
+                    @if (_rivalidades.Count == 0)
+                    {
+                        <div class="card-body text-muted small">Nenhuma rivalidade cadastrada.</div>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var r in _rivalidades)
+                            {
+                                <li class="list-group-item">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span class="fw-medium">@r.A.Nome</span>
+                                        <span class="text-muted small">x</span>
+                                        <span class="fw-medium">@r.B.Nome</span>
+                                        <span class="small text-muted numero ms-1">
+                                            @r.Retrospecto.Vitorias-@r.Retrospecto.Empates-@r.Retrospecto.Derrotas · @r.Retrospecto.Jogos J
+                                        </span>
+                                        <span class="small text-muted ms-auto">desde @r.CriadaEm.ToString("dd/MM/yy", Br)</span>
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <input class="form-control form-control-sm" placeholder="Nome do clássico (opcional)" maxlength="80"
+                                               value="@NomeEditado(r)" @onchange="e => _nomes[r.RivalidadeId] = e.Value?.ToString()" />
+                                        <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" disabled="@_salvando"
+                                                @onclick="() => RenomearAsync(r)">Salvar nome</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_salvando" title="Desfazer a rivalidade"
+                                                @onclick="() => RemoverAsync(r)"><Icone Nome="x" Tamanho="14" /></button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card mb-3">
+                    <div class="card-header fw-medium">Nova rivalidade</div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small">Treinador</label>
+                            <select class="form-select form-select-sm" @bind="_novoA">
+                                <option value="">Escolha…</option>
+                                @foreach (var t in _treinadores)
+                                {
+                                    <option value="@t.TreinadorId">@t.Nome (@t.TimeAtual)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Rival</label>
+                            <select class="form-select form-select-sm" @bind="_novoB">
+                                <option value="">Escolha…</option>
+                                @foreach (var t in _treinadores.Where(t => t.TreinadorId.ToString() != _novoA))
+                                {
+                                    <option value="@t.TreinadorId">@t.Nome (@t.TimeAtual)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Nome do clássico (opcional)</label>
+                            <input class="form-control form-control-sm" maxlength="80" @bind="_novoNome" />
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" disabled="@(_salvando || !Guid.TryParse(_novoA, out _) || !Guid.TryParse(_novoB, out _))"
+                                @onclick="CriarAsync">Adicionar</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header fw-medium">Prêmio por vitória</div>
+                    <div class="card-body">
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="number" min="0" step="0.5" class="form-control" @bind="_premioMi" />
+                            <span class="input-group-text">Mi</span>
+                            <button type="button" class="btn btn-outline-primary" disabled="@_salvando" @onclick="SalvarPremioAsync">Salvar</button>
+                        </div>
+                        <div class="small text-muted">0 desliga o prêmio (o clássico continua aparecendo no site).</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<RivalidadeDto>? _rivalidades;
+    private IReadOnlyList<TreinadorDto> _treinadores = Array.Empty<TreinadorDto>();
+    private readonly Dictionary<Guid, string?> _nomes = new();
+    private string? _novoA, _novoB, _novoNome;
+    private decimal _premioMi;
+    private bool _salvando;
+    private string? _erro, _ok;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/admin/classicos"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _treinadores = (await TreinadorSvc.ListAsync(false, CancellationToken.None)).OrderBy(t => t.Nome).ToList();
+            _premioMi = await ClassicoSvc.PremioAsync(CancellationToken.None) / 1_000_000m;
+            await RecarregarAsync();
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task RecarregarAsync()
+    {
+        _rivalidades = (await ClassicoSvc.ListarAsync(CancellationToken.None)).OrderBy(r => r.A.Nome).ToList();
+        _nomes.Clear();
+    }
+
+    private string? NomeEditado(RivalidadeDto r) => _nomes.TryGetValue(r.RivalidadeId, out var n) ? n : r.Nome;
+
+    private async Task CriarAsync()
+    {
+        if (!Guid.TryParse(_novoA, out var a) || !Guid.TryParse(_novoB, out var b)) return;
+        await RodarAsync(async () =>
+        {
+            await ClassicoSvc.SalvarAsync(null, a, b, _novoNome, CancellationToken.None);
+            _novoA = _novoB = _novoNome = null;
+            await RecarregarAsync();
+        }, "Rivalidade criada.");
+    }
+
+    private Task RenomearAsync(RivalidadeDto r) => RodarAsync(async () =>
+    {
+        await ClassicoSvc.SalvarAsync(r.RivalidadeId, r.A.TreinadorId, r.B.TreinadorId, NomeEditado(r), CancellationToken.None);
+        await RecarregarAsync();
+    }, "Nome salvo.");
+
+    private Task RemoverAsync(RivalidadeDto r) => RodarAsync(async () =>
+    {
+        await ClassicoSvc.RemoverAsync(r.RivalidadeId, CancellationToken.None);
+        await RecarregarAsync();
+    }, $"Rivalidade {r.A.Nome} x {r.B.Nome} desfeita. Os prêmios já pagos continuam no caixa.");
+
+    private Task SalvarPremioAsync() => RodarAsync(
+        () => ClassicoSvc.SalvarPremioAsync(_premioMi * 1_000_000m, CancellationToken.None),
+        _premioMi > 0 ? $"Prêmio do clássico: {Fc25Draft.Core.Utilities.Classicos.Rotulo(_premioMi * 1_000_000m)}." : "Prêmio do clássico desligado.");
+
+    private async Task RodarAsync(Func<Task> acao, string ok)
+    {
+        _salvando = true;
+        _erro = _ok = null;
+        try
+        {
+            await acao();
+            _ok = ok;
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
+    }
+}

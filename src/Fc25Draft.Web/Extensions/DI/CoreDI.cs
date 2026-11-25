@@ -104,6 +104,7 @@ namespace Fc25Draft.Web.Extensions.DI
             services.AddComConexaoPropria<ITreinadorService, TreinadorService>();
             services.AddComConexaoPropria<IAdministradorService, AdministradorService>();
             services.AddComConexaoPropria<IBolaoService, BolaoService>();
+            services.AddComConexaoPropria<IClassicoService, ClassicoService>();
             services.AddComConexaoPropria<IPremiosService, PremiosService>();
             services.AddComConexaoPropria<IPremiosEstatisticaService, PremiosEstatisticaService>();
             services.AddComConexaoPropria<IResumoRodadaService, ResumoRodadaService>();

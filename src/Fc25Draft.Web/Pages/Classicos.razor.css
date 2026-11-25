@@ -1,0 +1,84 @@
+.classico {
+    padding: 0.25rem;
+}
+
+::deep .classico-chama {
+    color: var(--cbfv-laranja);
+    flex-shrink: 0;
+}
+
+.classico-duelo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+    .classico-duelo > div {
+        min-width: 0;
+    }
+
+.classico-placar {
+    display: flex;
+    gap: 0.75rem;
+}
+
+    .classico-placar .valor {
+        font-size: 2rem;
+        font-weight: 500;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+        color: var(--bs-emphasis-color);
+    }
+
+    .classico-placar .valor.lado-a { color: var(--cbfv-azul); }
+    .classico-placar .valor.lado-b { color: var(--cbfv-laranja); }
+
+.classico-nome {
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+}
+
+.classico-barra {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+    .classico-barra .lado-a { background: var(--cbfv-azul); }
+    .classico-barra .empate { background: var(--cbfv-empate); }
+    .classico-barra .lado-b { background: var(--cbfv-laranja); }
+
+::deep .classico-foto {
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.classico-jogo {
+    border-color: var(--bs-border-color) !important;
+}
+
+    .classico-jogo .badge.classico-a { background: var(--cbfv-azul); color: #fff; }
+    .classico-jogo .badge.classico-b { background: var(--cbfv-laranja); color: #fff; }
+
+.classico-proximo {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-tertiary-bg);
+}
+
+    .classico-proximo:hover {
+        background: var(--bs-secondary-bg);
+    }
+
+@media (max-width: 575.98px) {
+    .classico-placar {
+        gap: 0.4rem;
+    }
+
+        .classico-placar .valor {
+            font-size: 1.6rem;
+        }
+}

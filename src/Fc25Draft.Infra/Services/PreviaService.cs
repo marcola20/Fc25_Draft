@@ -20,10 +20,12 @@ public class PreviaService : IPreviaService
     private readonly IEstatisticasPesService _estatisticas;
     private readonly ITreinadorService _treinadores;
     private readonly IPerfilTreinadorService _perfis;
+    private readonly IClassicoService _classicos;
 
     public PreviaService(DraftDbContext db, ILigaPublicService ligas, IEstatisticasPesService estatisticas,
-        ITreinadorService treinadores, IPerfilTreinadorService perfis)
+        ITreinadorService treinadores, IPerfilTreinadorService perfis, IClassicoService classicos)
     {
+        _classicos = classicos;
         _db = db;
         _ligas = ligas;
         _estatisticas = estatisticas;
@@ -86,6 +88,8 @@ public class PreviaService : IPreviaService
                 : new PreviaJogoAnteriorDto(j.Data, j.Competicao, p.Fora, j.GolsContra!.Value, j.GolsPro!.Value, p.Casa))
             .ToList();
 
+        var classico = (await _classicos.DasPartidasAsync([partidaId], ct)).GetValueOrDefault(partidaId);
+
         return new PreviaDto(
             partidaId, p.Competicao,
             Lado(p.TimeCasaId, p.Casa, perfilCasa),
@@ -93,7 +97,9 @@ public class PreviaService : IPreviaService
             new PreviaConfrontoDto(
                 confronto?.Jogos ?? 0, confronto?.Vitorias ?? 0, confronto?.Empates ?? 0, confronto?.Derrotas ?? 0,
                 confronto?.GolsPro ?? 0, confronto?.GolsContra ?? 0, anteriores),
-            await DueloDosTreinadoresAsync(p.TimeCasaId, p.TimeForaId, ct));
+            await DueloDosTreinadoresAsync(p.TimeCasaId, p.TimeForaId, ct),
+            classico,
+            classico is null ? 0m : await _classicos.PremioAsync(ct));
     }
 
     /// <summary>Quem está no comando de cada clube hoje e como foram os jogos entre os dois, com qualquer clube.</summary>

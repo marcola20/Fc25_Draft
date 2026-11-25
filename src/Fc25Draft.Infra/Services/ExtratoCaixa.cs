@@ -21,6 +21,7 @@ internal static class ExtratoCaixa
     public const string VendaAdmin = "VENDA_ADMIN";
     public const string TrocaAdmin = "TROCA_ADMIN";
     public const string Bolao = "BOLAO";
+    public const string Classico = "CLASSICO";
     public const string Comissao = "COMISSAO";
     public const string Aposentadoria = "APOSENTADORIA";
 

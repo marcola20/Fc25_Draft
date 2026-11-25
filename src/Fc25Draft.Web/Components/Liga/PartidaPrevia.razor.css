@@ -40,3 +40,15 @@
         font-weight: 800;
         line-height: 1.1;
     }
+
+.previa-classico {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--bs-border-radius);
+    border: 1px solid color-mix(in srgb, var(--cbfv-laranja) 45%, transparent);
+    background: color-mix(in srgb, var(--cbfv-laranja) 10%, transparent);
+}
+
+::deep .previa-classico-chama {
+    color: var(--cbfv-laranja);
+    flex-shrink: 0;
+}
