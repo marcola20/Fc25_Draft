@@ -26,12 +26,6 @@ public interface ILigaAdminService
     Task<LigaRodadaDto> DefinirDataRodadaAsync(Guid rodadaId, DateTime? dataHora, CancellationToken ct);
 
     Task<IReadOnlyList<LigaRodadaDto>> GerarRodadasAutoAsync(Guid ligaId, CancellationToken ct);
-
-    /// <summary>
-    /// Se o Gerar Automático vai repetir o turno da temporada anterior (mesma divisão, mando invertido),
-    /// o texto que explica isso e quem entrou no lugar de quem; nulo se vai sortear os jogos.
-    /// </summary>
-    Task<string?> DescreverEspelhoDoTurnoAsync(Guid ligaId, CancellationToken ct);
     Task DeleteRodadaAsync(Guid rodadaId, CancellationToken ct);
 
     // Partidas

@@ -72,8 +72,6 @@ namespace Fc25Draft.Infra.Migrations
 
             A Série B termina em 12/01 e a Série A em 21/01 (ela tem mais rodadas). A final da Copa é no sábado 23/01 e o playoff de acesso fecha a temporada no sábado 30/01.
 
-            *Segundo turno*: os jogos seguem a mesma ordem da temporada passada, com o mando invertido. Quem subiu entra no lugar de quem caiu.
-
             O calendário completo está na página *Formato* do site.
             """;
 
@@ -84,8 +82,6 @@ namespace Fc25Draft.Infra.Migrations
             Datas: Série A R1 28/11, R2 03/12 ... R8 14/01, R9 21/01 (só a A joga nessa semana). Série B R1 01/12 ... R7 12/01. Copa: fase de liga 05/12, 12/12, 19/12, 26/12; playoff 02/01; quartas 09/01; semis 16/01; final 23/01. Não tem mais a semana em que a B folgava e a A jogava duas vezes.
 
             Datas que caem em feriado: Série A R5 em 24/12, Série A R6 em 31/12, Copa R4 em 26/12 e playoff da Copa em 02/01. Cada rodada pode ter a data mudada à mão na aba Rodadas da competição; rodada com jogo começado não é remarcada.
-
-            Segundo turno: o Gerar Automático da Série A e da B repete, rodada por rodada, os jogos da mesma divisão em 2010, com o mando invertido. Quem subiu fica no lugar de quem fez o caminho contrário: na A, o campeão da B no lugar do último da A e o vencedor do playoff no lugar de quem perdeu o playoff; na B, o contrário. A aba Rodadas mostra quem entra no lugar de quem antes de gerar.
             """;
 
         private const string ResumoCalendario =
@@ -113,11 +109,6 @@ namespace Fc25Draft.Infra.Migrations
             - A Série A tem 9 rodadas e termina na quinta 21/01.
             - A final da Copa é no sábado 23/01.
             - O playoff de acesso fecha a temporada no sábado 30/01.
-
-            ## Segundo turno
-            Os jogos seguem a *mesma ordem da temporada passada*, com o *mando invertido*. Quem subiu entra no lugar de quem caiu.
-
-            > Exemplo: se na 1ª rodada de 2010 foi Botafogo x Palmeiras e o Palmeiras desceu, em 2011 é Corinthians x Botafogo, com o Corinthians (que subiu) no lugar dele e o mando trocado.
             """;
 
         // ── Copa ────────────────────────────────────────────────────────────────────────────

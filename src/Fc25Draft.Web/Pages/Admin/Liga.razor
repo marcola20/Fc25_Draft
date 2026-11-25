@@ -844,20 +844,9 @@
                         <button class="btn btn-sm btn-outline-primary" @onclick="SalvarConfrontoFinal" disabled="@_saving">Salvar</button>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="LimparConfrontoFinal" disabled="@_saving">Tirar</button>
                         <span class="text-muted small ms-auto">
-                            @if (_espelhoDoTurno is null)
-                            {
-                                <text>Ao gerar as rodadas automaticamente, esse confronto é levado para a última — o resto da tabela não muda.</text>
-                            }
-                            else
-                            {
-                                <text>No segundo turno a ordem é a da temporada passada: esse confronto não é usado.</text>
-                            }
+                            Ao gerar as rodadas automaticamente, esse confronto é levado para a última — o resto da tabela não muda.
                         </span>
                     </div>
-                    @if (_espelhoDoTurno is not null)
-                    {
-                        <div class="small mt-2"><Icone Nome="repeat" Tamanho="14" /> @_espelhoDoTurno</div>
-                    }
                 </div>
             </div>
         }
@@ -1326,7 +1315,6 @@
         _times.Where(t => _timesLigaSel.Contains(t.TeamId)).OrderBy(t => t.TeamName).ToList();
 
     private string _confrontoFinalA = "";
-    private string? _espelhoDoTurno;
     private string _confrontoFinalB = "";
 
     // Rodadas
@@ -1429,7 +1417,6 @@
                 _rodadaDesempate = _rodadas.FirstOrDefault(r => r.Desempate);
                 _confrontoFinalA = _ligaAtual.ConfrontoFinalTimeAId?.ToString() ?? "";
                 _confrontoFinalB = _ligaAtual.ConfrontoFinalTimeBId?.ToString() ?? "";
-                _espelhoDoTurno = await AdminSvc.DescreverEspelhoDoTurnoAsync(_ligaAtual.LigaId, CancellationToken.None);
             }
 
             _tab = RodadaId.HasValue ? "partidas" : (string.IsNullOrEmpty(TabQuery) ? "rodadas" : TabQuery);
@@ -1850,13 +1837,7 @@
     private async Task GerarRodadasAuto()
     {
         _erro = null; _saving = true;
-        try
-        {
-            var espelho = _espelhoDoTurno is not null;
-            await AdminSvc.GerarRodadasAutoAsync(_ligaAtual!.LigaId, CancellationToken.None);
-            _ok = espelho ? "Rodadas geradas: segundo turno da temporada passada, com o mando invertido." : "Rodadas geradas automaticamente.";
-            await CarregarDados();
-        }
+        try { await AdminSvc.GerarRodadasAutoAsync(_ligaAtual!.LigaId, CancellationToken.None); _ok = "Rodadas geradas automaticamente."; await CarregarDados(); }
         catch (Exception ex) { _erro = ex.Message; }
         finally { _saving = false; }
     }

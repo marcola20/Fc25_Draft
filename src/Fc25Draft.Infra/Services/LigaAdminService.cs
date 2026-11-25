@@ -578,13 +578,9 @@ public partial class LigaAdminService : ILigaAdminService
         }
 
         // Liga: round-robin completo (n-1 rodadas). Copa: usa TotalRodadas (6).
-        // Liga com a mesma divisão na temporada anterior: é o segundo turno dela, na mesma ordem.
-        var espelho = await EspelhoDoTurnoAnteriorAsync(liga, times, ct);
-        var totalRodadas = espelho?.Jogos.Count ?? (liga.Tipo == TipoCompetition.Liga ? times.Count - 1 : liga.TotalRodadas);
-        var jogos = espelho?.Jogos ?? GerarRoundRobinParcial(times, totalRodadas);
-
-        if (espelho is null)
-            PorConfrontoFinal(jogos, liga.ConfrontoFinalTimeAId, liga.ConfrontoFinalTimeBId);
+        var totalRodadas = liga.Tipo == TipoCompetition.Liga ? times.Count - 1 : liga.TotalRodadas;
+        var jogos = GerarRoundRobinParcial(times, totalRodadas);
+        PorConfrontoFinal(jogos, liga.ConfrontoFinalTimeAId, liga.ConfrontoFinalTimeBId);
 
         var rodadasCriadas = new List<LigaRodada>();
         for (int r = 0; r < totalRodadas; r++)
@@ -619,96 +615,6 @@ public partial class LigaAdminService : ILigaAdminService
         await _db.SaveChangesAsync(ct);
 
         return rodadasCriadas.Select(r => new LigaRodadaDto(r.RodadaId, r.LigaId, r.Numero, r.Partidas.Count, false, r.DataHora)).ToArray();
-    }
-
-    public async Task<string?> DescreverEspelhoDoTurnoAsync(Guid ligaId, CancellationToken ct)
-    {
-        var liga = await _db.Ligas.AsNoTracking().FirstOrDefaultAsync(x => x.LigaId == ligaId, ct);
-        if (liga is null) return null;
-
-        var times = await _db.LigaTimes.AsNoTracking().Where(x => x.LigaId == ligaId).Select(x => x.TimeId).ToListAsync(ct);
-        if (await EspelhoDoTurnoAnteriorAsync(liga, times, ct) is not { } espelho) return null;
-
-        var nomes = await _db.Teams.AsNoTracking()
-            .Where(t => espelho.Trocas.Select(x => x.Entrou).Contains(t.TeamId) || espelho.Trocas.Select(x => x.Saiu).Contains(t.TeamId))
-            .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
-
-        var texto = $"O Gerar Automático faz o segundo turno de {espelho.TemporadaAnterior}: a mesma ordem de jogos, com o mando invertido.";
-        if (espelho.Trocas.Count > 0)
-            texto += " " + string.Join(", ", espelho.Trocas.Select(x => $"{nomes[x.Entrou]} no lugar do {nomes[x.Saiu]}")) + ".";
-        return texto;
-    }
-
-    /// <summary>Jogos do segundo turno e quem entrou no lugar de quem (quem subiu ou desceu).</summary>
-    private sealed record EspelhoDoTurno(int TemporadaAnterior, List<List<(Guid, Guid)>> Jogos, List<(Guid Entrou, Guid Saiu)> Trocas);
-
-    /// <summary>
-    /// Segundo turno da temporada anterior: cada rodada repete os jogos da mesma rodada da mesma divisão
-    /// um ano antes, com o mando invertido. Quem chegou entra no lugar de quem fez o caminho contrário,
-    /// do mais extremo para o menos: na Série A o campeão da B fica com a vaga do último da A, o vice da B
-    /// com a do penúltimo, e assim por diante; na Série B, o espelho disso. Nulo se não há temporada
-    /// anterior da divisão ou se a troca não fecha um turno completo (número de times diferente etc.).
-    /// </summary>
-    private async Task<EspelhoDoTurno?> EspelhoDoTurnoAnteriorAsync(Liga liga, List<Guid> times, CancellationToken ct)
-    {
-        if (liga.Tipo != TipoCompetition.Liga || liga.Temporada is not int temporada || liga.Divisao is not Divisao divisao)
-            return null;
-
-        var ligasAnteriores = await _db.Ligas.AsNoTracking()
-            .Where(l => l.Tipo == TipoCompetition.Liga && l.Temporada == temporada - 1)
-            .ToListAsync(ct);
-        var anterior = ligasAnteriores.FirstOrDefault(l => l.Divisao == divisao);
-        if (anterior is null) return null;
-
-        var rodadas = await _db.LigaRodadas.AsNoTracking()
-            .Where(r => r.LigaId == anterior.LigaId && r.Numero > 0 && !r.Desempate)
-            .OrderBy(r => r.Numero)
-            .Select(r => r.Partidas.Select(p => new { p.TimeCasaId, p.TimeForaId }).ToList())
-            .ToListAsync(ct);
-        if (rodadas.Count == 0) return null;
-
-        var timesAntes = await _db.LigaTimes.AsNoTracking()
-            .Where(x => x.LigaId == anterior.LigaId)
-            .Select(x => x.TimeId)
-            .ToListAsync(ct);
-        var saiu = timesAntes.Except(times).ToList();
-        var entrou = times.Except(timesAntes).ToList();
-        if (saiu.Count != entrou.Count) return null;
-
-        // Posição final de cada time na temporada anterior, em qualquer divisão.
-        var posicao = new Dictionary<Guid, int>();
-        foreach (var l in ligasAnteriores)
-            foreach (var (timeId, pos) in await GetPosicoesTabelaAsync(l.LigaId, ct))
-                posicao.TryAdd(timeId, pos);
-        int Pos(Guid id) => posicao.TryGetValue(id, out var p) && p > 0 ? p : int.MaxValue;
-
-        var naElite = divisao == Divisao.SerieA;
-        var saidas = naElite ? saiu.OrderByDescending(Pos).ToList() : saiu.OrderBy(Pos).ToList();
-        var chegadas = naElite ? entrou.OrderBy(Pos).ToList() : entrou.OrderByDescending(Pos).ToList();
-        var trocas = chegadas.Zip(saidas, (e, s) => (Entrou: e, Saiu: s)).ToList();
-        var novo = timesAntes.ToDictionary(id => id, id => id);
-        foreach (var (e, s) in trocas) novo[s] = e;
-
-        var jogos = new List<List<(Guid, Guid)>>();
-        var confrontos = new HashSet<(Guid, Guid)>();
-        foreach (var rodada in rodadas)
-        {
-            var daRodada = new List<(Guid, Guid)>();
-            var jogaram = new HashSet<Guid>();
-            foreach (var p in rodada)
-            {
-                if (!novo.TryGetValue(p.TimeCasaId, out var fora) || !novo.TryGetValue(p.TimeForaId, out var casa))
-                    return null;
-                // Cada par uma vez no turno e cada time uma vez por rodada.
-                var par = casa.CompareTo(fora) < 0 ? (casa, fora) : (fora, casa);
-                if (!confrontos.Add(par) || !jogaram.Add(casa) || !jogaram.Add(fora)) return null;
-                daRodada.Add((casa, fora));
-            }
-            jogos.Add(daRodada);
-        }
-
-        var esperados = times.Count * (times.Count - 1) / 2;
-        return confrontos.Count == esperados ? new EspelhoDoTurno(temporada - 1, jogos, trocas) : null;
     }
 
     public async Task DeleteRodadaAsync(Guid rodadaId, CancellationToken ct)
