@@ -1,0 +1,69 @@
+@using Fc25Draft.Core.Interfaces
+@inject IIdoloService IdoloSvc
+
+@* Mural do clube: as lendas (ídolos aposentados, com a camisa aposentada) e os ídolos. Some quando o clube não tem nenhum. *@
+@if (_idolos.Count > 0)
+{
+    var lendas = _idolos.Where(i => i.Lenda).ToList();
+    var idolos = _idolos.Where(i => !i.Lenda).ToList();
+    <div class="card mb-3">
+        <div class="card-header d-flex flex-wrap align-items-center gap-2">
+            <strong>@(lendas.Count > 0 ? "Lendas e ídolos" : "Ídolos do clube")</strong>
+            <a href="/idolos#time-@TeamId" class="ms-auto small">Ver todos os clubes</a>
+        </div>
+        <div class="card-body d-flex flex-column gap-3">
+            @if (lendas.Count > 0)
+            {
+                <div class="d-flex flex-wrap gap-3">
+                    @foreach (var l in lendas)
+                    {
+                        <a href="/players/details/@l.JogadorId" class="lenda-mural text-reset text-decoration-none" title="@string.Join(" · ", l.Motivos)">
+                            @if (l.CamisaAposentada is short n)
+                            {
+                                <span class="lenda-camisa numero" title="Camisa @n aposentada">@n</span>
+                            }
+                            else
+                            {
+                                <FotoJogador PlayerId="@l.JogadorId" Tamanho="40" Alt="@l.JogadorNome" />
+                            }
+                            <span>
+                                <span class="d-block fw-medium"><Icone Nome="crown" Tamanho="12" Classe="lenda-coroa" /> @l.JogadorNome</span>
+                                <span class="d-block small text-body-tertiary">
+                                    Lenda@(l.CamisaAposentada is short c ? $" · camisa {c} aposentada" : "") · @l.Jogos J · @l.Gols G
+                                </span>
+                            </span>
+                        </a>
+                    }
+                </div>
+            }
+            @if (idolos.Count > 0)
+            {
+                <div class="d-flex flex-wrap gap-1">
+                    @foreach (var i in idolos)
+                    {
+                        <a href="/players/details/@i.JogadorId" class="etiqueta @(i.NoClube ? "acento" : "")"
+                           title="@(i.NoClube ? "No clube" : "Saiu do clube") · @string.Join(" · ", i.Motivos)">
+                            @if (i.NoClube)
+                            {
+                                <Icone Nome="crown" Tamanho="12" />
+                            }
+                            @i.JogadorNome
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid TeamId { get; set; }
+
+    private IReadOnlyList<IdoloDto> _idolos = Array.Empty<IdoloDto>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _idolos = await IdoloSvc.DoClubeAsync(TeamId, CancellationToken.None); }
+        catch { _idolos = Array.Empty<IdoloDto>(); } // Mural é enfeite: sem ele a página abre do mesmo jeito.
+    }
+}

@@ -150,6 +150,11 @@ public class AposentadoriaService : IAposentadoriaService
             var precos = new PricingService(_db, new ParticipacaoService(_db, _time));
             var timesQueRecebem = vinculos.Select(r => r.TeamId).Concat(emprestimos.Select(e => e.DonoTeamId)).Distinct().ToList();
             var times = await _db.Teams.Where(t => timesQueRecebem.Contains(t.TeamId)).ToDictionaryAsync(t => t.TeamId, ct);
+            // Ídolo que se aposenta vira lenda do clube (e, se se aposentou nele, a camisa fica aposentada).
+            var idolos = await _db.Idolos.AsNoTracking()
+                .Where(i => ids.Contains(i.JogadorId))
+                .Select(i => new { i.JogadorId, i.TimeId, i.Time.TeamName })
+                .ToListAsync(ct);
 
             foreach (var p in jogadores)
             {
@@ -169,6 +174,7 @@ public class AposentadoriaService : IAposentadoriaService
                 }
 
                 p.TimeAoSeAposentar = vinculo?.TeamId ?? p.CurrentTeamId;
+                p.NumeroAoSeAposentar = vinculo?.NumeroCamisa;
                 p.AposentadoNaTemporada = p.UltimaTemporada;
                 p.AposentadoEm = agora;
                 p.CurrentTeamId = null;
@@ -187,6 +193,16 @@ public class AposentadoriaService : IAposentadoriaService
                     AvisosDoTime.Criar(_db, dono, AvisosDoTime.Carreira,
                         $"🎖️ {p.Name}, emprestado, pendurou as chuteiras. O clube recebeu {valorTexto}.",
                         $"/players/details/{p.PlayerId}", agora);
+
+                foreach (var idolo in idolos.Where(i => i.JogadorId == p.PlayerId))
+                {
+                    var camisa = idolo.TimeId == p.TimeAoSeAposentar && p.NumeroAoSeAposentar is short n
+                        ? $" A camisa {n} está aposentada: ninguém mais usa no clube."
+                        : "";
+                    AvisosDoTime.Criar(_db, idolo.TimeId, AvisosDoTime.Idolo,
+                        $"👑 {p.Name} pendurou as chuteiras e virou lenda do {idolo.TeamName}.{camisa}",
+                        "/idolos", agora);
+                }
 
                 _db.TransferHistories.Add(new TransferHistory
                 {
@@ -229,7 +245,12 @@ public class AposentadoriaService : IAposentadoriaService
                 && await _db.Teams.AnyAsync(t => t.TeamId == time, ct)
                 && !await _db.TeamRosters.AnyAsync(r => r.PlayerId == p.PlayerId, ct))
             {
-                _db.TeamRosters.Add(new TeamRoster { TeamId = time, PlayerId = p.PlayerId });
+                // O número volta com ele, se ninguém pegou nesse meio tempo.
+                var numero = p.NumeroAoSeAposentar is short n
+                             && !await _db.TeamRosters.AnyAsync(r => r.TeamId == time && r.NumeroCamisa == n, ct)
+                    ? p.NumeroAoSeAposentar
+                    : null;
+                _db.TeamRosters.Add(new TeamRoster { TeamId = time, PlayerId = p.PlayerId, NumeroCamisa = numero });
                 p.CurrentTeamId = time;
             }
 
@@ -261,6 +282,7 @@ public class AposentadoriaService : IAposentadoriaService
             p.UltimaTemporada = null;
             p.DespedidaAnunciadaEm = null;
             p.TimeAoSeAposentar = null;
+            p.NumeroAoSeAposentar = null;
 
             await _db.SaveChangesAsync(ct);
             await transacao.CommitAsync(ct);

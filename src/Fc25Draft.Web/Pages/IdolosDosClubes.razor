@@ -15,10 +15,11 @@
         <strong class="text-body-emphasis">@IdolosCriterios.Gols gols</strong>,
         <strong class="text-body-emphasis">@IdolosCriterios.Assistencias assistências</strong> ou
         <strong class="text-body-emphasis">@IdolosCriterios.ParticipacoesEmGol gols + assistências</strong>, ou quem foi destaque
-        de um título do clube (Série A, Série B ou Copa): artilheiro ou garçom do time (pelo menos @IdolosCriterios.MinimoNoTitulo)
+        de um título do clube na Série A ou na Copa (Série B não conta): artilheiro ou garçom do time (pelo menos @IdolosCriterios.MinimoNoTitulo)
         ou a melhor nota média do time na campanha. Vender ou trocar um ídolo tira
         <strong class="text-body-emphasis">@((-IdolosCriterios.SaidaNaConfianca).ToString("0")) de confiança</strong> da diretoria;
-        aposentadoria, empréstimo e draft de expansão não tiram.
+        aposentadoria, empréstimo e draft de expansão não tiram. Ídolo que se aposenta vira <strong class="text-body-emphasis">lenda</strong>
+        do clube; se se aposentou nele, a camisa dele fica aposentada lá e ninguém mais usa o número.
     </p>
 
     @if (_erro is not null)
@@ -44,6 +45,34 @@
             </div>
         </div>
 
+        var lendas = _idolos.Where(i => i.Lenda).ToList();
+        @if (lendas.Count > 0)
+        {
+            <h2 class="h6 mb-2"><Icone Nome="crown" Tamanho="14" Classe="idolo-coroa" /> Lendas</h2>
+            <div class="row g-2 mb-4">
+                @foreach (var l in lendas)
+                {
+                    <div class="col-sm-6 col-xl-4">
+                        <a href="/players/details/@l.JogadorId" class="painel lenda d-flex align-items-center gap-3 p-3 text-reset text-decoration-none h-100">
+                            @if (l.CamisaAposentada is short n)
+                            {
+                                <span class="lenda-camisa numero" title="Camisa @n aposentada no @l.TimeNome">@n</span>
+                            }
+                            else
+                            {
+                                <FotoJogador PlayerId="@l.JogadorId" Tamanho="44" Alt="@l.JogadorNome" />
+                            }
+                            <span style="min-width: 0;">
+                                <span class="d-block fw-medium text-truncate">@l.JogadorNome</span>
+                                <span class="d-block small text-body-secondary text-truncate">Lenda do @l.TimeNome</span>
+                                <span class="d-block small text-body-tertiary numero">@l.Jogos J · @l.Gols G · @l.Assistencias A</span>
+                            </span>
+                        </a>
+                    </div>
+                }
+            </div>
+        }
+
         <div class="row g-3">
             @foreach (var clube in _idolos.Where(i => !_soNoClube || i.NoClube).GroupBy(i => (i.TimeId, i.TimeNome)))
             {
@@ -57,11 +86,11 @@
                         <ul class="list-unstyled mb-0">
                             @foreach (var i in clube)
                             {
-                                <li class="d-flex gap-2 px-3 py-2 border-top idolo @(i.NoClube ? "" : "idolo-saiu")">
+                                <li class="d-flex gap-2 px-3 py-2 border-top idolo @(i.NoClube || i.Lenda ? "" : "idolo-saiu")">
                                     <FotoJogador PlayerId="@i.JogadorId" Tamanho="40" Alt="@i.JogadorNome" />
                                     <div class="flex-grow-1" style="min-width: 0;">
                                         <div class="d-flex align-items-baseline gap-2 flex-wrap">
-                                            @if (i.NoClube)
+                                            @if (i.NoClube || i.Lenda)
                                             {
                                                 <Icone Nome="crown" Tamanho="13" Classe="idolo-coroa" />
                                             }
@@ -119,7 +148,7 @@
     /// <summary>"Vendido em 12/10/26 · hoje no Santos", "Aposentado".</summary>
     private static string Situacao(IdoloDto i)
     {
-        if (i.Aposentado) return "Aposentado";
+        if (i.Lenda) return i.CamisaAposentada is short n ? $"Lenda · camisa {n} aposentada no clube" : "Lenda · aposentado";
         var como = i.Saida switch
         {
             SaidaDoIdolo.Vendido => "Vendido",

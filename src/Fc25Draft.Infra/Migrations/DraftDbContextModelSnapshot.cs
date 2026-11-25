@@ -2987,6 +2987,9 @@ namespace Fc25Draft.Infra.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<short?>("NumeroAoSeAposentar")
+                        .HasColumnType("smallint");
+
                     b.Property<int>("Overall")
                         .HasColumnType("integer");
 

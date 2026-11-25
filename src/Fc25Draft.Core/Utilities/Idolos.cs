@@ -22,7 +22,8 @@ public static class IdolosCriterios
 /// Ídolo de um clube: somando a passagem dele pelo clube, <see cref="IdolosCriterios.Jogos"/> jogos, ou
 /// <see cref="IdolosCriterios.Gols"/> gols, ou <see cref="IdolosCriterios.Assistencias"/> assistências, ou
 /// <see cref="IdolosCriterios.ParticipacoesEmGol"/> gols + assistências. Ou ter sido destaque de um título do clube
-/// (Série A, Série B ou Copa): artilheiro do time, garçom do time ou melhor nota média do time na campanha.
+/// (Série A ou Copa): artilheiro do time, garçom do time ou melhor nota média do time na campanha. O título da Série B
+/// conta no número de títulos, mas não faz ninguém virar ídolo.
 /// </summary>
 public static class Idolos
 {
@@ -30,8 +31,11 @@ public static class Idolos
     public sealed record Estatistica(
         int JogadorId, Guid TimeId, Guid LigaId, int Jogos, int Gols, int Assistencias, decimal? NotaMedia, int JogosComNota);
 
-    /// <summary>Título de um clube: a competição e quantos jogos o clube fez nela.</summary>
-    public sealed record Titulo(Guid LigaId, string Competicao, Guid CampeaoId, int JogosDoTime);
+    /// <summary>
+    /// Título de um clube: a competição e quantos jogos o clube fez nela. <paramref name="FazIdolo"/>: o destaque da
+    /// campanha vira ídolo (falso na Série B).
+    /// </summary>
+    public sealed record Titulo(Guid LigaId, string Competicao, Guid CampeaoId, int JogosDoTime, bool FazIdolo = true);
 
     public sealed record Resultado(
         int JogadorId, Guid TimeId, int Jogos, int Gols, int Assistencias, int Titulos, IReadOnlyList<string> Motivos);
@@ -55,6 +59,7 @@ public static class Idolos
 
             foreach (var e in doTime.Where(e => e.Jogos > 0 || e.Gols > 0 || e.Assistencias > 0))
                 titulosDoJogador[(e.JogadorId, e.TimeId)] = titulosDoJogador.GetValueOrDefault((e.JogadorId, e.TimeId)) + 1;
+            if (!t.FazIdolo) continue;
 
             var maisGols = doTime.Max(e => e.Gols);
             if (maisGols >= IdolosCriterios.MinimoNoTitulo)

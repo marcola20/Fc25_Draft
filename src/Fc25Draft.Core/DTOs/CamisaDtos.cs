@@ -11,7 +11,11 @@ public record CamisaJogadorDto(
     short? Numero,
     string? EmprestadoPor);
 
-public record CamisasDoTimeDto(Guid TeamId, IReadOnlyList<CamisaJogadorDto> Jogadores);
+/// <summary>Número aposentado no clube, em homenagem a uma lenda (ninguém mais usa).</summary>
+public record CamisaAposentadaDto(short Numero, int JogadorId, string Nome);
+
+public record CamisasDoTimeDto(
+    Guid TeamId, IReadOnlyList<CamisaJogadorDto> Jogadores, IReadOnlyList<CamisaAposentadaDto>? Aposentadas = null);
 
 /// <summary>Resultado de "Enviar camisas ao site" no Editor PES.</summary>
 public record CamisasDoPesResultadoDto(int Gravados, int JaTinham, int Iguais, IReadOnlyList<string> Conflitos);

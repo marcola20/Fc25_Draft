@@ -32,11 +32,16 @@ public class CamisasService : ICamisasService
                     .FirstOrDefault()))
             .ToListAsync(ct);
 
+        var aposentadas = (await CamisasAposentadas.DosTimes(_db, [teamId]).ToListAsync(ct))
+            .Select(c => new CamisaAposentadaDto(c.Numero, c.JogadorId, c.Nome))
+            .ToList();
+
         return new CamisasDoTimeDto(teamId, jogadores
             .OrderBy(j => j.PositionId)
             .ThenByDescending(j => j.Overall)
             .ThenBy(j => j.Nome)
-            .ToList());
+            .ToList(),
+            aposentadas.OrderBy(a => a.Numero).ToList());
     }
 
     public async Task SalvarAsync(Guid teamId, IReadOnlyList<CamisaRequest> camisas, CancellationToken ct)
@@ -68,6 +73,14 @@ public class CamisasService : ICamisasService
 
         var mudam = camisas.Where(c => porId[c.PlayerId].NumeroCamisa != c.Numero).ToList();
         if (mudam.Count == 0) return;
+
+        // Camisa aposentada não volta a ser usada no clube.
+        var aposentadas = await CamisasAposentadas.DosTimes(_db, [teamId]).ToListAsync(ct);
+        if (mudam.FirstOrDefault(c => aposentadas.Any(a => a.Numero == c.Numero)) is { } bloqueada)
+        {
+            var lenda = aposentadas.First(a => a.Numero == bloqueada.Numero);
+            throw new InvalidOperationException($"A camisa {bloqueada.Numero} está aposentada no clube em homenagem a {lenda.Nome}.");
+        }
 
         // Trocas entre dois jogadores esbarram no índice único no meio do caminho: primeiro tira, depois põe.
         var ids = mudam.Select(c => c.PlayerId).ToList();
@@ -104,6 +117,9 @@ public class CamisasService : ICamisasService
                 .ToListAsync(ct))
             .Select(x => (x.TeamId, x.Numero))
             .ToHashSet();
+        var aposentadas = (await CamisasAposentadas.DosTimes(_db, times).ToListAsync(ct))
+            .GroupBy(c => (c.TimeId, c.Numero))
+            .ToDictionary(g => g.Key, g => string.Join(" e ", g.Select(c => c.Nome)));
         var nomesDosTimes = await _db.Teams.AsNoTracking()
             .Where(t => times.Contains(t.TeamId))
             .ToDictionaryAsync(t => t.TeamId, t => t.TeamName, ct);
@@ -116,6 +132,11 @@ public class CamisasService : ICamisasService
             var numero = item.Numero!.Value;
             if (r.NumeroCamisa == numero) { iguais++; continue; }
             if (r.NumeroCamisa is not null) { jaTinham++; continue; }
+            if (aposentadas.TryGetValue((r.TeamId, numero), out var lenda))
+            {
+                conflitos.Add($"{r.Player.Name} ({nomesDosTimes[r.TeamId]}): a {numero} está aposentada em homenagem a {lenda}.");
+                continue;
+            }
             if (!usados.Add((r.TeamId, numero)))
             {
                 conflitos.Add($"{r.Player.Name} ({nomesDosTimes[r.TeamId]}): a {numero} já é de outro no time.");

@@ -73,9 +73,12 @@ public record JogadorSelecaoDto(
     int? Numero,
     string? FotoUrl);
 
+/// <param name="LendaDe">Clubes de que ele era ídolo: vira lenda deles (arte especial). Vazio = aposentadoria comum.</param>
+/// <param name="CamisaAposentada">Número aposentado no <paramref name="Clube"/> (ele era ídolo de lá e usava esse número).</param>
 public record AposentadoriaArteDto(
     string Nome, string? Clube, int? Idade, int Temporadas, int Jogos, int Gols, int Assistencias,
-    IReadOnlyList<string> Clubes, IReadOnlyList<string> Titulos, string? FotoUrl, int Temporada);
+    IReadOnlyList<string> Clubes, IReadOnlyList<string> Titulos, string? FotoUrl, int Temporada,
+    IReadOnlyList<string>? LendaDe = null, short? CamisaAposentada = null);
 
 public record HatTrickArteDto(
     string Nome, string Clube, int Gols, IReadOnlyList<int?> Minutos, string Casa, string Fora, int GolsCasa,

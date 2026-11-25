@@ -11,3 +11,22 @@
     align-self: center;
     flex-shrink: 0;
 }
+
+.lenda {
+    border: 1px solid color-mix(in srgb, var(--cbfv-acento) 45%, transparent);
+}
+
+.lenda-camisa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 3rem;
+    flex-shrink: 0;
+    font-size: 1.35rem;
+    font-weight: 600;
+    border-radius: 0.5rem 0.5rem 0.9rem 0.9rem;
+    border: 2px solid var(--cbfv-acento);
+    color: var(--cbfv-acento-texto);
+    background: color-mix(in srgb, var(--cbfv-acento) 12%, transparent);
+}

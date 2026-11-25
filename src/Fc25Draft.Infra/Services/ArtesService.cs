@@ -517,7 +517,7 @@ public class ArtesService : IArtesService
     {
         var p = await _db.Players.AsNoTracking()
             .Where(x => x.PlayerGuid == pedido.ReferenciaId && x.AposentadoEm != null)
-            .Select(x => new { x.PlayerId, x.Name, x.Age, x.TimeAoSeAposentar, x.AposentadoNaTemporada })
+            .Select(x => new { x.PlayerId, x.Name, x.Age, x.TimeAoSeAposentar, x.AposentadoNaTemporada, x.NumeroAoSeAposentar })
             .FirstOrDefaultAsync(ct);
         if (p is null) return null;
         var carreira = await new LigaPublicService(_db).GetCarreiraJogadorAsync(p.PlayerId, ct);
@@ -527,10 +527,17 @@ public class ArtesService : IArtesService
         var ultimo = await NomeDoTimeAsync(p.TimeAoSeAposentar, ct) ?? clubes.LastOrDefault();
         if (ultimo is not null && !clubes.Contains(ultimo)) clubes.Add(ultimo);
         var titulos = (est?.Titulos ?? []).Select(t => t.Competicao).Distinct().ToList();
+        // Ídolo que se aposenta vira lenda: a arte muda, e a camisa fica aposentada no clube em que ele se aposentou.
+        var idoloDe = await _db.Idolos.AsNoTracking()
+            .Where(i => i.JogadorId == p.PlayerId)
+            .Select(i => new { i.TimeId, i.Time.TeamName })
+            .ToListAsync(ct);
+        var camisa = idoloDe.Any(i => i.TimeId == p.TimeAoSeAposentar) ? p.NumeroAoSeAposentar : null;
         var dto = new AposentadoriaArteDto(p.Name, ultimo, p.Age,
             competicoes.Select(c => c.Temporada).Where(t => t != null).Distinct().Count(),
             est?.Jogos ?? 0, est?.Gols ?? 0, est?.Assistencias ?? 0, clubes, titulos,
-            await FotoAsync(p.PlayerId, ct), p.AposentadoNaTemporada ?? 0);
+            await FotoAsync(p.PlayerId, ct), p.AposentadoNaTemporada ?? 0,
+            idoloDe.Select(i => i.TeamName).ToList(), camisa);
         return new PedidoArteDto(pedido.PedidoArteId, "aposentadoria", pedido.Titulo, null, null, Aposentadoria: dto);
     }
 

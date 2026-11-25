@@ -130,6 +130,14 @@ else
                         {
                             var numero = n;
                             var dono = porNumero.TryGetValue(numero, out var d) ? d : null;
+                            if (dono is null && Aposentada(numero) is { } lenda)
+                            {
+                                <div class="camisa aposentada" title="Camisa @numero aposentada em homenagem a @lenda.Nome">
+                                    <span class="camisa-n numero">@numero</span>
+                                    <span class="camisa-dono"><Icone Nome="crown" Tamanho="10" /> @Curto(lenda.Nome)</span>
+                                </div>
+                                continue;
+                            }
                             var classe = $"camisa {(dono is null ? "livre" : "usada")} {(dono is not null && dono.PlayerId == _selecionado ? "selecionada" : "")} {(dono is not null && Mudou(dono.PlayerId) ? "mudou" : "")}";
                             if (editavel)
                             {
@@ -197,6 +205,10 @@ else
         catch (Exception ex) { _erro = ex.Message; }
         finally { _loading = false; }
     }
+
+    /// <summary>A lenda que aposentou este número no clube (nulo = número normal).</summary>
+    private CamisaAposentadaDto? Aposentada(short numero) =>
+        _dados?.Aposentadas?.FirstOrDefault(a => a.Numero == numero);
 
     private Dictionary<short, CamisaJogadorDto> PorNumero() =>
         _dados!.Jogadores
@@ -277,6 +289,11 @@ else
     private void Colocar(int quem, short numero)
     {
         _aviso = null;
+        if (!PorNumero().ContainsKey(numero) && Aposentada(numero) is { } lenda)
+        {
+            _aviso = $"A camisa {numero} está aposentada em homenagem a {lenda.Nome}.";
+            return;
+        }
         var antigo = _numeros[quem];
         if (antigo == numero)
         {

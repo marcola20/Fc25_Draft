@@ -82,6 +82,17 @@ public class IdoloService : IIdoloService
             }
         }
 
+        // Quem não se encaixa mais na regra (ela mudou, ou um número foi corrigido) deixa de ser ídolo. Fica quem já
+        // marcou história: a saída custou confiança da diretoria, ou ele se aposentou e é lenda do clube.
+        var continuam = resultados.Select(r => (r.JogadorId, r.TimeId)).ToHashSet();
+        foreach (var idolo in porChave.Values.Where(i => !continuam.Contains((i.JogadorId, i.TimeId))).ToList())
+        {
+            if (idolo.PerdeuConfianca || onde.Aposentados.Contains(idolo.JogadorId)) continue;
+            _db.Idolos.Remove(idolo);
+            porChave.Remove((idolo.JogadorId, idolo.TimeId));
+            mudancas++;
+        }
+
         // Ídolo que deixou o clube depois de reconhecido.
         foreach (var idolo in porChave.Values.Where(i => i.SaiuEm is null && !onde.NoClube(i.JogadorId, i.TimeId)).ToList())
         {
@@ -108,6 +119,9 @@ public class IdoloService : IIdoloService
     public async Task<IReadOnlyList<IdoloDto>> DoJogadorAsync(int jogadorId, CancellationToken ct) =>
         await MontarAsync(jogadorId, null, ct);
 
+    public async Task<IReadOnlyList<IdoloDto>> DoClubeAsync(Guid timeId, CancellationToken ct) =>
+        await MontarAsync(null, timeId, ct);
+
     public async Task<IReadOnlySet<int>> DoTimeAsync(Guid timeId, CancellationToken ct) =>
         (await _db.Idolos.AsNoTracking().Where(i => i.TimeId == timeId).Select(i => i.JogadorId).ToListAsync(ct)).ToHashSet();
 
@@ -119,6 +133,7 @@ public class IdoloService : IIdoloService
             {
                 i.IdoloId, i.JogadorId, i.Jogador.Name, Posicao = i.Jogador.Position.Name, i.Jogador.Overall,
                 Aposentado = i.Jogador.AposentadoEm != null,
+                Camisa = i.Jogador.AposentadoEm != null && i.Jogador.TimeAoSeAposentar == i.TimeId ? i.Jogador.NumeroAoSeAposentar : null,
                 i.TimeId, i.Time.TeamName, i.Jogos, i.Gols, i.Assistencias, i.Titulos, i.Motivos, i.ReconhecidoEm,
                 i.SaiuEm, i.Saida, i.PerdeuConfianca,
                 TimeAtual = i.Jogador.TeamRosters.Select(r => r.Team.TeamName).FirstOrDefault()
@@ -133,7 +148,7 @@ public class IdoloService : IIdoloService
                 l.Jogos, l.Gols, l.Assistencias, l.Titulos,
                 l.Motivos.Split(Separador, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
                 l.ReconhecidoEm, onde.NoClube(l.JogadorId, l.TimeId), l.Aposentado, l.TimeAtual,
-                l.SaiuEm, l.Saida, l.PerdeuConfianca))
+                l.SaiuEm, l.Saida, l.PerdeuConfianca, l.Camisa))
             .OrderBy(i => i.TimeNome, StringComparer.CurrentCultureIgnoreCase)
             .ThenByDescending(i => i.NoClube)
             .ThenByDescending(i => i.Jogos + i.Gols + i.Assistencias + i.Titulos * 10)
@@ -236,7 +251,10 @@ public class IdoloService : IIdoloService
             .ToList();
     }
 
-    /// <summary>Títulos que fazem ídolo: Série A, Série B e Copa (a Supercopa é um jogo só).</summary>
+    /// <summary>
+    /// Títulos do clube: Série A, Série B e Copa (a Supercopa é um jogo só). Só Série A e Copa fazem o destaque da
+    /// campanha virar ídolo; a Série B entra só na conta de títulos.
+    /// </summary>
     private async Task<List<Idolos.Titulo>> TitulosAsync(CancellationToken ct)
     {
         var edicoes = (await _ligas.ListEdicoesAsync(ct))
@@ -254,7 +272,8 @@ public class IdoloService : IIdoloService
 
         return edicoes
             .Select(e => new Idolos.Titulo(e.LigaId, e.Nome, e.CampeaoTimeId!.Value,
-                jogosDoTime.GetValueOrDefault((e.LigaId, e.CampeaoTimeId!.Value))))
+                jogosDoTime.GetValueOrDefault((e.LigaId, e.CampeaoTimeId!.Value)),
+                FazIdolo: e.Divisao != Divisao.SerieB))
             .ToList();
     }
 }

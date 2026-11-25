@@ -148,6 +148,7 @@ else
     @* As chaves levam um prefixo: a diretoria e a aba aberta ficam lado a lado na página, e duas
        chaves iguais (só o Id do time) derrubavam a conexão inteira ao renderizar. *@
     <DiretoriaCard @key="@($"diretoria-{Id}")" TeamId="@Id" />
+    <LendasDoClube @key="@($"lendas-{Id}")" TeamId="@Id" />
 
     <ComissaoTecnica TeamId="@Id" />
 

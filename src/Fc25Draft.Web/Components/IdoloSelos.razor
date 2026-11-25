@@ -4,7 +4,7 @@
 @* Selos de ídolo na ficha do jogador: um por clube de que ele é ídolo. *@
 @foreach (var i in _idolos)
 {
-    <a href="/idolos#time-@i.TimeId" class="etiqueta acento" title="@string.Join(" · ", i.Motivos)"><Icone Nome="crown" Tamanho="12" /> Ídolo do @i.TimeNome</a>
+    <a href="/idolos#time-@i.TimeId" class="etiqueta acento" title="@string.Join(" · ", i.Motivos)"><Icone Nome="crown" Tamanho="12" /> @(i.Lenda ? "Lenda" : "Ídolo") do @i.TimeNome@(i.CamisaAposentada is short n ? $" · camisa {n} aposentada" : "")</a>
 }
 
 @code {

@@ -2,7 +2,11 @@ using Fc25Draft.Core.Entities;
 
 namespace Fc25Draft.Core.Interfaces;
 
-/// <summary>Um ídolo de um clube. <see cref="NoClube"/>: ainda está lá (emprestado pelo clube também conta).</summary>
+/// <summary>
+/// Um ídolo de um clube. <see cref="NoClube"/>: ainda está lá (emprestado pelo clube também conta).
+/// Ídolo aposentado é lenda do clube (<see cref="Lenda"/>); se se aposentou nele, <see cref="CamisaAposentada"/> é o
+/// número que ninguém mais usa lá.
+/// </summary>
 public record IdoloDto(
     Guid IdoloId,
     int JogadorId,
@@ -22,7 +26,11 @@ public record IdoloDto(
     string? TimeAtualNome,
     DateTime? SaiuEm,
     SaidaDoIdolo? Saida,
-    bool PerdeuConfianca);
+    bool PerdeuConfianca,
+    short? CamisaAposentada = null)
+{
+    public bool Lenda => Aposentado;
+}
 
 /// <summary>Ídolos dos clubes: quem é, por quê, e o que acontece quando um deles sai.</summary>
 public interface IIdoloService
@@ -37,6 +45,9 @@ public interface IIdoloService
 
     /// <summary>Clubes de que o jogador é ídolo.</summary>
     Task<IReadOnlyList<IdoloDto>> DoJogadorAsync(int jogadorId, CancellationToken ct);
+
+    /// <summary>Os ídolos e lendas do clube, com os números.</summary>
+    Task<IReadOnlyList<IdoloDto>> DoClubeAsync(Guid timeId, CancellationToken ct);
 
     /// <summary>Jogadores que são ídolos do clube.</summary>
     Task<IReadOnlySet<int>> DoTimeAsync(Guid timeId, CancellationToken ct);

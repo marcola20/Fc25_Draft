@@ -28,6 +28,12 @@ public class Player
     /// <summary>Clube em que estava ao se aposentar (para desfazer).</summary>
     public Guid? TimeAoSeAposentar { get; set; }
 
+    /// <summary>
+    /// Número da camisa que ele usava no <see cref="TimeAoSeAposentar"/> quando se aposentou. Se ele era ídolo desse
+    /// clube, vira lenda e o número fica aposentado lá (ninguém mais usa).
+    /// </summary>
+    public short? NumeroAoSeAposentar { get; set; }
+
     public Position Position { get; set; } = null!;
     public PlayerAtributos? Atributos { get; set; }
     public ICollection<DraftPick> DraftPicks { get; set; } = new List<DraftPick>();

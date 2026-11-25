@@ -159,6 +159,16 @@
 
 .camisa.usada .camisa-dono { color: var(--bs-secondary-color); }
 
+/* Número aposentado em homenagem a uma lenda: dourado e sem clique. */
+.camisa.aposentada {
+    cursor: not-allowed;
+    border-color: color-mix(in srgb, var(--cbfv-acento) 55%, transparent);
+    background: color-mix(in srgb, var(--cbfv-acento) 12%, var(--bs-tertiary-bg));
+}
+
+.camisa.aposentada .camisa-n,
+.camisa.aposentada .camisa-dono { color: var(--cbfv-acento-texto); }
+
 .camisa.mudou { box-shadow: inset 0 0 0 2px var(--cbfv-acento); }
 
 .camisa.selecionada {
