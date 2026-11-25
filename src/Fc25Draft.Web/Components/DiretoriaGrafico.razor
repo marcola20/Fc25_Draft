@@ -33,8 +33,9 @@
             if (p.Evento is EventoDiretoria evento)
             {
                 var (cx, cy) = (X(i + 1), Y(p.Valor));
-                <polygon points="@Num(cx),@Num(cy - 7) @Num(cx + 7),@Num(cy) @Num(cx),@Num(cy + 7) @Num(cx - 7),@Num(cy)" fill="var(--cbfv-acento)">
-                    <title>@p.Data.AddHours(-3).ToString("dd/MM") · @Diretoria.NomeDoEvento(evento) → @p.Valor.ToString("0", Brasil)</title>
+                <polygon points="@Num(cx),@Num(cy - 7) @Num(cx + 7),@Num(cy) @Num(cx),@Num(cy + 7) @Num(cx - 7),@Num(cy)"
+                         fill="@(evento == EventoDiretoria.SaidaDeIdolo ? "var(--cbfv-derrota)" : "var(--cbfv-acento)")">
+                    <title>@p.Data.AddHours(-3).ToString("dd/MM") · @p.Competicao@(evento == EventoDiretoria.SaidaDeIdolo ? $" ({p.Variacao.ToString("0", Brasil)})" : "") → @p.Valor.ToString("0", Brasil)</title>
                 </polygon>
                 continue;
             }
@@ -46,7 +47,7 @@
     </svg>
     <div class="small text-muted">
         Cada bolinha é um jogo (verde vitória, cinza empate, vermelha derrota); o losango dourado é uma decisão da diretoria
-        (voto de confiança ou técnico novo). Passe o mouse para ver o placar e quanto a confiança mudou.
+        (voto de confiança ou técnico novo) e o vermelho, a venda ou troca de um ídolo do clube. Passe o mouse para ver o placar e quanto a confiança mudou.
     </div>
 }
 

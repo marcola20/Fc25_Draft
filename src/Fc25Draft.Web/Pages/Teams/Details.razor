@@ -18,6 +18,7 @@
 @inject TransferOffersApiClient OffersApi
 @inject IEmprestimoService EmprestimoSvc
 @inject EscudoService Escudos
+@inject IIdoloService IdoloSvc
 
 @implements IDisposable
 
@@ -354,6 +355,10 @@ else
                                     @if (player.Participacao is { Papel: { } papel } comPapel)
                                     {
                                         <span class="papel ms-1" role="img" aria-label="@PapelDoJogador.Nome(papel.Papel)" title="@TituloPapel(comPapel)"><Icone Nome="@IconeDoPapel(papel.Papel)" Tamanho="14" /></span>
+                                    }
+                                    @if (_idolos.Contains(player.PlayerId))
+                                    {
+                                        <a href="/idolos#time-@Id" class="etiqueta acento ms-1" title="Ídolo do clube: vender ou trocar tira confiança da diretoria"><Icone Nome="crown" Tamanho="12" /> Ídolo</a>
                                     }
                                     @if (player.AskingPrice is decimal preco)
                                     {
@@ -726,6 +731,7 @@ else
     private bool authInitialized;
     private readonly List<RosterPlayerViewModel> _rosterPlayers = new();
     private IReadOnlyList<RosterPlayerViewModel> _sortedRosterPlayers = Array.Empty<RosterPlayerViewModel>();
+    private IReadOnlySet<int> _idolos = new HashSet<int>();
     private RosterSortColumn? _activeSortColumn = RosterSortColumn.Position;
     private bool _sortDescending;
     private string? _quickSellSuccessMessage;
@@ -847,6 +853,8 @@ else
             }
 
             roster = await TeamsApiClient.GetRosterByIdAsync(Id);
+            try { _idolos = await IdoloSvc.DoTimeAsync(Id, CancellationToken.None); }
+            catch { _idolos = new HashSet<int>(); } // Selo é enfeite: o elenco abre do mesmo jeito.
             _emprestadosFora = (await EmprestimoSvc.ListarAtivosAsync(Id, CancellationToken.None))
                 .Where(e => e.DonoTeamId == Id)
                 .ToList();

@@ -1,0 +1,20 @@
+@using Fc25Draft.Core.Interfaces
+@inject IIdoloService IdoloSvc
+
+@* Selos de ídolo na ficha do jogador: um por clube de que ele é ídolo. *@
+@foreach (var i in _idolos)
+{
+    <a href="/idolos#time-@i.TimeId" class="etiqueta acento" title="@string.Join(" · ", i.Motivos)"><Icone Nome="crown" Tamanho="12" /> Ídolo do @i.TimeNome</a>
+}
+
+@code {
+    [Parameter, EditorRequired] public int PlayerId { get; set; }
+
+    private IReadOnlyList<IdoloDto> _idolos = Array.Empty<IdoloDto>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { _idolos = await IdoloSvc.DoJogadorAsync(PlayerId, CancellationToken.None); }
+        catch { _idolos = Array.Empty<IdoloDto>(); } // Selo é enfeite: sem ele a ficha abre do mesmo jeito.
+    }
+}

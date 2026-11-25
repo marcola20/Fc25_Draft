@@ -103,11 +103,16 @@ public enum EventoDiretoria
     /// <summary>Pedido de demissão recusado: a confiança vai para o voto de confiança.</summary>
     VotoDeConfianca = 1,
     /// <summary>Pedido aceito: o técnico novo começa com a confiança inicial.</summary>
-    NovoTecnico = 2
+    NovoTecnico = 2,
+    /// <summary>O clube vendeu ou trocou um ídolo: a confiança cai <see cref="IdolosCriterios.SaidaNaConfianca"/>.</summary>
+    SaidaDeIdolo = 3
 }
 
-/// <summary>Ajuste da confiança de um time num momento (decisão sobre um pedido de demissão).</summary>
-public record DiretoriaAjusteInput(Guid TimeId, DateTime Data, EventoDiretoria Evento);
+/// <summary>
+/// Ajuste da confiança de um time num momento (decisão sobre um pedido de demissão, saída de um ídolo).
+/// <paramref name="Detalhe"/>: o nome do ídolo, na saída de ídolo.
+/// </summary>
+public record DiretoriaAjusteInput(Guid TimeId, DateTime Data, EventoDiretoria Evento, string? Detalhe = null);
 
 public enum SituacaoUltimato
 {
@@ -325,11 +330,14 @@ public static class Diretoria
             {
                 var a = pendentes.Dequeue();
                 var antes = Atual(a.TimeId);
-                var depois = a.Evento == EventoDiretoria.VotoDeConfianca
-                    ? DiretoriaCriterios.ConfiancaVotoDeConfianca
-                    : DiretoriaCriterios.ConfiancaInicial;
+                var depois = a.Evento switch
+                {
+                    EventoDiretoria.VotoDeConfianca => DiretoriaCriterios.ConfiancaVotoDeConfianca,
+                    EventoDiretoria.SaidaDeIdolo => Math.Clamp(antes + IdolosCriterios.SaidaNaConfianca, 0, 100),
+                    _ => DiretoriaCriterios.ConfiancaInicial
+                };
                 if (!pontos.TryGetValue(a.TimeId, out var lista)) pontos[a.TimeId] = lista = new List<PontoConfianca>();
-                lista.Add(new PontoConfianca(Guid.Empty, NomeDoEvento(a.Evento), a.Data, Guid.Empty, 0, 0,
+                lista.Add(new PontoConfianca(Guid.Empty, NomeDoEvento(a.Evento, a.Detalhe), a.Data, Guid.Empty, 0, 0,
                     Math.Round(depois - antes, 1), depois, a.Evento));
             }
         }
@@ -350,9 +358,10 @@ public static class Diretoria
         return pontos;
     }
 
-    public static string NomeDoEvento(EventoDiretoria evento) => evento switch
+    public static string NomeDoEvento(EventoDiretoria evento, string? detalhe = null) => evento switch
     {
         EventoDiretoria.VotoDeConfianca => "Voto de confiança",
+        EventoDiretoria.SaidaDeIdolo => string.IsNullOrWhiteSpace(detalhe) ? "Saída de um ídolo" : $"Saída do ídolo {detalhe}",
         _ => "Técnico novo"
     };
 
@@ -372,6 +381,8 @@ public static class Diretoria
 
         foreach (var p in pontos)
         {
+            // A saída de um ídolo só mexe no número: o ultimato segue (ou começa no próximo jogo, se a queda levou à crise).
+            if (p.Evento == EventoDiretoria.SaidaDeIdolo) continue;
             if (p.Evento is EventoDiretoria evento)
             {
                 atual = null;

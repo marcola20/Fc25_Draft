@@ -51,6 +51,7 @@ public class LayoutNavigationService
             new("Comparar Jogadores", "/jogadores/comparar", "arrow-left-right"),
             new("Treinadores", "/treinadores", "briefcase"),
             new("Clássicos", "/classicos", "flame"),
+            new("Ídolos dos Clubes", "/idolos", "crown"),
             new("Associação de Treinadores", "/associacao", "landmark"),
             new("Valor de Elenco", "/times/caixa", "banknote"),
             new("Virada de Temporada", "/virada", "refresh-cw"),
@@ -777,6 +778,18 @@ public class LayoutNavigationService
                 new("Início", "/home"),
                 new("Clubes e Jogadores"),
                 new("Clássicos")
+            }
+        },
+        ["/idolos"] = new PageDefinition
+        {
+            Route = "/idolos",
+            Title = "Ídolos dos Clubes",
+            Subtitle = "Quem fez história em cada clube",
+            Breadcrumbs = new List<BreadcrumbSegment>
+            {
+                new("Início", "/home"),
+                new("Clubes e Jogadores"),
+                new("Ídolos dos Clubes")
             }
         },
         ["/admin/classicos"] = new PageDefinition

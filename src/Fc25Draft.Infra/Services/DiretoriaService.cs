@@ -432,6 +432,7 @@ public class DiretoriaService : IDiretoriaService
                 p.Status == StatusPedidoDemissao.Aceito ? EventoDiretoria.NovoTecnico : EventoDiretoria.VotoDeConfianca))
             .ToList();
         ajustes.AddRange(await SaidasDeTreinadorAsync(temporada, ligas, ajustes, ct));
+        ajustes.AddRange(await SaidasDeIdolosAsync(ligas, ct));
 
         var (pontos, ultimoJogo) = await ConfiancaAsync(temporada, ajustes, ct);
         var ultimatos = pontos.ToDictionary(p => p.Key, p => Diretoria.Ultimatos(p.Key, p.Value));
@@ -515,6 +516,29 @@ public class DiretoriaService : IDiretoriaService
             .Where(s => !jaTem.Any(a => a.TimeId == s.TimeId && a.Evento == EventoDiretoria.NovoTecnico
                                         && Math.Abs((a.Data - s.Quando).TotalHours) < 1))
             .Select(s => new DiretoriaAjusteInput(s.TimeId, s.Quando, EventoDiretoria.NovoTecnico))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Ídolos vendidos ou trocados durante a temporada: cada um tira <see cref="IdolosCriterios.SaidaNaConfianca"/>
+    /// do clube que ele deixou. Quem já tinha saído quando virou ídolo (ou quando a regra entrou) não conta.
+    /// </summary>
+    private async Task<List<DiretoriaAjusteInput>> SaidasDeIdolosAsync(IReadOnlyList<LigaInfo> ligas, CancellationToken ct)
+    {
+        if (ligas.Count == 0) return new List<DiretoriaAjusteInput>();
+        var ligaIds = ligas.Select(l => l.LigaId).ToList();
+        var inicio = await _db.Ligas.Where(l => ligaIds.Contains(l.LigaId)).MinAsync(l => l.CriadoEm, ct);
+        DateTime? fim = null;
+        if (ligas.All(l => l.Status == LigaStatus.Encerrada))
+            fim = await _db.LigaPartidas
+                .Where(p => ligaIds.Contains(p.Rodada.LigaId) && p.Status == PartidaStatus.Encerrada)
+                .MaxAsync(p => (DateTime?)(p.EncerradaEm ?? p.Rodada.DataHora), ct);
+
+        return (await _db.Idolos.AsNoTracking()
+                .Where(i => i.PerdeuConfianca && i.SaiuEm != null && i.SaiuEm >= inicio && (fim == null || i.SaiuEm <= fim))
+                .Select(i => new { i.TimeId, SaiuEm = i.SaiuEm!.Value, i.Jogador.Name })
+                .ToListAsync(ct))
+            .Select(i => new DiretoriaAjusteInput(i.TimeId, i.SaiuEm, EventoDiretoria.SaidaDeIdolo, i.Name))
             .ToList();
     }
 

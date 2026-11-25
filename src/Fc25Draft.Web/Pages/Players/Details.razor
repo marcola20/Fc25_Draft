@@ -64,6 +64,7 @@ else
                         <h2 class="jogador-hero-nome">@player.Name</h2>
                         <span class="jogador-hero-overall @AtributosPes.Faixa(player.Overall)" title="Overall">@player.Overall</span>
                         <PremiosConquistados PlayerId="@player.PlayerId" />
+                        <IdoloSelos PlayerId="@player.PlayerId" />
                         @if (player.AposentadoNaTemporada is int aposentou)
                         {
                             <span class="etiqueta" title="Pendurou as chuteiras">Aposentado · última temporada @aposentou</span>

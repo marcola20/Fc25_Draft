@@ -86,7 +86,11 @@ public class NotificacoesService : BackgroundService
         await TentarAsync("leilões fechando", s => s.GetRequiredService<IPushService>().AvisarLeiloesFechandoAsync(ct));
         await TentarAsync("avisos", s => s.GetRequiredService<IPushService>().EnviarAvisosPendentesAsync(ct));
         if (lembrarBolao)
+        {
             await TentarAsync("bolão", s => s.GetRequiredService<IPushService>().LembrarBolaoAsync(ct));
+            // Ídolos novos e ídolos que saíram (a diretoria lê a saída na próxima conta da confiança).
+            await TentarAsync("ídolos", s => s.GetRequiredService<IIdoloService>().AtualizarAsync(ct));
+        }
 
         async Task TentarAsync(string parte, Func<IServiceProvider, Task> acao)
         {

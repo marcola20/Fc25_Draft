@@ -1,0 +1,13 @@
+.idolo {
+    border-color: var(--bs-border-color) !important;
+}
+
+.idolo-saiu {
+    opacity: 0.7;
+}
+
+::deep .idolo-coroa {
+    color: var(--cbfv-acento);
+    align-self: center;
+    flex-shrink: 0;
+}

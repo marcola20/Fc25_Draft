@@ -1,0 +1,135 @@
+@page "/idolos"
+@using System.Globalization
+@using Fc25Draft.Core.Entities
+@using Fc25Draft.Core.Utilities
+@inject IIdoloService IdoloSvc
+@inject EscudoService Escudos
+@inject LayoutState LayoutState
+@inject LayoutNavigationService NavigationService
+
+<PageTitle>Ídolos dos Clubes</PageTitle>
+
+<div>
+    <p class="text-body-secondary small mb-3">
+        Vira ídolo quem, pelo mesmo clube, chega a <strong class="text-body-emphasis">@IdolosCriterios.Jogos jogos</strong>,
+        <strong class="text-body-emphasis">@IdolosCriterios.Gols gols</strong>,
+        <strong class="text-body-emphasis">@IdolosCriterios.Assistencias assistências</strong> ou
+        <strong class="text-body-emphasis">@IdolosCriterios.ParticipacoesEmGol gols + assistências</strong>, ou quem foi destaque
+        de um título do clube (Série A, Série B ou Copa): artilheiro ou garçom do time (pelo menos @IdolosCriterios.MinimoNoTitulo)
+        ou a melhor nota média do time na campanha. Vender ou trocar um ídolo tira
+        <strong class="text-body-emphasis">@((-IdolosCriterios.SaidaNaConfianca).ToString("0")) de confiança</strong> da diretoria;
+        aposentadoria, empréstimo e draft de expansão não tiram.
+    </p>
+
+    @if (_erro is not null)
+    {
+        <div class="alert alert-danger"><strong>Erro ao carregar os ídolos:</strong> @_erro</div>
+    }
+    else if (_idolos is null)
+    {
+        <div class="text-center py-5"><div class="spinner-border" role="status"></div></div>
+    }
+    else if (_idolos.Count == 0)
+    {
+        <div class="alert alert-info">Nenhum ídolo ainda. A lista é atualizada a cada 10 minutos.</div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-3 small text-body-secondary">
+            <span><strong class="text-body-emphasis numero">@_idolos.Count(i => i.NoClube)</strong> ídolos nos clubes</span>
+            <span><strong class="text-body-emphasis numero">@_idolos.Count(i => !i.NoClube)</strong> na história</span>
+            <div class="form-check form-switch ms-auto mb-0">
+                <input class="form-check-input" type="checkbox" id="soNoClube" @bind="_soNoClube" />
+                <label class="form-check-label" for="soNoClube">Só quem está no clube</label>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            @foreach (var clube in _idolos.Where(i => !_soNoClube || i.NoClube).GroupBy(i => (i.TimeId, i.TimeNome)))
+            {
+                <div class="col-lg-6" id="time-@clube.Key.TimeId">
+                    <div class="painel h-100">
+                        <div class="d-flex align-items-center gap-2 px-3 pt-3 pb-2">
+                            <img src="@Escudos.GetEscudo(clube.Key.TimeNome)" alt="" width="28" height="28" style="object-fit:contain" />
+                            <a href="/teams/details/@clube.Key.TimeId" class="fw-medium text-body-emphasis text-decoration-none">@clube.Key.TimeNome</a>
+                            <span class="small text-body-tertiary ms-auto">@clube.Count() ídolo@(clube.Count() == 1 ? "" : "s")</span>
+                        </div>
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var i in clube)
+                            {
+                                <li class="d-flex gap-2 px-3 py-2 border-top idolo @(i.NoClube ? "" : "idolo-saiu")">
+                                    <FotoJogador PlayerId="@i.JogadorId" Tamanho="40" Alt="@i.JogadorNome" />
+                                    <div class="flex-grow-1" style="min-width: 0;">
+                                        <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                                            @if (i.NoClube)
+                                            {
+                                                <Icone Nome="crown" Tamanho="13" Classe="idolo-coroa" />
+                                            }
+                                            <a href="/players/details/@i.JogadorId" class="fw-medium text-reset">@i.JogadorNome</a>
+                                            <span class="small text-body-tertiary">@i.Posicao · @i.Overall</span>
+                                            <span class="small text-body-secondary ms-auto text-nowrap numero">
+                                                @i.Jogos J · @i.Gols G · @i.Assistencias A@(i.Titulos > 0 ? $" · {i.Titulos} título{(i.Titulos == 1 ? "" : "s")}" : "")
+                                            </span>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1 mt-1">
+                                            @foreach (var m in i.Motivos)
+                                            {
+                                                <span class="etiqueta @(m.Contains("título") ? "acento" : "")">@m</span>
+                                            }
+                                        </div>
+                                        @if (!i.NoClube)
+                                        {
+                                            <div class="small text-body-tertiary mt-1">
+                                                @Situacao(i)
+                                                @if (i.PerdeuConfianca)
+                                                {
+                                                    <span class="texto-derrota"> · custou @((-IdolosCriterios.SaidaNaConfianca).ToString("0")) de confiança</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = CultureInfo.GetCultureInfo("pt-BR");
+
+    private IReadOnlyList<IdoloDto>? _idolos;
+    private string? _erro;
+    private bool _soNoClube;
+
+    protected override void OnInitialized()
+    {
+        LayoutState.SetPage(NavigationService.GetPageDefinition("/idolos"));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { _idolos = await IdoloSvc.ListarAsync(CancellationToken.None); }
+        catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    /// <summary>"Vendido em 12/10/26 · hoje no Santos", "Aposentado".</summary>
+    private static string Situacao(IdoloDto i)
+    {
+        if (i.Aposentado) return "Aposentado";
+        var como = i.Saida switch
+        {
+            SaidaDoIdolo.Vendido => "Vendido",
+            SaidaDoIdolo.Troca => "Trocado",
+            SaidaDoIdolo.DraftDeExpansao => "Saiu no draft de expansão",
+            SaidaDoIdolo.Aposentou => "Aposentado",
+            _ => "Saiu"
+        };
+        var quando = i.SaiuEm is DateTime d ? $" em {d:dd/MM/yy}" : "";
+        var hoje = i.TimeAtualNome is { } t ? $" · hoje no {t}" : "";
+        return como + quando + hoje;
+    }
+}

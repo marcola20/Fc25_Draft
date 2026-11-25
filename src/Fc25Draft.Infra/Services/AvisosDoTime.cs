@@ -33,6 +33,7 @@ internal static class AvisosDoTime
     public const string Promessa = "PROMESSA";
     public const string Premio = "PREMIO";
     public const string Classico = "CLASSICO";
+    public const string Idolo = "IDOLO";
 
     public static void Criar(DraftDbContext db, Guid teamId, string tipo, string texto, string? link, DateTime quando)
     {

@@ -1629,6 +1629,57 @@ namespace Fc25Draft.Infra.Migrations
                     b.ToTable("IdempotencyKeys");
                 });
 
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Idolo", b =>
+                {
+                    b.Property<Guid>("IdoloId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Assistencias")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Gols")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("JogadorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Jogos")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Motivos")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("PerdeuConfianca")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ReconhecidoEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int?>("Saida")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SaiuEm")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid>("TimeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Titulos")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdoloId");
+
+                    b.HasIndex("TimeId");
+
+                    b.HasIndex("JogadorId", "TimeId")
+                        .IsUnique();
+
+                    b.ToTable("Idolos", (string)null);
+                });
+
             modelBuilder.Entity("Fc25Draft.Core.Entities.InscricaoPush", b =>
                 {
                     b.Property<Guid>("InscricaoId")
@@ -5146,6 +5197,25 @@ namespace Fc25Draft.Infra.Migrations
                         .WithMany()
                         .HasForeignKey("LigaId")
                         .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Fc25Draft.Core.Entities.Idolo", b =>
+                {
+                    b.HasOne("Fc25Draft.Core.Entities.Player", "Jogador")
+                        .WithMany()
+                        .HasForeignKey("JogadorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Fc25Draft.Core.Entities.Team", "Time")
+                        .WithMany()
+                        .HasForeignKey("TimeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Jogador");
+
+                    b.Navigation("Time");
                 });
 
             modelBuilder.Entity("Fc25Draft.Core.Entities.InscricaoPush", b =>
