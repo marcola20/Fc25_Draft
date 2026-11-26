@@ -193,7 +193,7 @@
     color: #2a1a00;
 }
 
-.capa-logo { position: relative; width: 92px; height: auto; margin-top: .8rem; filter: drop-shadow(0 .3rem .6rem rgba(0, 0, 0, .45)); }
+.capa-logo { position: relative; width: 104px; height: auto; margin-top: .7rem; filter: drop-shadow(0 .3rem .6rem rgba(0, 0, 0, .45)); }
 
 .capa-nome {
     position: relative;
@@ -208,27 +208,37 @@
 
 .capa-temporada { position: relative; font-size: .9rem; font-weight: 600; color: rgba(255, 248, 230, .8); }
 
-.capa-leque {
+/* A mascote num quadro dourado, como a ilustração colada na capa de um livro antigo. */
+.capa-quadro {
     position: relative;
     flex: 1;
-    width: 100%;
-    min-height: 210px;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+    margin: .6rem 0 .8rem;
 }
 
-.capa-carta {
-    position: absolute;
-    transition: transform .3s ease;
-    filter: drop-shadow(0 .6rem .8rem rgba(0, 0, 0, .45));
+.capa-quadro img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(78%, 300px);
+    max-height: min(40vh, 380px);
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    padding: 5px;
+    border-radius: 4px;
+    background: linear-gradient(145deg, #f5d36b, #8a6400 45%, #f5d36b 70%, #8a6400);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, .35),
+        0 .8rem 1.6rem rgba(0, 0, 0, .5);
+    transform: rotate(-1deg);
+    transition: transform .35s ease;
 }
 
-.capa-carta.c0 { transform: translateY(-6px) scale(1.08); z-index: 3; }
-.capa-carta.c1 { transform: translateX(-78px) rotate(-12deg) translateY(12px); z-index: 2; }
-.capa-carta.c2 { transform: translateX(78px) rotate(12deg) translateY(12px); z-index: 1; }
-.capa-frente:hover .capa-carta.c1 { transform: translateX(-92px) rotate(-16deg) translateY(10px); }
-.capa-frente:hover .capa-carta.c2 { transform: translateX(92px) rotate(16deg) translateY(10px); }
+.capa-frente:hover .capa-quadro img { transform: rotate(0deg) scale(1.02); }
 
 .capa-rodape { position: relative; display: flex; flex-direction: column; align-items: center; gap: .45rem; }
 .capa-progresso { font-size: .9rem; }
@@ -288,8 +298,8 @@
 
 @media (max-width: 575.98px) {
     .capa-frente { min-height: 76vh; padding-inline: 1.6rem .9rem; }
-    .capa-carta.c1 { transform: translateX(-62px) rotate(-12deg) translateY(12px); }
-    .capa-carta.c2 { transform: translateX(62px) rotate(12deg) translateY(12px); }
+    .capa-logo { width: 84px; }
+    .capa-quadro img { max-height: 34vh; }
 }
 
 /* ---- A folha: papel, lombada à esquerda e as outras folhas aparecendo na borda ---- */

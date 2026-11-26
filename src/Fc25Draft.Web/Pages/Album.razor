@@ -45,15 +45,11 @@
             <div class="capa-frente" @onclick="AbrirCapaAsync">
                 <div class="capa-brilho" aria-hidden="true"></div>
                 <span class="capa-faixa">Álbum oficial de figurinhas</span>
-                <img src="images/logobranca.png" class="capa-logo" alt="CBFV" />
+                <img src="images/album/cbfv-escudo.webp" class="capa-logo" width="287" height="360" alt="CBFV" />
                 <h1 class="capa-nome">@a.Album.Nome</h1>
                 <span class="capa-temporada">Temporada @a.Album.Temporada</span>
-                <div class="capa-leque" aria-hidden="true">
-                    @{ var i = 0; }
-                    @foreach (var f in CartasDaCapa(a))
-                    {
-                        <div class="capa-carta c@(i++)"><CartaFigurinha Figurinha="@f" Largura="120" Lazy="false" SeloLendaria="@Selo" /></div>
-                    }
+                <div class="capa-quadro">
+                    <img src="images/album/mascote.webp" width="720" height="1080" alt="A mascote da CBFV" />
                 </div>
                 <div class="capa-rodape">
                     <span class="capa-progresso"><strong>@a.Coladas</strong> de @a.Total figurinhas · @a.Percentual%</span>
@@ -619,15 +615,6 @@
         _recemAberto = false;
         if (_pagina is not null) Navigation.NavigateTo("/album");
     }
-
-    /// <summary>As três da capa: as especiais com arte, depois as mais raras.</summary>
-    private static IEnumerable<FigurinhaDto> CartasDaCapa(MeuAlbumDto a) =>
-        a.Paginas.SelectMany(p => p.Vagas).Select(v => v.Figurinha)
-            .OrderByDescending(f => f.Especial && f.TemArte)
-            .ThenByDescending(f => f.Raridade)
-            .ThenByDescending(f => f.Tipo == TipoFigurinha.Jogador)
-            .ThenByDescending(f => f.Overall ?? 0)
-            .Take(3);
 
     /// <summary>O sumário em partes: a abertura (Organização), os clubes e a história (Campeões e Lendários).</summary>
     private static IEnumerable<(string Titulo, List<PaginaDoAlbumDto> Paginas)> Secoes(MeuAlbumDto a)
