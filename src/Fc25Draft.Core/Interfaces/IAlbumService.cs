@@ -67,6 +67,13 @@ public interface IAlbumService
     /// <summary>Uma figurinha de campeão para cada título de Liga e de Copa do Hall da Fama que ainda não está no álbum.</summary>
     Task<int> ColocarCampeoesAsync(Guid albumId, string? adminToken, CancellationToken ct);
 
+    /// <summary>
+    /// Copia as figurinhas especiais de outro álbum (todas as páginas ou só <paramref name="pagina"/>), com a arte, no
+    /// fim de cada página e com os próximos números. A que já está no destino (mesmo título do Hall da Fama, mesma
+    /// pessoa ou mesmo nome e texto) não entra de novo; se estiver sem arte, ganha a do outro álbum.
+    /// </summary>
+    Task<CopiaDeEspeciaisDto> CopiarEspeciaisAsync(Guid deAlbumId, Guid paraAlbumId, PaginaEspecial? pagina, string? adminToken, CancellationToken ct);
+
     /// <summary>Muda nome, texto, raridade, clube e jogador da especial (a página não muda). Vale mesmo com dono.</summary>
     Task EditarEspecialAsync(Guid figurinhaId, NovaEspecialDto dados, string? adminToken, CancellationToken ct);
 

@@ -267,6 +267,12 @@ public record AdminCandidatoDto(Guid AdminTokenId, string Nome, Guid? TreinadorI
 /// <summary>Título do Hall da Fama (Liga ou Copa) que pode virar figurinha de campeão.</summary>
 public record CampeaoCandidatoDto(Guid HallOfFameId, PaginaEspecial Pagina, string Time, Guid? TeamId, string Titulo, bool JaNoAlbum);
 
+/// <summary>
+/// Resultado da cópia das especiais de outro álbum: quantas entraram, quantas já estavam (e dessas, quantas
+/// ganharam a arte) e quantas ficaram de fora por página cheia.
+/// </summary>
+public record CopiaDeEspeciaisDto(int Copiadas, int JaEstavam, int ArtesCopiadas, int SemLugar);
+
 /// <summary>As páginas especiais de um álbum e quem ainda pode entrar nelas.</summary>
 public record EspeciaisDoAlbumDto(
     AlbumDto Album,

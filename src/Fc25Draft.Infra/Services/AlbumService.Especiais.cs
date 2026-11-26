@@ -118,6 +118,129 @@ public partial class AlbumService
         return faltam.Count;
     }
 
+    public async Task<CopiaDeEspeciaisDto> CopiarEspeciaisAsync(Guid deAlbumId, Guid paraAlbumId, PaginaEspecial? pagina, string? adminToken, CancellationToken ct)
+    {
+        if (deAlbumId == paraAlbumId)
+            throw new InvalidOperationException("Escolha outro álbum para copiar.");
+
+        // O contexto vive com a tela: nada de figurinha ou arte rastreada de uma ação anterior.
+        _db.ChangeTracker.Clear();
+        var de = await _db.Albuns.AsNoTracking().FirstOrDefaultAsync(a => a.AlbumId == deAlbumId, ct)
+            ?? throw new InvalidOperationException("Álbum de origem não encontrado.");
+        var para = await _db.Albuns.AsNoTracking().FirstOrDefaultAsync(a => a.AlbumId == paraAlbumId, ct)
+            ?? throw new InvalidOperationException("Álbum não encontrado.");
+
+        var origem = (await _db.Figurinhas.AsNoTracking()
+                .Where(f => f.AlbumId == deAlbumId && f.Tipo == TipoFigurinha.Especial && f.Pagina != null)
+                .Where(f => pagina == null || f.Pagina == pagina)
+                .ToListAsync(ct))
+            .OrderBy(f => f.Pagina).ThenBy(f => f.Ordem).ThenBy(f => f.Numero)
+            .ToList();
+        if (origem.Count == 0)
+            throw new InvalidOperationException($"O {de.Nome} não tem figurinha especial{(pagina is { } p ? $" em “{AlbumFigurinhas.Especial(p).Titulo}”" : "")}.");
+
+        var idsOrigem = origem.Select(f => f.FigurinhaId).ToList();
+        var artes = await _db.FigurinhasArtes.AsNoTracking()
+            .Where(a => idsOrigem.Contains(a.FigurinhaId))
+            .ToDictionaryAsync(a => a.FigurinhaId, ct);
+
+        var destino = await _db.Figurinhas.AsNoTracking()
+            .Where(f => f.AlbumId == paraAlbumId && f.Tipo == TipoFigurinha.Especial && f.Pagina != null)
+            .Select(f => new { f.FigurinhaId, f.Pagina, f.Ordem, f.HallOfFameId, f.TreinadorId, f.NomeImpresso, f.Destaque })
+            .ToListAsync(ct);
+        var idsDestino = destino.Select(f => f.FigurinhaId).ToList();
+        var destinoComArte = (await _db.FigurinhasArtes.AsNoTracking()
+                .Where(a => idsDestino.Contains(a.FigurinhaId))
+                .Select(a => a.FigurinhaId)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        static string Chave(string nome, string? destaque) =>
+            $"{nome.Trim().ToLowerInvariant()}|{destaque?.Trim().ToLowerInvariant()}";
+
+        var numero = await _db.Figurinhas.Where(f => f.AlbumId == paraAlbumId).MaxAsync(f => (int?)f.Numero, ct) ?? 0;
+        var porPagina = destino.GroupBy(f => f.Pagina!.Value)
+            .ToDictionary(g => g.Key, g => (Quantas: g.Count(), Ordem: g.Max(f => f.Ordem)));
+        var agora = Agora;
+
+        int copiadas = 0, jaEstavam = 0, artesCopiadas = 0, semLugar = 0;
+        foreach (var f in origem)
+        {
+            var pag = f.Pagina!.Value;
+            var igual = destino.FirstOrDefault(d => d.Pagina == pag
+                && ((f.HallOfFameId != null && d.HallOfFameId == f.HallOfFameId)
+                    || (f.TreinadorId != null && d.TreinadorId == f.TreinadorId)
+                    || Chave(d.NomeImpresso, d.Destaque) == Chave(f.NomeImpresso, f.Destaque)));
+            if (igual is not null)
+            {
+                jaEstavam++;
+                if (!destinoComArte.Contains(igual.FigurinhaId) && artes.TryGetValue(f.FigurinhaId, out var arteDaOutra))
+                {
+                    _db.FigurinhasArtes.Add(CopiaDaArte(arteDaOutra, igual.FigurinhaId));
+                    destinoComArte.Add(igual.FigurinhaId);
+                    artesCopiadas++;
+                }
+                continue;
+            }
+
+            var (quantas, ordem) = porPagina.GetValueOrDefault(pag);
+            if (quantas >= AlbumFigurinhas.MaximoPorPaginaEspecial)
+            {
+                semLugar++;
+                continue;
+            }
+            porPagina[pag] = (quantas + 1, ordem + 1);
+
+            var nova = new Figurinha
+            {
+                FigurinhaId = Guid.NewGuid(),
+                AlbumId = paraAlbumId,
+                Numero = ++numero,
+                Tipo = TipoFigurinha.Especial,
+                Raridade = f.Raridade,
+                Pagina = pag,
+                TeamId = f.TeamId,
+                PlayerId = f.PlayerId,
+                TreinadorId = f.TreinadorId,
+                Papel = f.Papel,
+                HallOfFameId = f.HallOfFameId,
+                NomeImpresso = f.NomeImpresso,
+                PosicaoSigla = f.PosicaoSigla,
+                Overall = f.Overall,
+                Destaque = f.Destaque,
+                Ordem = ordem + 1,
+                EntrouEm = agora
+            };
+            _db.Figurinhas.Add(nova);
+            if (artes.TryGetValue(f.FigurinhaId, out var arte))
+                _db.FigurinhasArtes.Add(CopiaDaArte(arte, nova.FigurinhaId));
+            copiadas++;
+        }
+
+        if (copiadas + artesCopiadas > 0)
+        {
+            await RegistrarAsync(AdminActionType.FigurinhasEspeciais, adminToken, new
+            {
+                album = para.Nome,
+                acao = $"copiou as especiais do {de.Nome}",
+                pagina = pagina is { } p ? AlbumFigurinhas.Especial(p).Titulo : "todas",
+                figurinhas = copiadas,
+                artes = artesCopiadas
+            }, ct);
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return new CopiaDeEspeciaisDto(copiadas, jaEstavam, artesCopiadas, semLugar);
+
+        FigurinhaArte CopiaDaArte(FigurinhaArte a, Guid figurinhaId) => new()
+        {
+            FigurinhaId = figurinhaId,
+            Imagem = a.Imagem,
+            ContentType = a.ContentType,
+            AtualizadaEm = agora
+        };
+    }
+
     public async Task EditarEspecialAsync(Guid figurinhaId, NovaEspecialDto dados, string? adminToken, CancellationToken ct)
     {
         var f = await _db.Figurinhas.Include(x => x.Album)

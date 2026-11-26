@@ -58,6 +58,39 @@
             </div>
         </div>
 
+        @if (_albuns.Count > 1)
+        {
+            var outros = _albuns.Where(a => a.AlbumId != _albumId).ToList();
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="small fw-semibold mb-2"><Icone Nome="copy" Tamanho="14" /> Copiar as figurinhas especiais de outro álbum para o @_dados.Album.Nome</div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <select class="form-select form-select-sm w-auto" @bind="_copiarDe">
+                            <option value="">De qual álbum…</option>
+                            @foreach (var a in outros)
+                            {
+                                <option value="@a.AlbumId">@a.Nome</option>
+                            }
+                        </select>
+                        <select class="form-select form-select-sm w-auto" @bind="_copiarPagina">
+                            <option value="">Todas as páginas</option>
+                            @foreach (var p in AlbumFigurinhas.PaginasEspeciais.OrderBy(p => p.AntesDosClubes ? -1 : p.Ordem))
+                            {
+                                <option value="@p.Pagina">@p.Titulo</option>
+                            }
+                        </select>
+                        <button class="btn btn-sm btn-primary" disabled="@(_salvando || string.IsNullOrEmpty(_copiarDe))" @onclick="CopiarAsync">
+                            <Icone Nome="copy" Tamanho="14" /> Copiar
+                        </button>
+                    </div>
+                    <div class="small text-muted mt-2">
+                        Vêm com a arte, no fim de cada página e com os próximos números. A que já está aqui (mesmo campeão, mesma
+                        pessoa ou mesmo nome e texto) não entra de novo — se estiver sem arte, ganha a do outro álbum.
+                    </div>
+                </div>
+            </div>
+        }
+
         @foreach (var info in AlbumFigurinhas.PaginasEspeciais.OrderBy(p => p.AntesDosClubes ? -1 : p.Ordem))
         {
             var daPagina = _dados.Figurinhas.Where(f => f.Figurinha.Pagina == info.Pagina).OrderBy(f => f.Figurinha.Ordem).ThenBy(f => f.Figurinha.Numero).ToList();
@@ -274,6 +307,9 @@
     private FigurinhaDto? _editando;
     private FormEspecial _edicao = new();
 
+    private string _copiarDe = string.Empty;
+    private string _copiarPagina = string.Empty;
+
     private string _buscaJogador = string.Empty;
     private List<JogadorAchado> _achados = new();
 
@@ -345,6 +381,27 @@
             await Token(), CancellationToken.None);
         return $"{adm.Nome} entrou na página da Organização. Suba a arte quando estiver pronta.";
     });
+
+    private async Task CopiarAsync()
+    {
+        if (!Guid.TryParse(_copiarDe, out var de)) return;
+        PaginaEspecial? pagina = Enum.TryParse<PaginaEspecial>(_copiarPagina, out var p) ? p : null;
+        var nomeDe = _albuns.FirstOrDefault(a => a.AlbumId == de)?.Nome;
+        var oque = pagina is { } pg ? $"“{AlbumFigurinhas.Especial(pg).Titulo}”" : "todas as páginas especiais";
+        if (!await JS.InvokeAsync<bool>("confirm", $"Copiar {oque} do {nomeDe} para o {_dados?.Album.Nome}? Elas entram nos pacotes na hora."))
+            return;
+
+        await ExecutarAsync(async () =>
+        {
+            var r = await AlbumSvc.CopiarEspeciaisAsync(de, _albumId, pagina, await Token(), CancellationToken.None);
+            var partes = new List<string> { $"{r.Copiadas} figurinha{(r.Copiadas == 1 ? "" : "s")} copiada{(r.Copiadas == 1 ? "" : "s")}" };
+            if (r.JaEstavam > 0) partes.Add($"{r.JaEstavam} já estava{(r.JaEstavam == 1 ? "" : "m")} aqui");
+            if (r.ArtesCopiadas > 0) partes.Add($"{r.ArtesCopiadas} ganhou{(r.ArtesCopiadas == 1 ? "" : "ram")} a arte");
+            if (r.SemLugar > 0) partes.Add($"{r.SemLugar} ficou{(r.SemLugar == 1 ? "" : "aram")} de fora (página cheia)");
+            _copiarDe = string.Empty;
+            return string.Join(" · ", partes) + ".";
+        });
+    }
 
     private async Task ColocarCampeoesAsync()
     {
