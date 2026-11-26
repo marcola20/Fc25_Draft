@@ -161,7 +161,7 @@
                            OnFechar="() => _compartilhar = null" />
 
         @* ---- Últimas raras tiradas (de todo mundo) ---- *@
-        @if (_raras.Count > 0 && _pagina is null && string.IsNullOrWhiteSpace(_busca))
+        @if (_raras.Count > 0 && _pagina is null && !_apresentacao && string.IsNullOrWhiteSpace(_busca))
         {
             <div class="card mb-3">
                 <div class="card-header d-flex align-items-baseline gap-2">
@@ -191,7 +191,7 @@
                 <input class="form-check-input" type="checkbox" id="soFaltam" checked="@_soFaltam" @onchange="e => _soFaltam = e.Value is true" />
                 <label class="form-check-label" for="soFaltam">Só as que faltam</label>
             </div>
-            @if (_pagina is not null && string.IsNullOrWhiteSpace(_busca))
+            @if ((_pagina is not null || _apresentacao) && string.IsNullOrWhiteSpace(_busca))
             {
                 <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => IrParaAsync(null, -1)" @onclick:preventDefault="true">
                     <Icone Nome="list" Tamanho="14" /> Sumário
@@ -290,6 +290,102 @@
                         </footer>
                     </article>
                 }
+                else if (_apresentacao)
+                {
+                    @* ---- Apresentação: a CBFV e a Áurea, entre a capa e o sumário ---- *@
+                    var titulosLiga = a.Paginas.FirstOrDefault(x => x.Especial == PaginaEspecial.CampeoesLiga);
+                    var titulosCopa = a.Paginas.FirstOrDefault(x => x.Especial == PaginaEspecial.CampeoesCopa);
+                    var clubesCampeoes = new[] { titulosLiga, titulosCopa }.OfType<PaginaDoAlbumDto>()
+                        .SelectMany(x => x.Vagas).Select(v => v.Figurinha.NomeImpresso.Trim().ToLowerInvariant()).Distinct().Count();
+
+                    <article class="folha apresentacao" @key="@("apresentacao")">
+                        <header class="folha-cabeca">
+                            <span class="folha-icone"><Icone Nome="book-open" Tamanho="30" /></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="folha-sobre">@a.Album.Nome</div>
+                                <h2 class="folha-titulo">Apresentação</h2>
+                                <div class="folha-conta">A CBFV e a Áurea, a nossa Harpia</div>
+                            </div>
+                        </header>
+
+                        <div class="folha-miolo">
+                            <div class="apresentacao-grade">
+                                <section>
+                                    <h3 class="apresentacao-titulo">A CBFV</h3>
+                                    <p class="apresentacao-abre">
+                                        A Confederação Brasileira de Futebol Virtual nasceu em 2019 e chega à oitava edição com sete anos de
+                                        história: muitos jogos, leilões, rivalidades, títulos e treinadores que fazem dela mais do que um campeonato.
+                                    </p>
+
+                                    <ul class="apresentacao-numeros">
+                                        <li><strong>8</strong><span>edições</span></li>
+                                        <li><strong>7</strong><span>anos</span></li>
+                                        @if (titulosLiga is not null)
+                                        {
+                                            <li><strong>@titulosLiga.Total</strong><span>título@(titulosLiga.Total == 1 ? "" : "s") de liga</span></li>
+                                        }
+                                        @if (titulosCopa is not null)
+                                        {
+                                            <li><strong>@titulosCopa.Total</strong><span>copa@(titulosCopa.Total == 1 ? "" : "s")</span></li>
+                                        }
+                                        @if (clubesCampeoes > 0)
+                                        {
+                                            <li><strong>@clubesCampeoes</strong><span>clubes campeões</span></li>
+                                        }
+                                    </ul>
+
+                                    <ol class="linha-do-tempo">
+                                        <li>
+                                            <span class="ldt-quando">1ª edição · 2019</span>
+                                            <span class="ldt-texto">Tudo começou no FIFA 18, no PS4, com a <strong>Nordic League</strong>: só clubes nórdicos em campo.</span>
+                                        </li>
+                                        <li>
+                                            <span class="ldt-quando">2ª edição</span>
+                                            <span class="ldt-texto">A liga veio para o Brasil e ganhou o <strong>leilão</strong> de jogadores, agora no PES 19, ainda no PS4.</span>
+                                        </li>
+                                        <li>
+                                            <span class="ldt-quando">3ª edição</span>
+                                            <span class="ldt-texto">De volta ao FIFA, desta vez com os <strong>elencos oficiais</strong> dos clubes escolhidos.</span>
+                                        </li>
+                                        <li>
+                                            <span class="ldt-quando">4ª à 7ª edição</span>
+                                            <span class="ldt-texto">A mudança para o <strong>PC</strong>, no FIFA, onde a liga cresceu por quatro edições seguidas.</span>
+                                        </li>
+                                        <li class="agora">
+                                            <span class="ldt-quando">8ª edição · hoje</span>
+                                            <span class="ldt-texto">O retorno ao <strong>PES</strong>, com uma nova identidade e este álbum para colecionar.</span>
+                                        </li>
+                                    </ol>
+                                </section>
+
+                                <section class="apresentacao-aurea">
+                                    <h3 class="apresentacao-titulo">Áurea, a nossa Harpia</h3>
+                                    <img src="images/album/mascote.webp" width="720" height="1080" alt="Áurea, a Harpia mascote da CBFV" loading="lazy" />
+                                    <p>
+                                        Uma nova era merecia uma identidade à sua altura. Inspirada numa das aves mais majestosas da fauna
+                                        brasileira, a <strong>Áurea</strong> representa a força, a imponência e o espírito competitivo da CBFV.
+                                    </p>
+                                    <p>
+                                        A coroa fala da nobreza e da tradição que estamos construindo, as cores são as nossas, e as
+                                        <strong>oito estrelas</strong> lembram a história e a grandeza da CBFV. Mais do que uma mascote, ela é um
+                                        símbolo de pertencimento e de orgulho para todos que fazem parte da nossa comunidade.
+                                    </p>
+                                    <p class="apresentacao-lema">Áurea. A força de uma harpia. A grandeza da CBFV.</p>
+                                </section>
+                            </div>
+                        </div>
+
+                        <footer class="folha-pe">
+                            <button type="button" class="folha-seta" title="Capa" @onclick="VerCapa">
+                                <Icone Nome="chevron-left" Tamanho="18" /> <span class="folha-seta-nome">Capa</span>
+                            </button>
+                            <span class="folha-numero">apresentação</span>
+                            <button type="button" class="folha-seta" title="Sumário" @onclick="() => IrParaAsync(null, 1)">
+                                <span class="folha-seta-nome">Sumário</span> <Icone Nome="chevron-right" Tamanho="18" />
+                            </button>
+                        </footer>
+                    </article>
+                }
                 else
                 {
                     @* ---- Sumário: a primeira folha do álbum ---- *@
@@ -304,6 +400,17 @@
                         </header>
 
                         <div class="folha-miolo">
+                            <a class="indice-item card text-reset text-decoration-none apresentacao-link mb-3" href="/album?pagina=@Apresentacao"
+                               @onclick="IrParaApresentacaoAsync" @onclick:preventDefault="true">
+                                <div class="card-body d-flex align-items-center gap-2 p-2">
+                                    <span class="indice-icone"><Icone Nome="book-open" Tamanho="22" /></span>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="fw-semibold">Apresentação</div>
+                                        <div class="small text-muted text-truncate">A história da CBFV e a Áurea, a nossa Harpia</div>
+                                    </div>
+                                    <Icone Nome="chevron-right" Tamanho="16" />
+                                </div>
+                            </a>
                             @foreach (var secao in Secoes(a))
                             {
                                 <h3 class="sumario-secao">@secao.Titulo</h3>
@@ -346,8 +453,8 @@
                         </div>
 
                         <footer class="folha-pe">
-                            <button type="button" class="folha-seta" title="Capa" @onclick="VerCapa">
-                                <Icone Nome="chevron-left" Tamanho="18" /> <span class="folha-seta-nome">Capa</span>
+                            <button type="button" class="folha-seta" title="Apresentação" @onclick="IrParaApresentacaoAsync">
+                                <Icone Nome="chevron-left" Tamanho="18" /> <span class="folha-seta-nome">Apresentação</span>
                             </button>
                             <span class="folha-numero">sumário</span>
                             <button type="button" class="folha-seta" disabled="@(a.Paginas.Count == 0)" @onclick="() => IrParaAsync(a.Paginas.FirstOrDefault(), 1)">
@@ -358,7 +465,7 @@
                 }
             </div>
 
-            @if (_pagina is null && a.ForaDoAlbum is { Count: > 0 } fora)
+            @if (_pagina is null && !_apresentacao && a.ForaDoAlbum is { Count: > 0 } fora)
             {
                 @* ---- Figurinhas de quem saiu dos clubes da liga ---- *@
                 <div class="card mt-4">
@@ -415,6 +522,10 @@
     private const int RarasNaCapa = 12;
     private PaginaDoAlbumDto? _pagina;
 
+    /// <summary>A folha de apresentação (a CBFV e a Áurea), entre a capa e o sumário: <c>/album?pagina=apresentacao</c>.</summary>
+    private const string Apresentacao = "apresentacao";
+    private bool _apresentacao;
+
     private string _busca = string.Empty;
     private bool _soFaltam;
 
@@ -455,7 +566,7 @@
                 await JS.InvokeVoidAsync("cbfvAlbum.ligar", _ponte);
                 // Quem chega direto numa página (link de aviso, busca) não vê a capa.
                 var aberta = await JS.InvokeAsync<bool>("cbfvAlbum.capaJaAberta");
-                _mostrarCapa = !aberta && _pagina is null;
+                _mostrarCapa = !aberta && _pagina is null && !_apresentacao;
             }
             catch (JSException) { }
             catch (JSDisconnectedException) { }
@@ -518,6 +629,7 @@
     private async Task AbrirPaginaAsync()
     {
         _pagina = PaginaDoEndereco();
+        _apresentacao = _album is not null && string.Equals(PaginaPedida?.Trim(), Apresentacao, StringComparison.OrdinalIgnoreCase);
         var chave = _pagina?.Chave.NoEndereco;
         if (chave != _paginaDasNovas)
         {
@@ -554,9 +666,16 @@
         _album is null ? -1 : _album.Paginas.ToList().FindIndex(p => p.Chave == pagina.Chave);
 
     /// <summary>Vira a folha (para a frente ou para trás) e vai para a página; nulo = o sumário.</summary>
-    private async Task IrParaAsync(PaginaDoAlbumDto? destino, int direcao)
+    private Task IrParaAsync(PaginaDoAlbumDto? destino, int direcao) => VirarParaAsync(Endereco(destino), direcao);
+
+    /// <summary>A apresentação vem antes do sumário: chegar nela é sempre voltar uma folha.</summary>
+    private Task IrParaApresentacaoAsync() => VirarParaAsync($"/album?pagina={Apresentacao}", -1);
+
+    private string EnderecoAtual => _apresentacao ? $"/album?pagina={Apresentacao}" : Endereco(_pagina);
+
+    private async Task VirarParaAsync(string endereco, int direcao)
     {
-        if (_virando || destino?.Chave == _pagina?.Chave) return;
+        if (_virando || endereco == EnderecoAtual) return;
         _virando = true;
         try
         {
@@ -564,7 +683,7 @@
             catch (JSException) { }
             catch (JSDisconnectedException) { }
             _rolarParaOLivro = true;
-            Navigation.NavigateTo(Endereco(destino));
+            Navigation.NavigateTo(endereco);
         }
         finally { _virando = false; }
     }
@@ -575,9 +694,15 @@
     {
         if (_album is null || _mostrarCapa || !string.IsNullOrWhiteSpace(_busca) || _aberto is not null || _compartilhar is not null) return;
         var paginas = _album.Paginas;
+        if (_apresentacao)
+        {
+            if (proxima) await IrParaAsync(null, 1);
+            return;
+        }
         if (_pagina is null)
         {
             if (proxima && paginas.Count > 0) await IrParaAsync(paginas[0], 1);
+            else if (!proxima) await IrParaApresentacaoAsync();
             return;
         }
 
@@ -613,7 +738,7 @@
     {
         _mostrarCapa = true;
         _recemAberto = false;
-        if (_pagina is not null) Navigation.NavigateTo("/album");
+        if (_pagina is not null || _apresentacao) Navigation.NavigateTo("/album");
     }
 
     /// <summary>O sumário em partes: a abertura (Organização), os clubes e a história (Campeões e Lendários).</summary>

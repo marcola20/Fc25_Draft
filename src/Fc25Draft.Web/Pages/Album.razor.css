@@ -461,6 +461,125 @@
 .indice-item.p-campeoes-copa .indice-icone { background: linear-gradient(135deg, #8a6400, #e0b23c); }
 .indice-item.p-lendarios .indice-icone { background: linear-gradient(135deg, #3b1670, #7c3aed); }
 
+.indice-item.apresentacao-link .indice-icone { background: linear-gradient(135deg, #0a3b25, #198754); }
+.indice-item.apresentacao-link + .sumario-secao { margin-top: 0; }
+
+/* ---- Apresentação: a CBFV e a Áurea ---- */
+.folha.apresentacao { --cabeca: linear-gradient(90deg, #0a3b25, #0f5132 60%, #8a6400); }
+
+.apresentacao-grade {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 1.6rem;
+}
+
+.apresentacao-titulo {
+    font-size: 1.05rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: 0 0 .6rem;
+    color: #0f5132;
+}
+[data-bs-theme="dark"] .apresentacao-titulo { color: #e0b23c; }
+
+.apresentacao-abre { font-size: 1rem; line-height: 1.55; }
+
+.apresentacao-numeros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 0 0 1.2rem;
+    padding: 0;
+    list-style: none;
+}
+
+.apresentacao-numeros li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 4.6rem;
+    padding: .45rem .6rem;
+    border-radius: .6rem;
+    border: 1px solid var(--papel-borda);
+    background: rgba(255, 255, 255, .55);
+}
+[data-bs-theme="dark"] .apresentacao-numeros li { background: rgba(255, 255, 255, .04); }
+
+.apresentacao-numeros strong { font-size: 1.4rem; font-weight: 900; line-height: 1; color: #8a6400; font-variant-numeric: tabular-nums; }
+[data-bs-theme="dark"] .apresentacao-numeros strong { color: #e0b23c; }
+.apresentacao-numeros span { font-size: .72rem; opacity: .75; text-align: center; }
+
+/* A linha do tempo das edições: um fio com uma bolinha por marco. */
+.linha-do-tempo {
+    position: relative;
+    margin: 0;
+    padding: 0 0 0 1.3rem;
+    list-style: none;
+}
+
+.linha-do-tempo::before {
+    content: "";
+    position: absolute;
+    left: .38rem;
+    top: .4rem;
+    bottom: .4rem;
+    border-left: 2px solid var(--papel-borda);
+}
+
+.linha-do-tempo li { position: relative; display: flex; flex-direction: column; padding-bottom: .85rem; }
+.linha-do-tempo li:last-child { padding-bottom: 0; }
+
+.linha-do-tempo li::before {
+    content: "";
+    position: absolute;
+    left: -1.22rem;
+    top: .3rem;
+    width: .7rem;
+    height: .7rem;
+    border-radius: 50%;
+    background: var(--papel);
+    border: 2px solid #198754;
+}
+
+.linha-do-tempo li.agora::before { background: #e0b23c; border-color: #8a6400; box-shadow: 0 0 0 3px rgba(224, 178, 60, .25); }
+
+.ldt-quando { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.ldt-texto { font-size: .92rem; line-height: 1.45; }
+
+.apresentacao-aurea img {
+    float: right;
+    width: 42%;
+    max-width: 170px;
+    height: auto;
+    margin: 0 0 .6rem .9rem;
+    padding: 4px;
+    border-radius: 4px;
+    background: linear-gradient(145deg, #f5d36b, #8a6400 45%, #f5d36b 70%, #8a6400);
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .25);
+    transform: rotate(1.5deg);
+}
+
+.apresentacao-aurea p { font-size: .92rem; line-height: 1.55; }
+
+.apresentacao-lema {
+    clear: both;
+    margin: 1rem 0 0;
+    padding-top: .7rem;
+    border-top: 1px dashed var(--papel-borda);
+    font-weight: 900;
+    font-size: .85rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    text-align: center;
+    color: #8a6400;
+}
+[data-bs-theme="dark"] .apresentacao-lema { color: #e0b23c; }
+
+@media (max-width: 767.98px) {
+    .apresentacao-grade { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .capa-frente, .recem-aberto, .capa-brilho { animation: none; }
     .capa-frente { transition: none; }
