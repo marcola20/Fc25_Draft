@@ -173,7 +173,15 @@
                         @foreach (var r in _raras)
                         {
                             <div class="rara @(r.TreinadorId == _eu.TreinadorId ? "minha" : "")">
-                                <CartaFigurinha Figurinha="@r.Figurinha" Largura="92" SeloLendaria="@Selo" />
+                                @if (r.Figurinha.Deitada)
+                                {
+                                    @* Deitada (campeão): girada, ocupa o mesmo lugar de uma carta em pé. *@
+                                    <div class="rara-girada"><div class="rara-giro"><CartaFigurinha Figurinha="@r.Figurinha" Largura="92" SeloLendaria="@Selo" /></div></div>
+                                }
+                                else
+                                {
+                                    <CartaFigurinha Figurinha="@r.Figurinha" Largura="92" SeloLendaria="@Selo" />
+                                }
                                 <div class="rara-quem text-truncate" title="@r.Nome">@(r.TreinadorId == _eu.TreinadorId ? "Você" : r.Nome)</div>
                                 <div class="rara-quando">@AvisosSino.Quando(r.Quando)</div>
                             </div>

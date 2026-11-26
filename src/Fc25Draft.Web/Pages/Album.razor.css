@@ -98,6 +98,16 @@
 .rara-quando { font-size: .7rem; color: var(--bs-secondary-color); }
 .rara.minha .rara-quem { color: var(--bs-success); }
 
+/* A deitada tem a mesma área da carta em pé (1,4 × 1 em vez de 1 × 1,4): girada, cabe no mesmo lugar e a
+   faixa fica alinhada. */
+.rara-girada { position: relative; width: 92px; height: calc(92px * 1.4); }
+.rara-giro {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+}
+
 /* Figurinha colada é um botão (abre o compartilhar), sem cara de botão. */
 .carta-botao {
     padding: 0;
