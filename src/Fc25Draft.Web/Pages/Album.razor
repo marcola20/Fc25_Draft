@@ -193,7 +193,7 @@
             </div>
             @if ((_pagina is not null || _apresentacao) && string.IsNullOrWhiteSpace(_busca))
             {
-                <a href="/album" class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => IrParaAsync(null, -1)" @onclick:preventDefault="true">
+                <a href="@Endereco(null)" class="btn btn-sm btn-outline-secondary ms-auto" @onclick="() => IrParaAsync(null, -1)" @onclick:preventDefault="true">
                     <Icone Nome="list" Tamanho="14" /> Sumário
                 </a>
             }
@@ -660,7 +660,13 @@
         return Clube is { } clube ? _album.Paginas.FirstOrDefault(p => p.Especial is null && p.TeamId == clube) : null;
     }
 
-    private static string Endereco(PaginaDoAlbumDto? pagina) => pagina is null ? "/album" : $"/album?pagina={pagina.Chave.NoEndereco}";
+    /// <summary>
+    /// O endereço da folha; nulo = o sumário. O sumário também leva <c>?pagina=</c>: "/album" puro é tratado pelas
+    /// abas como clique no menu e volta para a última folha aberta (AbasService), então a folha nunca saía do lugar.
+    /// </summary>
+    private static string Endereco(PaginaDoAlbumDto? pagina) => $"/album?pagina={pagina?.Chave.NoEndereco ?? Sumario}";
+
+    private const string Sumario = "sumario";
 
     private int IndiceDa(PaginaDoAlbumDto pagina) =>
         _album is null ? -1 : _album.Paginas.ToList().FindIndex(p => p.Chave == pagina.Chave);
@@ -738,7 +744,8 @@
     {
         _mostrarCapa = true;
         _recemAberto = false;
-        if (_pagina is not null || _apresentacao) Navigation.NavigateTo("/album");
+        // Fechou o livro: ao abrir de novo, começa pelo sumário.
+        if (_pagina is not null || _apresentacao) Navigation.NavigateTo(Endereco(null));
     }
 
     /// <summary>O sumário em partes: a abertura (Organização), os clubes e a história (Campeões e Lendários).</summary>
