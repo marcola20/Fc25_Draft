@@ -67,6 +67,7 @@ public class AdminLogService : IAdminLogService
         AdminActionType.TirarLenda => "Tirou uma lenda do álbum",
         AdminActionType.AtualizarAlbum => "Atualizou o álbum com os elencos de hoje",
         AdminActionType.FigurinhasEspeciais => "Mexeu nas páginas especiais do álbum",
+        AdminActionType.LimparPacotesAntigos => "Tirou os pacotes fechados da temporada passada",
         _ => tipo.ToString()
     };
 
@@ -92,6 +93,8 @@ public class AdminLogService : IAdminLogService
         "album" => "Álbum",
         "treinador" => "Treinador",
         "quantidade" => "Pacotes",
+        "pacotes" => "Pacotes",
+        "pessoas" => "Pessoas",
         "clubes" => "Clubes",
         "figurinhas" => "Figurinhas",
         "lendarias" => "Lendárias",

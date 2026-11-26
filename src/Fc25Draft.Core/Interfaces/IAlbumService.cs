@@ -96,6 +96,15 @@ public interface IAlbumService
 
     Task<IReadOnlyList<PacotesDoTreinadorDto>> PacotesPorTreinadorAsync(CancellationToken ct);
 
+    /// <summary>Pacotes ainda fechados que foram ganhos antes do lançamento do álbum ativo (os da temporada passada).</summary>
+    Task<int> ContarPacotesAntigosAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Tira os pacotes ainda fechados ganhos antes do lançamento do álbum ativo: temporada nova, pacote novo.
+    /// Os abertos ficam (as figurinhas já estão nos álbuns). Fica no log. Devolve quantos saíram.
+    /// </summary>
+    Task<int> LimparPacotesAntigosAsync(string? adminToken, CancellationToken ct);
+
     /// <summary>Muda o X do bolão do álbum (1 pacote a cada X pontos). Fica no log de ações.</summary>
     Task SalvarPontosBolaoAsync(Guid albumId, int pontosPorPacote, string? adminToken, CancellationToken ct);
 

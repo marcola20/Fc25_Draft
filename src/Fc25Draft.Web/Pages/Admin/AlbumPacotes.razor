@@ -82,6 +82,22 @@
             </div>
         </div>
 
+        @if (_ativo is not null && _antigos > 0)
+        {
+            <div class="card mb-3 border-danger">
+                <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                    <div class="flex-grow-1 small">
+                        <strong>@_antigos pacote@(_antigos == 1 ? "" : "s") fechado@(_antigos == 1 ? "" : "s") da temporada passada</strong>
+                        <span class="text-muted">
+                            — ganhos antes do lançamento do @_ativo.Nome (@BrazilTime.FormatDateTime(_ativo.LancadoEm, "dd/MM")). Tirar zera o
+                            “Para abrir” de todo mundo nesses pacotes; os pacotes ganhos depois do lançamento e as figurinhas já coladas ficam.
+                        </span>
+                    </div>
+                    <button class="btn btn-outline-danger" disabled="@_salvando" @onclick="LimparAntigosAsync"><Icone Nome="ban" Tamanho="14" /> Tirar os pacotes da temporada passada</button>
+                </div>
+            </div>
+        }
+
         @if (_ativo is not null)
         {
             <div class="card mb-3">
@@ -152,6 +168,7 @@
     private string? _erro, _ok;
 
     private AlbumDto? _ativo;
+    private int _antigos;
     private IReadOnlyList<PacotesDoTreinadorDto> _lista = Array.Empty<PacotesDoTreinadorDto>();
 
     private string _treinadorId = string.Empty;
@@ -174,8 +191,28 @@
         {
             _ativo = await AlbumSvc.AtivoAsync(CancellationToken.None);
             _lista = await AlbumSvc.PacotesPorTreinadorAsync(CancellationToken.None);
+            _antigos = await AlbumSvc.ContarPacotesAntigosAsync(CancellationToken.None);
         }
         catch (Exception ex) { _erro = ex.Message; }
+    }
+
+    private async Task LimparAntigosAsync()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Tirar os {_antigos} pacotes fechados da temporada passada de todo mundo? Não tem volta."))
+            return;
+
+        _salvando = true;
+        _erro = null;
+        try
+        {
+            var tirados = await AlbumSvc.LimparPacotesAntigosAsync(await AdminAuth.GetTokenAsync(), CancellationToken.None);
+            await CarregarAsync();
+            _ok = tirados == 0
+                ? "Nenhum pacote da temporada passada para tirar."
+                : $"{tirados} pacote{(tirados == 1 ? "" : "s")} da temporada passada tirado{(tirados == 1 ? "" : "s")}.";
+        }
+        catch (Exception ex) { _erro = ex.Message; }
+        finally { _salvando = false; }
     }
 
     private async Task ContarJogosAntesAsync()

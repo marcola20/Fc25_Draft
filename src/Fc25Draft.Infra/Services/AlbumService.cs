@@ -125,9 +125,8 @@ public partial class AlbumService : IAlbumService
 
         _db.Albuns.Add(album);
 
-        // Pacote ainda fechado do álbum anterior vale para o novo: ninguém fica com pacote que não abre mais.
-        foreach (var fechado in await _db.PacotesGanhos.Where(p => p.AbertoEm == null && p.AlbumId != null).ToListAsync(ct))
-            fechado.AlbumId = album.AlbumId;
+        // Temporada nova, pacote novo: o que ficou fechado do álbum anterior não passa para este.
+        _db.PacotesGanhos.RemoveRange(await _db.PacotesGanhos.Where(p => p.AbertoEm == null && p.AlbumId != null).ToListAsync(ct));
 
         await RegistrarAsync(AdminActionType.LancarAlbum, adminToken, new
         {
@@ -460,7 +459,7 @@ public partial class AlbumService : IAlbumService
                 t.Ativo,
                 TimeAtual = t.Passagens.Where(p => p.Ate == null).Select(p => p.Time.TeamName).FirstOrDefault(),
                 ParaAbrir = _db.PacotesGanhos.Count(p => p.TreinadorId == t.TreinadorId && p.AbertoEm == null),
-                Abertos = _db.PacotesGanhos.Count(p => p.TreinadorId == t.TreinadorId && p.AbertoEm != null),
+                Abertos = _db.PacotesGanhos.Count(p => p.TreinadorId == t.TreinadorId && p.AbertoEm != null && p.AlbumId == albumId),
                 Coladas = _db.FigurinhasDosTreinadores.Count(f => f.TreinadorId == t.TreinadorId && f.Figurinha.AlbumId == albumId
                                                                 && f.Figurinha.SaiuEm == null)
             })
@@ -471,6 +470,35 @@ public partial class AlbumService : IAlbumService
             .ThenBy(t => t.Nome, StringComparer.CurrentCulture)
             .Select(t => new PacotesDoTreinadorDto(t.TreinadorId, t.Nome, t.TimeAtual, t.Ativo, t.ParaAbrir, t.Abertos, t.Coladas))
             .ToList();
+    }
+
+    public async Task<int> ContarPacotesAntigosAsync(CancellationToken ct)
+    {
+        var lancadoEm = await _db.Albuns.Where(a => a.Ativo).Select(a => (DateTime?)a.LancadoEm).FirstOrDefaultAsync(ct);
+        return lancadoEm is null ? 0 : await _db.PacotesGanhos.CountAsync(p => p.AbertoEm == null && p.CriadoEm < lancadoEm, ct);
+    }
+
+    public async Task<int> LimparPacotesAntigosAsync(string? adminToken, CancellationToken ct)
+    {
+        var album = await _db.Albuns.AsNoTracking().Where(a => a.Ativo).Select(a => new { a.Nome, a.LancadoEm }).FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("O álbum ainda não foi lançado.");
+
+        // A reconciliação não devolve estes: ela só olha os jogos depois do lançamento (ou os da temporada do
+        // álbum, se o admin mandar contar) e o bolão da temporada do álbum; o pacote do dia é por data.
+        var antigos = await _db.PacotesGanhos
+            .Where(p => p.AbertoEm == null && p.CriadoEm < album.LancadoEm)
+            .ToListAsync(ct);
+        if (antigos.Count == 0) return 0;
+
+        _db.PacotesGanhos.RemoveRange(antigos);
+        await RegistrarAsync(AdminActionType.LimparPacotesAntigos, adminToken, new
+        {
+            album = album.Nome,
+            pacotes = antigos.Count,
+            pessoas = antigos.Select(p => p.TreinadorId).Distinct().Count()
+        }, ct);
+        await _db.SaveChangesAsync(ct);
+        return antigos.Count;
     }
 
     // ---------------------------------------------------------------- A pessoa

@@ -21,5 +21,8 @@ public enum AdminActionType
     AtualizarAlbum = 16,
 
     /// <summary>Colocou, mudou, tirou ou trocou a arte de figurinha das páginas especiais (Organização, Campeões, Lendários).</summary>
-    FigurinhasEspeciais = 17
+    FigurinhasEspeciais = 17,
+
+    /// <summary>Tirou os pacotes ainda fechados de antes do lançamento do álbum ativo (os da temporada passada).</summary>
+    LimparPacotesAntigos = 18
 }
