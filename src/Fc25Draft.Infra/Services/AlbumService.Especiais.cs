@@ -280,10 +280,10 @@ public partial class AlbumService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task TirarEspecialAsync(Guid figurinhaId, string? adminToken, CancellationToken ct)
+    public async Task<int> TirarEspecialAsync(Guid figurinhaId, bool mesmoComDono, string? adminToken, CancellationToken ct)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        var (donos, selos, trocasQueCairam) = await strategy.ExecuteAsync(async () =>
         {
             _db.ChangeTracker.Clear();
             await using var transacao = await _db.Database.BeginTransactionAsync(ct);
@@ -291,22 +291,42 @@ public partial class AlbumService
             var f = await _db.Figurinhas.Include(x => x.Album)
                 .FirstOrDefaultAsync(x => x.FigurinhaId == figurinhaId && x.Tipo == TipoFigurinha.Especial, ct)
                 ?? throw new InvalidOperationException("Figurinha especial não encontrada.");
-            if (await _db.FigurinhasDosTreinadores.AnyAsync(x => x.FigurinhaId == figurinhaId, ct))
+            var albumId = f.AlbumId;
+            var donos = await _db.FigurinhasDosTreinadores
+                .Where(x => x.FigurinhaId == figurinhaId)
+                .Select(x => x.TreinadorId)
+                .ToListAsync(ct);
+            if (donos.Count > 0 && !mesmoComDono)
                 throw new InvalidOperationException($"{f.NomeImpresso} já saiu em pacote e fica no álbum.");
+
+            // Proposta pendente com ela não tem mais como ser aceita (os itens somem junto com a figurinha).
+            var agora = Agora;
+            var trocas = await _db.TrocasFigurinhas
+                .Where(t => t.Status == StatusTroca.Pendente && t.Itens.Any(i => i.FigurinhaId == figurinhaId))
+                .ToListAsync(ct);
+            foreach (var troca in trocas)
+            {
+                troca.Status = StatusTroca.NaoValeMais;
+                troca.RespondidaEm = agora;
+                troca.Motivo = $"{f.NomeImpresso} saiu do álbum.";
+            }
 
             // As que vêm depois descem um número, uma de cada vez por causa do número único.
             var depois = await _db.Figurinhas
-                .Where(x => x.AlbumId == f.AlbumId && x.Numero > f.Numero)
+                .Where(x => x.AlbumId == albumId && x.Numero > f.Numero)
                 .OrderBy(x => x.Numero)
                 .ToListAsync(ct);
 
+            // A coleção de quem tinha e a arte saem junto (cascata no banco).
             _db.Figurinhas.Remove(f);
             await RegistrarAsync(AdminActionType.FigurinhasEspeciais, adminToken, new
             {
                 album = f.Album.Nome,
-                acao = "tirou",
+                acao = donos.Count > 0 ? "tirou (já tinha dono)" : "tirou",
                 pagina = f.Pagina is { } p ? AlbumFigurinhas.Especial(p).Titulo : null,
-                figurinha = f.NomeImpresso
+                figurinha = f.NomeImpresso,
+                pessoas = donos.Count,
+                trocasQueCairam = trocas.Count
             }, ct);
             await _db.SaveChangesAsync(ct);
             foreach (var x in depois)
@@ -315,8 +335,25 @@ public partial class AlbumService
                 await _db.SaveChangesAsync(ct);
             }
 
+            // Saiu a que faltava (tivesse dono ou não): quem ficou com a página (ou o álbum) completa ganha o selo agora.
+            var selos = 0;
+            var figurinhas = await FigurinhasAsync(albumId, ct);
+            var paginas = figurinhas.Select(x => x.ChavePagina).ToHashSet();
+            var colecionadores = await _db.FigurinhasDosTreinadores.AsNoTracking()
+                .Where(x => x.Figurinha.AlbumId == albumId)
+                .Select(x => x.TreinadorId)
+                .Distinct()
+                .ToListAsync(ct);
+            foreach (var pessoa in colecionadores)
+                selos += (await GravarConquistasAsync(pessoa, albumId, figurinhas, paginas, agora, ct)).Count;
+
             await transacao.CommitAsync(ct);
+            return (donos.Count, selos, trocas.Count);
         });
+
+        if (selos > 0) ConquistasGravadas?.Invoke();
+        if (trocasQueCairam > 0) TrocasMudaram?.Invoke();
+        return donos;
     }
 
     public async Task SalvarArteAsync(Guid figurinhaId, byte[] imagem, string? adminToken, CancellationToken ct)

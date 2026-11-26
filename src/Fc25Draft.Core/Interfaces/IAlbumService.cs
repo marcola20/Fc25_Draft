@@ -80,8 +80,12 @@ public interface IAlbumService
     /// <summary>Sobe ou desce a especial um lugar dentro da página.</summary>
     Task MoverEspecialAsync(Guid figurinhaId, bool paraCima, CancellationToken ct);
 
-    /// <summary>Tira a especial, só enquanto ninguém a tirou em pacote; as de número maior descem um.</summary>
-    Task TirarEspecialAsync(Guid figurinhaId, string? adminToken, CancellationToken ct);
+    /// <summary>
+    /// Tira a especial; as de número maior descem um. Com dono, só com <paramref name="mesmoComDono"/>: ela sai da
+    /// coleção de quem tirou, as trocas pendentes com ela caem e quem ficou com a página completa ganha o selo.
+    /// Devolve quantas pessoas tinham a figurinha.
+    /// </summary>
+    Task<int> TirarEspecialAsync(Guid figurinhaId, bool mesmoComDono, string? adminToken, CancellationToken ct);
 
     /// <summary>Guarda a arte inteira da especial (WebP, PNG ou JPEG; 5:7).</summary>
     Task SalvarArteAsync(Guid figurinhaId, byte[] imagem, string? adminToken, CancellationToken ct);

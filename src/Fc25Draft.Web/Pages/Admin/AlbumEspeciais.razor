@@ -144,10 +144,8 @@
                                         <button class="btn btn-sm btn-outline-secondary" title="Editar" disabled="@_salvando" @onclick="() => Editar(f)"><Icone Nome="pencil" Tamanho="14" /></button>
                                         <button class="btn btn-sm btn-outline-secondary" title="Subir" disabled="@(_salvando || f == daPagina[0].Figurinha)" @onclick="() => MoverAsync(f, true)"><Icone Nome="arrow-left" Tamanho="14" /></button>
                                         <button class="btn btn-sm btn-outline-secondary" title="Descer" disabled="@(_salvando || f == daPagina[^1].Figurinha)" @onclick="() => MoverAsync(f, false)"><Icone Nome="arrow-right" Tamanho="14" /></button>
-                                        @if (e.Donos == 0)
-                                        {
-                                            <button class="btn btn-sm btn-outline-danger" title="Tirar do álbum" disabled="@_salvando" @onclick="() => TirarAsync(f)"><Icone Nome="x" Tamanho="14" /></button>
-                                        }
+                                        <button class="btn btn-sm btn-outline-danger" title="@(e.Donos == 0 ? "Tirar do álbum" : $"Tirar do álbum (sai também de quem tem: {e.Donos})")"
+                                                disabled="@_salvando" @onclick="() => TirarAsync(f, e.Donos)"><Icone Nome="x" Tamanho="14" /></button>
                                     </div>
 
                                     @if (_editando?.FigurinhaId == f.FigurinhaId)
@@ -454,13 +452,19 @@
         return null;
     });
 
-    private async Task TirarAsync(FigurinhaDto f)
+    private async Task TirarAsync(FigurinhaDto f, int donos)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Tirar {f.NomeImpresso} do álbum? As figurinhas de número maior descem um.")) return;
+        var aviso = donos == 0
+            ? $"Tirar {f.NomeImpresso} do álbum? As figurinhas de número maior descem um."
+            : $"{f.NomeImpresso} já saiu em pacote para {donos} pessoa{(donos == 1 ? "" : "s")}. Tirar mesmo assim? Ela sai do álbum de " +
+              $"quem tem (cópias e repetidas), as trocas pendentes com ela caem e as de número maior descem um. Não tem volta.";
+        if (!await JS.InvokeAsync<bool>("confirm", aviso)) return;
         await ExecutarAsync(async () =>
         {
-            await AlbumSvc.TirarEspecialAsync(f.FigurinhaId, await Token(), CancellationToken.None);
-            return $"{f.NomeImpresso} saiu do álbum.";
+            var tinham = await AlbumSvc.TirarEspecialAsync(f.FigurinhaId, mesmoComDono: true, await Token(), CancellationToken.None);
+            return tinham == 0
+                ? $"{f.NomeImpresso} saiu do álbum."
+                : $"{f.NomeImpresso} saiu do álbum e da coleção de {tinham} pessoa{(tinham == 1 ? "" : "s")}.";
         });
     }
 
