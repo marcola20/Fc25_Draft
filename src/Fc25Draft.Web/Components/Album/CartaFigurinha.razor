@@ -7,7 +7,7 @@
    Campeões, Lendários) mostra a arte inteira que o admin subiu; sem arte, monta uma com foto ou escudo. *@
 @if (Vazia)
 {
-    <div class="carta vaga @ClasseDaVaga" style="--w: @(Largura)px"
+    <div class="carta vaga @ClasseDaVaga @(Figurinha.Deitada ? "deitada" : "")" style="--w: @(Largura)px"
          title="@Titulo">
         @if (InfoEspecial is { } info)
         {
@@ -32,10 +32,56 @@
 else if (Figurinha.Especial && Figurinha.TemArte)
 {
     @* A arte é a carta inteira: só o número e o reflexo da raridade vão por cima. *@
-    <div class="carta t-especial com-arte @ClasseDaRaridade @ClasseDaPagina @(Colar ? "colando" : "")" style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
+    <div class="carta t-especial com-arte @ClasseDaRaridade @ClasseDaPagina @(Figurinha.Deitada ? "deitada" : "") @(Colar ? "colando" : "")" style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
         <div class="moldura">
             <img class="arte" src="/fotos/figurinhas/@Figurinha.FigurinhaId?v=@Figurinha.VersaoArte" alt="@Titulo" loading="@(Lazy ? "lazy" : "eager")" decoding="async" />
             <span class="num num-arte">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
+            <div class="brilho" aria-hidden="true"></div>
+        </div>
+        @if (Nova)
+        {
+            <span class="marca-nova">NOVA</span>
+        }
+        @if (Quantidade > 1)
+        {
+            <span class="marca-qtd" title="@(Quantidade - 1) repetida(s)">×@Quantidade</span>
+        }
+    </div>
+}
+else if (Figurinha.Deitada)
+{
+    @* Campeão: figurinha deitada, como a do time campeão no álbum de verdade. Escudo num medalhão à esquerda,
+       com os raios de festa atrás; à direita a faixa de campeão, o nome, o ano grande e a competição. *@
+    <div class="carta deitada t-especial @ClasseDaRaridade @ClasseDaPagina @(Colar ? "colando" : "")"
+         style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
+        <div class="moldura">
+            <div class="dt-raios" aria-hidden="true"></div>
+            <div class="selo">@InfoEspecial!.Titulo</div>
+            <span class="num dt-num">@AlbumFigurinhas.NumeroImpresso(Figurinha.Numero)</span>
+
+            <div class="dt-medalhao">
+                @if (EscudoDoCampeao is { } escudo)
+                {
+                    <img src="@escudo" alt="@Figurinha.NomeImpresso" loading="@(Lazy ? "lazy" : "eager")" />
+                }
+                else
+                {
+                    <span class="dt-simbolo"><Icone Nome="@InfoEspecial.Icone" Tamanho="@((int)(Largura * 0.4))" /></span>
+                }
+            </div>
+
+            <div class="dt-texto">
+                <span class="dt-nome @ClasseDoNomeDeitado">@Figurinha.NomeImpresso</span>
+                @if (AnoDoTitulo is { } ano)
+                {
+                    <span class="dt-ano">@ano</span>
+                }
+                @if (CompeticaoDoTitulo is { } competicao)
+                {
+                    <span class="dt-competicao">@competicao</span>
+                }
+                <span class="dt-estrelas" aria-hidden="true">★ ★ ★</span>
+            </div>
             <div class="brilho" aria-hidden="true"></div>
         </div>
         @if (Nova)
@@ -254,6 +300,40 @@ else
     {
         > 13 => "nome-muito-longo",
         > 10 => "nome-longo",
+        _ => ""
+    };
+
+    /// <summary>
+    /// Escudo do campeão: o do clube cadastrado ou, campeão de outra edição (Randers, Inter…), o arquivo de escudo
+    /// com o nome impresso — o mesmo que o Hall da Fama usa. Sem arquivo, nulo (vai o símbolo da página).
+    /// </summary>
+    private string? EscudoDoCampeao =>
+        Escudos.TryGetEscudo(Figurinha.TimeNome, out var doClube) ? doClube
+        : Escudos.TryGetEscudo(Figurinha.NomeImpresso, out var peloNome) ? peloNome
+        : null;
+
+    private static readonly System.Text.RegularExpressions.Regex Ano = new(@"\b(19|20)\d{2}\b");
+
+    /// <summary>O ano do título ("Brasileirão 2010 · Série A" → 2010), que sai grande na deitada.</summary>
+    private string? AnoDoTitulo => Figurinha.Destaque is { } d && Ano.Match(d) is { Success: true } m ? m.Value : null;
+
+    /// <summary>A competição sem o ano ("Brasileirão · Série A"); sem ano no texto, o texto inteiro.</summary>
+    private string? CompeticaoDoTitulo
+    {
+        get
+        {
+            if (Figurinha.Destaque is not { } d) return null;
+            if (AnoDoTitulo is null) return d;
+            var sem = Ano.Replace(d, "", 1);
+            sem = System.Text.RegularExpressions.Regex.Replace(sem, @"\s{2,}", " ").Trim(' ', '·');
+            return string.IsNullOrWhiteSpace(sem) ? null : sem;
+        }
+    }
+
+    private string ClasseDoNomeDeitado => Figurinha.NomeImpresso.Length switch
+    {
+        > 11 => "nome-muito-longo",
+        > 7 => "nome-longo",
         _ => ""
     };
 

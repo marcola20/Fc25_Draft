@@ -146,6 +146,12 @@
     outline-offset: 4px;
 }
 
+/* Campeão vem deitado no pacote (7:5), do mesmo tamanho da figurinha. */
+.flip.deitada {
+    width: min(calc(var(--w) * 1.4), calc(var(--w-max, 1000px) * 2 + .6rem));
+    aspect-ratio: 7 / 5;
+}
+
 .flip.entrando { animation: dar .55s cubic-bezier(.2, .8, .3, 1.2) both; animation-delay: calc(var(--i) * 90ms); }
 
 @keyframes dar {

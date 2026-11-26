@@ -34,6 +34,9 @@ public record FigurinhaDto(
     /// <summary>Tem a arte inteira enviada pelo admin (<c>/fotos/figurinhas/{id}?v=</c>).</summary>
     public bool TemArte => VersaoArte is not null;
 
+    /// <summary>Figurinha deitada (paisagem, 7:5): os campeões da Liga e da Copa, como a foto do time campeão no álbum de verdade.</summary>
+    public bool Deitada => Tipo == TipoFigurinha.Especial && Pagina is PaginaEspecial.CampeoesLiga or PaginaEspecial.CampeoesCopa;
+
     /// <summary>A página onde a figurinha é colada.</summary>
     public ChaveDaPagina ChavePagina => new(Pagina is null ? TeamId : null, Pagina);
 

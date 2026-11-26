@@ -6,4 +6,7 @@
     width: 150px;
 }
 
+/* Campeões: figurinha deitada, mais larga. */
+.especial-item.deitada { width: 196px; }
+
 .especial-edicao { width: 100%; background: var(--bs-tertiary-bg); }

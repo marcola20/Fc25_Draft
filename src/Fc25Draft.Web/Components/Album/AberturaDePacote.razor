@@ -40,7 +40,7 @@
                     var t = Pacote.Figurinhas[i];
                     var virada = _viradas.Contains(i);
                     <div class="carta-do-pacote">
-                        <div class="flip r-@t.Figurinha.Raridade.ToString().ToLowerInvariant() @(virada ? "virada" : "") @(_dandoCartas ? "entrando" : "")"
+                        <div class="flip r-@t.Figurinha.Raridade.ToString().ToLowerInvariant() @(t.Figurinha.Deitada ? "deitada" : "") @(virada ? "virada" : "") @(_dandoCartas ? "entrando" : "")"
                              style="--i: @i; --w: @(Largura)px; --atraso-virar: @(_virandoTodas ? (_ordemDeVirar.IndexOf(i) * 220) : 0)ms"
                              role="button" tabindex="0" aria-pressed="@(virada ? "true" : "false")"
                              aria-label="@(virada ? t.Figurinha.NomeImpresso : $"Virar a carta {i + 1}")"

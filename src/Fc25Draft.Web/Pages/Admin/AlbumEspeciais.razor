@@ -53,6 +53,7 @@
                     WebP, PNG ou JPEG. Fora dessa medida o navegador recorta no meio e comprime até 300 KB. O número da figurinha
                     vai num selinho no canto de cima à direita; deixe esse canto sem nada importante. Sem arte, a figurinha sai montada
                     com a foto (pessoa ou jogador), o escudo do clube ou o símbolo da página.
+                    <strong>Campeões da Liga e da Copa são deitadas:</strong> arte em <strong>840×600 px (7:5)</strong>.
                 </p>
             </div>
         </div>
@@ -85,7 +86,7 @@
                             {
                                 var f = e.Figurinha;
                                 var idArquivo = $"arte-{f.FigurinhaId:N}";
-                                <div class="especial-item" @key="f.FigurinhaId">
+                                <div class="especial-item @(f.Deitada ? "deitada" : "")" @key="f.FigurinhaId">
                                     <CartaFigurinha Figurinha="@f" Largura="130" Lazy="false" />
                                     <div class="small text-center text-muted">
                                         @if (e.Donos > 0)
@@ -98,7 +99,7 @@
                                         }
                                     </div>
                                     <div class="d-flex flex-wrap justify-content-center gap-1">
-                                        <label class="btn btn-sm @(f.TemArte ? "btn-outline-secondary" : "btn-primary") mb-0" title="Subir a arte (600×840)">
+                                        <label class="btn btn-sm @(f.TemArte ? "btn-outline-secondary" : "btn-primary") mb-0" title="@(f.Deitada ? "Subir a arte (840×600, deitada)" : "Subir a arte (600×840)")">
                                             <Icone Nome="camera" Tamanho="14" /> @(f.TemArte ? "Trocar" : "Arte")
                                             <input type="file" id="@idArquivo" accept="image/webp,image/png,image/jpeg" class="d-none" disabled="@_salvando"
                                                    @onchange="() => SubirArteAsync(f, idArquivo)" />
@@ -408,8 +409,10 @@
 
     private Task SubirArteAsync(FigurinhaDto f, string idArquivo) => ExecutarAsync(async () =>
     {
-        // Recorta 5:7 e reduz no navegador (até 600 de largura e 300 KB) antes de subir.
-        var lida = await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", idArquivo, 600, 5.0 / 7.0, 300);
+        // Recorta 5:7 (campeões: 7:5, deitada) e reduz no navegador (até 600/840 de largura e 300 KB) antes de subir.
+        var lida = f.Deitada
+            ? await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", idArquivo, 840, 7.0 / 5.0, 300)
+            : await JS.InvokeAsync<FotoLida?>("cbfvFoto.ler", idArquivo, 600, 5.0 / 7.0, 300);
         if (lida is null) return "Nenhuma imagem escolhida.";
         await AlbumSvc.SalvarArteAsync(f.FigurinhaId, Convert.FromBase64String(lida.Base64), await Token(), CancellationToken.None);
         return $"Arte de {f.NomeImpresso} no ar.";
