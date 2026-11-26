@@ -29,7 +29,7 @@
         }
     </div>
 }
-else if (Figurinha.Especial && Figurinha.TemArte)
+else if (Figurinha.Especial && Figurinha.TemArte && !ArteEhFoto)
 {
     @* A arte é a carta inteira: só o número e o reflexo da raridade vão por cima. *@
     <div class="carta t-especial com-arte @ClasseDaRaridade @ClasseDaPagina @(Figurinha.Deitada ? "deitada" : "") @(Colar ? "colando" : "")" style="--w: @(Largura)px; --atraso: @(AtrasoColar)ms" title="@Titulo">
@@ -144,8 +144,16 @@ else
 
             @if (Figurinha.Especial)
             {
-                @* Sem arte ainda: a foto de quem é (jogador ou pessoa), o escudo do clube ou o símbolo da página. *@
-                @if (Figurinha.PlayerId is { } jogador)
+                @* Lendários: a arte é a foto do craque, e a carta põe o selo, o nome e o texto em volta. Sem arte ainda:
+                   a foto de quem é (jogador ou pessoa), o escudo do clube ou o símbolo da página. *@
+                @if (Figurinha.TemArte)
+                {
+                    <div class="foto">
+                        <img class="foto-arte" src="/fotos/figurinhas/@Figurinha.FigurinhaId?v=@Figurinha.VersaoArte" alt="@Figurinha.NomeImpresso"
+                             loading="@(Lazy ? "lazy" : "eager")" decoding="async" />
+                    </div>
+                }
+                else if (Figurinha.PlayerId is { } jogador)
                 {
                     <div class="foto">
                         <FotoJogador PlayerId="@jogador" Tamanho="@((int)(Largura * 0.78))" Alt="@Figurinha.NomeImpresso" Lazy="@Lazy" />
@@ -278,11 +286,18 @@ else
         TipoFigurinha.Escudo => "t-escudo",
         TipoFigurinha.Treinador => "t-treinador",
         // Especial com foto se comporta como a de jogador (topo claro sobre a foto).
-        TipoFigurinha.Especial => Figurinha.PlayerId is not null || Figurinha.TreinadorId is not null ? "t-especial t-jogador" : "t-especial t-escudo",
+        TipoFigurinha.Especial => Figurinha.PlayerId is not null || Figurinha.TreinadorId is not null || (Figurinha.TemArte && ArteEhFoto)
+            ? "t-especial t-jogador" : "t-especial t-escudo",
         _ => "t-jogador"
     };
 
     private AlbumFigurinhas.InfoPaginaEspecial? InfoEspecial => Figurinha.Pagina is { } p ? AlbumFigurinhas.Especial(p) : null;
+
+    /// <summary>
+    /// Nos Lendários a arte que o admin sobe é a foto do craque: ela vai na janela da foto e a carta mostra o selo,
+    /// o nome e o texto. Nas outras páginas especiais a arte é a carta inteira (já vem com os textos).
+    /// </summary>
+    private bool ArteEhFoto => Figurinha.Pagina == PaginaEspecial.Lendarios;
 
     /// <summary>"p-organizacao", "p-lendarios"…: o detalhe de cor de cada página especial.</summary>
     private string ClasseDaPagina => InfoEspecial is { } info ? $"p-{info.Endereco}" : "";
