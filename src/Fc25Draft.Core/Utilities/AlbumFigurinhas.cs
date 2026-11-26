@@ -57,6 +57,9 @@ public static class AlbumFigurinhas
 
     public static readonly IReadOnlyList<InfoPaginaEspecial> PaginasEspeciais = new[]
     {
+        // A folha que abre o livro (texto da CBFV e da Áurea): as figurinhas dela ficam no meio do texto.
+        new InfoPaginaEspecial(PaginaEspecial.Apresentacao, "Apresentação", "A CBFV e a Áurea, a nossa Harpia", "apresentacao", "book-open", "CBFV",
+            RaridadeFigurinha.Lendaria, true, -1),
         new InfoPaginaEspecial(PaginaEspecial.Organizacao, "A Organização", "Quem faz a CBFV acontecer", "organizacao", "landmark", "ADM",
             RaridadeFigurinha.Brilhante, true, 0),
         new InfoPaginaEspecial(PaginaEspecial.CampeoesLiga, "Campeões da Liga", "Hall da Fama · todos os campeões da liga", "campeoes-liga", "trophy", "LIGA",
@@ -518,6 +521,7 @@ public static class AlbumFigurinhas
         (TipoFigurinha.Escudo, _) => $"Colei o escudo brilhante do {f.TimeNome} no {albumNome}!",
         (TipoFigurinha.Treinador, _) => $"Tirei o {(f.Papel == PapelTreinador.Auxiliar ? "auxiliar" : "técnico")} {f.Perfil?.NomeCurto ?? f.NomeImpresso} do {f.TimeNome} no {albumNome}!",
         (TipoFigurinha.Especial, _) when f.Pagina == PaginaEspecial.Organizacao => $"Tirei a figurinha do ADM {f.NomeImpresso} no {albumNome}!",
+        (TipoFigurinha.Especial, _) when f.Pagina == PaginaEspecial.Apresentacao => $"Tirei a figurinha {f.NomeImpresso} da Apresentação do {albumNome}!",
         (TipoFigurinha.Especial, _) when f.Pagina is PaginaEspecial.CampeoesLiga or PaginaEspecial.CampeoesCopa =>
             $"Colei o {f.NomeImpresso}{(f.Destaque is null ? "" : $", {char.ToLower(f.Destaque[0])}{f.Destaque[1..]}")}, no {albumNome}!",
         (TipoFigurinha.Especial, _) => $"Tirei o lendário {f.NomeImpresso} no {albumNome}!",

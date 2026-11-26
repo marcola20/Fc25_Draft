@@ -7,6 +7,7 @@
 @inject IPlayerService PlayerSvc
 @inject AdminAuthService AdminAuth
 @inject IJSRuntime JS
+@inject IWebHostEnvironment Ambiente
 
 <PageTitle>Páginas especiais do álbum — Admin</PageTitle>
 
@@ -195,6 +196,27 @@
                                 <div class="small text-muted mt-1">Quem tem pessoa ligada ao token sai com a foto do perfil até a arte chegar.</div>
                             </div>
                         }
+                    }
+                    else if (info.Pagina == PaginaEspecial.Apresentacao)
+                    {
+                        var faltam = FigurinhasDaApresentacao.Where(x => !daPagina.Any(e => string.Equals(e.Figurinha.NomeImpresso, x.Nome, StringComparison.CurrentCultureIgnoreCase))).ToList();
+                        <div class="mb-3">
+                            @if (faltam.Count > 0)
+                            {
+                                <div class="d-flex flex-wrap gap-2 mb-1">
+                                    @foreach (var fig in faltam)
+                                    {
+                                        <button class="btn btn-sm btn-primary" disabled="@_salvando" @onclick="() => ColocarDaApresentacaoAsync(fig)">
+                                            <Icone Nome="plus" Tamanho="14" /> @fig.Botao
+                                        </button>
+                                    }
+                                </div>
+                            }
+                            <div class="small text-muted">
+                                Ficam no meio do texto da folha de Apresentação: a <strong>Áurea</strong> no lugar da ilustração (pelo nome) e a
+                                outra ao lado do texto da CBFV. Os botões já colocam a figurinha com a arte pronta.
+                            </div>
+                        </div>
                     }
                     else if (info.Pagina is PaginaEspecial.CampeoesLiga or PaginaEspecial.CampeoesCopa)
                     {
@@ -400,6 +422,25 @@
             return string.Join(" · ", partes) + ".";
         });
     }
+
+    /// <summary>As figurinhas prontas da Apresentação: nome, texto, raridade e a arte (600×840) que vem com o site.</summary>
+    private sealed record FigurinhaPronta(string Botao, string Nome, string Destaque, RaridadeFigurinha Raridade, string Arte);
+
+    private static readonly FigurinhaPronta[] FigurinhasDaApresentacao =
+    {
+        new("Colocar o escudo da CBFV", "CBFV", "Oitava edição · desde 2019", RaridadeFigurinha.Brilhante, "images/album/figurinha-cbfv.webp"),
+        new("Colocar a Áurea", "Áurea", "A Harpia da CBFV", RaridadeFigurinha.Lendaria, "images/album/figurinha-aurea.webp")
+    };
+
+    private Task ColocarDaApresentacaoAsync(FigurinhaPronta fig) => ExecutarAsync(async () =>
+    {
+        var arte = await File.ReadAllBytesAsync(Path.Combine(Ambiente.WebRootPath, fig.Arte));
+        var token = await Token();
+        var id = await AlbumSvc.ColocarEspecialAsync(_albumId,
+            new NovaEspecialDto(PaginaEspecial.Apresentacao, fig.Nome, fig.Destaque, fig.Raridade), token, CancellationToken.None);
+        await AlbumSvc.SalvarArteAsync(id, arte, token, CancellationToken.None);
+        return $"{fig.Nome} entrou na Apresentação, já com a arte.";
+    });
 
     private async Task ColocarCampeoesAsync()
     {

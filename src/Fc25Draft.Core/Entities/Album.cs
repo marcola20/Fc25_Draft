@@ -31,7 +31,13 @@ public enum PaginaEspecial
     CampeoesCopa = 3,
 
     /// <summary>Jogadores lendários: ainda na liga (com figurinha diferente) ou de outras edições.</summary>
-    Lendarios = 4
+    Lendarios = 4,
+
+    /// <summary>
+    /// As figurinhas da folha de Apresentação (o escudo da CBFV e a Áurea, a mascote): coladas no próprio texto
+    /// da folha, não numa página de grade.
+    /// </summary>
+    Apresentacao = 5
 }
 
 /// <summary>Raridade da figurinha. Cada uma tem só uma, a mais alta que se aplicar.</summary>

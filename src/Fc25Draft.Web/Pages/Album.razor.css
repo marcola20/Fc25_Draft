@@ -547,7 +547,14 @@
 .ldt-quando { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
 .ldt-texto { font-size: .92rem; line-height: 1.45; }
 
-.apresentacao-aurea img {
+/* O escudo da CBFV (figurinha) ao lado do texto de abertura. */
+.apresentacao-cbfv.com-vaga { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: .9rem; }
+.apresentacao-cbfv.com-vaga .apresentacao-abre { margin: 0; }
+.apresentacao-vaga { flex-shrink: 0; transform: rotate(-1.5deg); }
+.apresentacao-vaga-aurea { float: right; margin: 0 0 .6rem .9rem; transform: rotate(1.5deg); }
+.apresentacao-vaga .carta-botao { display: block; }
+
+.apresentacao-aurea .apresentacao-ilustracao {
     float: right;
     width: 42%;
     max-width: 170px;
@@ -578,6 +585,11 @@
 
 @media (max-width: 767.98px) {
     .apresentacao-grade { grid-template-columns: 1fr; }
+}
+
+/* No celular a carta cabe ao lado do texto só se encolher um pouco. */
+@media (max-width: 419.98px) {
+    .apresentacao-vaga ::deep .carta { --w: 130px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
