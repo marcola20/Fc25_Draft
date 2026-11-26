@@ -152,6 +152,9 @@
 
 .t-escudo .faixa { justify-content: center; }
 
+/* Especial (Lendários, Organização…): nome no meio, alinhado com o texto de destaque embaixo. */
+.t-especial .faixa { justify-content: center; }
+
 .destaque {
     font-size: .68em;
     font-style: italic;
