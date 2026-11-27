@@ -76,12 +76,20 @@
                     {
                         <li class="list-group-item">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <button type="button" class="btn btn-link p-0 text-reset text-decoration-none d-flex align-items-center gap-2"
-                                        title="Ver o que o envio trouxe" @onclick="() => AlternarDetalhes(p)">
-                                    <span class="fw-semibold">@p.Casa</span>
-                                    <span class="badge bg-dark fs-6">@p.GolsCasa x @p.GolsFora</span>
-                                    <span class="fw-semibold">@p.Fora</span>
-                                </button>
+                                <span class="fw-semibold">@p.Casa</span>
+                                @if (_revelados.Contains(p.Id))
+                                {
+                                    <button type="button" class="badge bg-dark fs-6 border-0" title="Esconder o placar" @onclick="() => _revelados.Remove(p.Id)">
+                                        @p.GolsCasa x @p.GolsFora
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="badge bg-secondary-subtle text-secondary-emphasis fs-6 border-0" title="Mostrar o placar" @onclick="() => _revelados.Add(p.Id)">
+                                        <Icone Nome="eye" Tamanho="14" /> ? x ?
+                                    </button>
+                                }
+                                <span class="fw-semibold">@p.Fora</span>
                                 @if (p.DataHora is DateTime quando)
                                 {
                                     <span class="text-muted small">@quando.ToString("dd/MM HH:mm")</span>
@@ -143,6 +151,12 @@
     // Pendentes abertos na tela: null enquanto carrega o que o envio trouxe.
     private readonly Dictionary<Guid, PendenteDetalhesDto?> _abertos = new();
 
+    // Placar escondido até o admin pedir (pode ser jogo do time dele).
+    private readonly HashSet<Guid> _revelados = new();
+
+    private string Placar(ResultadoPesPendenteDto p) =>
+        _revelados.Contains(p.Id) ? $"{p.Casa} {p.GolsCasa} x {p.GolsFora} {p.Fora}" : $"{p.Casa} x {p.Fora}";
+
     private sealed record Grupo(string Titulo, List<ResultadoPesPendenteDto> Itens);
 
     protected override void OnInitialized()
@@ -172,6 +186,7 @@
     {
         if (_abertos.Remove(p.Id)) return;
         _abertos[p.Id] = null;
+        _revelados.Add(p.Id);
         try
         {
             _abertos[p.Id] = await ResultadoSvc.DetalhesDoPendenteAsync(p.Id, CancellationToken.None);
@@ -211,7 +226,7 @@
     private async Task LiberarVarios(IReadOnlyList<ResultadoPesPendenteDto> itens, string? titulo)
     {
         var texto = itens.Count == 1
-            ? $"Liberar {itens[0].Casa} {itens[0].GolsCasa} x {itens[0].GolsFora} {itens[0].Fora}? A partida é encerrada e aparece para todos."
+            ? $"Liberar {Placar(itens[0])}? A partida é encerrada e aparece para todos."
             : $"Liberar os {itens.Count} jogos de {titulo}? As partidas são encerradas e aparecem para todos.";
         if (!await JSRuntime.InvokeAsync<bool>("confirm", texto)) return;
 
@@ -223,7 +238,9 @@
                 try
                 {
                     var r = await ResultadoSvc.LiberarAsync(p.Id, CancellationToken.None);
-                    _ok.Add($"Liberado: {r.Casa} {r.GolsCasa} x {r.GolsFora} {r.Fora} ({r.Competicao}).");
+                    _ok.Add(_revelados.Contains(p.Id)
+                        ? $"Liberado: {r.Casa} {r.GolsCasa} x {r.GolsFora} {r.Fora} ({r.Competicao})."
+                        : $"Liberado: {r.Casa} x {r.Fora} ({r.Competicao}).");
                     _ok.AddRange(r.Avisos.Select(a => "↳ " + a));
                 }
                 catch (Exception ex)
@@ -257,7 +274,7 @@
 
     private async Task Descartar(ResultadoPesPendenteDto p)
     {
-        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Descartar {p.Casa} {p.GolsCasa} x {p.GolsFora} {p.Fora}? A partida não muda; dá para reenviar do PES depois.")) return;
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Descartar {Placar(p)}? A partida não muda; dá para reenviar do PES depois.")) return;
         _erro = null; _ok.Clear(); _ocupado = true;
         try
         {
