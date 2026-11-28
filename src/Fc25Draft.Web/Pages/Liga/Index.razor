@@ -396,6 +396,14 @@
                             @foreach (var p in _rodadaAtual.Partidas)
                             {
                             <div class="jogo d-flex align-items-center gap-2 gap-md-3" role="button" tabindex="0" @onclick="() => AbrirDetalhesPartida(p)">
+                                @* O selo de clássico fica à esquerda, numa coluna da mesma largura da de status:
+                                   assim o jogo continua no centro, com ou sem selo. *@
+                                <div class="jogo-lado esquerdo">
+                                    @if (_classicos.TryGetValue(p.PartidaId, out var classico))
+                                    {
+                                        <span class="etiqueta aviso text-nowrap" title="Clássico: @classico.Titulo"><Icone Nome="flame" Tamanho="12" /><span class="d-none d-sm-inline"> Clássico</span></span>
+                                    }
+                                </div>
                                 @* A chance de cada resultado fica dentro da coluna dos times: assim o empate cai embaixo do "vs",
                                    e não no meio da linha inteira (que inclui os selos da direita). *@
                                 <div class="flex-grow-1" style="min-width:0;">
@@ -436,12 +444,8 @@
                                     </div>
                                 }
                                 </div>
-                                <div class="d-flex gap-1 align-items-center flex-shrink-0" style="min-width:auto;">
+                                <div class="jogo-lado direito">
                                     <span class="@StatusBadge(p.Status)">@StatusLabel(p.Status)</span>
-                                    @if (_classicos.TryGetValue(p.PartidaId, out var classico))
-                                    {
-                                        <span class="etiqueta aviso text-nowrap" title="Clássico: @classico.Titulo"><Icone Nome="flame" Tamanho="12" /><span class="d-none d-sm-inline"> Clássico</span></span>
-                                    }
                                     @if (p.TemPenaltis) { <span class="etiqueta" title="Decidido nos pênaltis">Pên.</span> }
                                     @if (!string.IsNullOrWhiteSpace(p.YoutubeVideoId)) { <span class="text-body-tertiary" title="Tem vídeo no telão"><Icone Nome="tv" Tamanho="14" /></span> }
                                 </div>

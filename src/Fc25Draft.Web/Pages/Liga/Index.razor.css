@@ -162,6 +162,25 @@
     outline-offset: -2px;
 }
 
+/* Colunas dos lados do jogo (selo de clássico à esquerda, status à direita): a mesma
+   largura nas duas mantém o confronto no centro da linha. */
+.liga ::deep .jogo-lado {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 0 0 auto;
+}
+
+.liga ::deep .jogo-lado.direito {
+    justify-content: flex-end;
+}
+
+@media (min-width: 768px) {
+    .liga ::deep .jogo-lado {
+        flex-basis: 9.5rem;
+    }
+}
+
 .liga ::deep .jogo-time {
     font-size: 0.875rem;
     font-weight: 500;
